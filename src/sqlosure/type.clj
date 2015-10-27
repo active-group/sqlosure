@@ -1,5 +1,5 @@
 (ns ^{:doc "Types."
-      :author "Marco Schneider"}
+      :author "Marco Schneider, based on Mike Sperbers schemeql2"}
     sqlosure.type
   (:require [sqlosure.universe :refer [register-type]]
             [active.clojure.record :refer [define-record-type]]))

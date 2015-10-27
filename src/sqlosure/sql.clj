@@ -1,5 +1,5 @@
 (ns ^{:doc "Structured representation of SQL Link to relational algebra"
-      :author "Marco Schneider"}
+      :author "Marco Schneider, based on Mike Sperbers schemeql2"}
     sqlosure.sql
   (:require [sqlosure.relational-algebra :refer [make-base-relation]]
             [sqlosure.universe :refer [make-universe make-derived-universe]]

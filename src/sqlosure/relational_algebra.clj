@@ -1,7 +1,7 @@
 (ns ^{:doc "Implementation of relational algebra based on Mike Sperbers
 relational-algebra.scm.
 Replaced alist with hash-map."
-      :author "Marco Schneider"}
+      :author "Marco Schneider, based on Mike Sperbers schemeql2"}
     sqlosure.relational-algebra
   (:require [sqlosure.universe :refer [register-base-relation
                                        universe-base-relation-table
@@ -129,13 +129,13 @@ Replaced alist with hash-map."
       (really-make-project alist query))
     (really-make-project alist query)))
 
-(defn make-extend
-  [alist query]
-  (make-project (concat alist (map (fn [p]
-                                     (cons (first p)
-                                           (make-attribute-ref (first p))))
-                                   (rel-scheme-alist (query-scheme query))))))
+#_ ((defn make-extend
+      [alist query]
+      (make-project (concat alist (map (fn [p]
+                                         (cons (first p)
+                                               (make-attribute-ref (first p))))
+                                       (rel-scheme-alist (query-scheme query))))))
 
-(defn query?
-  [obj]
-  (or (empty? obj) (base-relation? obj)))
+    (defn query?
+      [obj]
+      (or (empty? obj) (base-relation? obj))))
