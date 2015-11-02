@@ -1,7 +1,7 @@
 (ns ^{:doc "Types."
       :author "Marco Schneider, based on Mike Sperbers schemeql2"}
     sqlosure.type
-  (:require [sqlosure.universe :refer [register-type]]
+  (:require [sqlosure.universe :refer [register-type!]]
             [active.clojure.record :refer [define-record-type]]))
 
 ;;; ----------------------------------------------------------------------------
@@ -24,7 +24,7 @@
   (let [t (really-make-base-type name predicate const->datum-proc
                                  datum->const-proc data)]
     (if universe  ;; todo: register-type! ?
-      [t (register-type universe name t)]
+      [t (register-type! universe name t)]
       t)))
 
 (defn values
