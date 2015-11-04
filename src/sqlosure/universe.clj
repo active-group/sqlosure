@@ -30,12 +30,15 @@ application domain."
                                 (universe-type-table old-universe)
                                 (universe-rator-table old-universe)))))
 
+(defn update-universe!
+  [universe table f & args]
+  (apply swap! universe update-in [table] f args))
+
 (defn register-type!
   "Takes a universe, a name for a type and a type and returns a new universe
   which contains the new name->type mapping."
   [universe name type]
-  (let [new-universe @(make-derived-universe universe)]
-    (atom (assoc-in new-universe [:type-table name] type))))
+  (update-universe! universe :type-table assoc name type))
 
 (defn universe-lookup-type
   "Look up the type with name `name` in the `universe`. Returns nil if not
@@ -47,8 +50,7 @@ application domain."
   "Takes a universe, a name for a base relation and returns a new universe
   which contains the new name->base-relation mapping."
   [universe name base-relation]
-  (let [new-universe @(make-derived-universe universe)]
-    (atom (assoc-in new-universe [:base-relation-table name] base-relation))))
+  (update-universe! universe :base-relation-table assoc name base-relation))
 
 (defn universe-lookup-base-relation
   "Look up the base-relation with name `name` in the `universe`. Returns nil if
@@ -62,11 +64,22 @@ application domain."
   In Mikes implementation, this was a mutation. I'd like to try to make it work
   immutable first."
   [universe name rator]
-  (let [new-universe @(make-derived-universe universe)]
-    (atom (assoc-in new-universe [:rator-table name] rator))))
+  (update-universe! universe :rator-table assoc name rator))
 
 (defn universe-lookup-rator
   "Look up the rator with name `name` in the `universe`. Returns nil if
   not present."
   [universe name]
   (get (universe-rator-table @universe) name))
+
+(defn universe-get-base-relation-table
+  [u]
+  (universe-base-relation-table @u))
+
+(defn universe-get-type-table
+  [u]
+  (universe-type-table @u))
+
+(defn universe-get-rator-table
+  [u]
+  (universe-rator-table @u))
