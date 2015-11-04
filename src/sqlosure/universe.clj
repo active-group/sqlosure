@@ -38,7 +38,8 @@ application domain."
   "Takes a universe, a name for a type and a type and returns a new universe
   which contains the new name->type mapping."
   [universe name type]
-  (update-universe! universe :type-table assoc name type))
+  (update-universe! universe :type-table assoc name type)
+  universe)
 
 (defn universe-lookup-type
   "Look up the type with name `name` in the `universe`. Returns nil if not
@@ -50,7 +51,8 @@ application domain."
   "Takes a universe, a name for a base relation and returns a new universe
   which contains the new name->base-relation mapping."
   [universe name base-relation]
-  (update-universe! universe :base-relation-table assoc name base-relation))
+  (update-universe! universe :base-relation-table assoc name base-relation)
+  universe)
 
 (defn universe-lookup-base-relation
   "Look up the base-relation with name `name` in the `universe`. Returns nil if
@@ -61,10 +63,11 @@ application domain."
 (defn register-rator!
   "Takes a universe, a name for a rator and returns a new universe
   which contains the new name->rator-relation mapping.
-  In Mikes implementation, this was a mutation. I'd like to try to make it work
+  
   immutable first."
   [universe name rator]
-  (update-universe! universe :rator-table assoc name rator))
+  (update-universe! universe :rator-table assoc name rator)
+  universe)
 
 (defn universe-lookup-rator
   "Look up the rator with name `name` in the `universe`. Returns nil if
