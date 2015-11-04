@@ -13,12 +13,12 @@
 (deftest register-type!-test
   (let [test-universe (make-universe)]
     (is (= {:key :value}
-           (universe-type-table
-            @(register-type! test-universe :key :value))))
-    (is (let [new-universe (register-type! test-universe :name :type)]
-          (and (empty? (universe-base-relation-table @new-universe))
-               (= {:name :type} (universe-type-table @new-universe))
-               (empty? (universe-rator-table @new-universe)))))))
+           (universe-get-type-table
+            (register-type! test-universe :key :value)))))
+  (let [new-universe (register-type! (make-universe) :name :type)]
+    (is (empty? (universe-get-base-relation-table new-universe)))
+    (is (= {:name :type} (universe-get-type-table new-universe)))
+    (is (empty? (universe-get-rator-table new-universe)))))
 
 (deftest universe-lookup-type-test
   (let [test-universe (register-type! (make-universe) :name :type)]
@@ -29,14 +29,14 @@
   (let [test-universe (make-universe)]
     (is (= {:name :value}
            (universe-base-relation-table
-            @(register-base-relation! test-universe :name :value))))
-    (let [new-universe (-> test-universe
-                           (register-base-relation! :name "some value")
-                           (register-base-relation! :other "other value"))]
-      (is (and (= {:name "some value" :other "other value"}
-                  (universe-base-relation-table @new-universe))
-               (empty? (universe-type-table @new-universe))
-               (empty? (universe-rator-table @new-universe)))))))
+            @(register-base-relation! test-universe :name :value)))))
+  (let [new-universe (-> (make-universe)
+                         (register-base-relation! :name "some value")
+                         (register-base-relation! :other "other value"))]
+    (is (and (= {:name "some value" :other "other value"}
+                (universe-base-relation-table @new-universe))
+             (empty? (universe-type-table @new-universe))
+             (empty? (universe-rator-table @new-universe))))))
 
 (deftest universe-lookup-base-relation-test
   (let [test-universe
@@ -48,8 +48,8 @@
   (let [test-universe (make-universe)]
     (is (= {:name "some value"}
            (universe-rator-table @(register-rator! test-universe
-                                                 :name
-                                                 "some value"))))
+                                                   :name
+                                                   "some value"))))
     (is (let [new-universe (-> test-universe
                                (register-rator! :name "some value")
                                (register-rator! :other "other value"))]
@@ -63,3 +63,17 @@
         (register-rator! (make-universe) :name {:rel "ation"})]
     (is (= {:rel "ation"} (universe-lookup-rator test-universe :name)))
     (is (nil? (universe-lookup-rator test-universe :non-in-universe)))))
+
+(deftest universe-get-base-relation-table-test
+  (let [test-universe (make-universe)]
+    (is (empty? (universe-get-base-relation-table test-universe)))
+    (do
+      (register-base-relation! test-universe 'relation :relation)
+      (= {'relation :wrong} (universe-get-base-relation-table test-universe)))))
+
+(deftest universe-get-type-table-test
+  (let [test-universe (make-universe)]
+    (is (empty? (universe-get-type-table test-universe)))
+    (do
+      (register-type! test-universe 'long :long)
+      (= {'relation :relation} (universe-get-type-table test-universe)))))
