@@ -135,3 +135,16 @@
       (u/register-type! test-universe 'long double%)
       (is (= (datum->type (list 'long) test-universe)
              double%)))))
+
+(deftest const->datum-test
+  (let [my-bounded% (make-bounded-string-type 5)
+        my-product% (make-product-type [integer% string%])
+        my-set% (make-set-type integer%)]
+    (is (= (const->datum string% "foobar") "foobar"))
+    (is (= (const->datum double% 42.0) 42.0))
+    (is (= (const->datum double%-nullable 42.0) 42.0))
+    (is (= (const->datum double%-nullable nil) nil))
+    (is (= (const->datum my-bounded% "foobar") "foobar"))
+    (is (= (const->datum my-product% [42 "foobar"]) [42 "foobar"]))
+    (is (thrown? Exception (const->datum my-product% 42)))
+    (is (= (const->datum my-set% [23 42]) [23 42]))))

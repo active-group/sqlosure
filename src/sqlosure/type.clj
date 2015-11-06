@@ -198,19 +198,16 @@
     (not (empty? v))
     false))
 
-(defn const->datum
+(defn ^{:test false} const->datum
   [t val]
   (cond
     (base-type? t) ((base-type-const->datum-proc t) val)
-    (nullable-type? t) (when-not (empty? val)
+    (nullable-type? t) (when-not (null? val)
                          (const->datum (nullable-type-underlying t) val))
-    (bounded-string-type? t) val
+    (bounded-string-type? t) val  ;; Maybe check here for correct value again?
     (product-type? t) (cond
-                        (or (empty? val) (pair? val))
-                        (map const->datum (product-type-components t) val)
-                        (vector? val) (map const->datum
-                                           (product-type-components t)
-                                           val)
+                       (or (empty? val) (pair? val))
+                       (map const->datum (product-type-components t) val)
                         :else (throw
                                (Exception. (str 'const->datum
                                                 ": invalid product-type value "
