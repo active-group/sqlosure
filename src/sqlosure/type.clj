@@ -198,7 +198,7 @@
     (not (empty? v))
     false))
 
-(defn ^{:test false} const->datum
+(defn ^{:test true} const->datum
   [t val]
   (cond
     (base-type? t) ((base-type-const->datum-proc t) val)
@@ -216,22 +216,28 @@
                     (map (fn [v] (const->datum mem v)) val))
     :else (throw (Exception. (str 'const->datum ": invalid type " t val)))))
 
-(defn datum->const
+(defn ^{:test true} datum->const
   [t d]
   (cond
     (base-type? t) ((base-type-datum->const-proc t) d)
-    (nullable-type? t) (when (empty? d)
+    (nullable-type? t) (when-not (null? d)
                          (datum->const (nullable-type-underlying t) d))
     (bounded-string-type? t) d
     (product-type? t) (cond
-                        (or (empty? d) (pair? d))
+                        (or (pair? d) (nil? d))
+                        ;; Maybe add type check here?
                         (map datum->const (product-type-components t) d)
-                        (vector? d)
-                        (map datum->const (product-type-components t))
                         :else (throw
-                               (Exception. (str 'datum->const
-                                                " invalid product type datum"
-                                                t d))))
-    (set-type? t) (let [mem (set-type-member-type t)]
-                    (map (fn [dd] (datum->const mem dd)) d))
+                               (Exception.
+                                (str 'datum->const
+                                     ": invalid product type datum for type "
+                                     t " with value " d))))
+    (set-type? t) (cond
+                    (or (pair? d) (nil? d))
+                    (let [mem (set-type-member-type t)]
+                      (map (fn [dd] (datum->const mem dd)) d))
+                    :else (throw
+                           (Exception. (str 'datum->const
+                                            ": invalid set type datum for type "
+                                            t " with value " d))))
     :else (throw (Exception. (str 'datum->const " invalid type " t)))))

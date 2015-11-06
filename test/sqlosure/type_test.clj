@@ -147,4 +147,17 @@
     (is (= (const->datum my-bounded% "foobar") "foobar"))
     (is (= (const->datum my-product% [42 "foobar"]) [42 "foobar"]))
     (is (thrown? Exception (const->datum my-product% 42)))
-    (is (= (const->datum my-set% [23 42]) [23 42]))))
+    (is (= (const->datum my-set% [23 42]) [23 42]))
+    (is (thrown? Exception (const->datum :non-existent-type 42.0)))))
+
+(deftest datum->const-test
+  (let [my-bounded% (make-bounded-string-type 5)
+        my-product% (make-product-type [integer% string%])
+        my-set% (make-set-type integer%)]
+    (is (= (datum->const double% 42.0) 42.0))
+    (is (= (datum->const string% "foobar") "foobar"))
+    (is (= (datum->const my-bounded% "foobar") "foobar"))
+    (is (= (datum->const my-product% [42 "foobar"]) [42 "foobar"]))
+    (is (= (datum->const my-set% ["foo" "bar"]) ["foo" "bar"]))
+    (is (thrown? Exception (datum->const my-product% 42)))
+    (is (thrown? Exception (datum->const my-set% 42)))))
