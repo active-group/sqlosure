@@ -16,35 +16,35 @@
    datum->const-proc base-type-datum->const-proc
    data base-type-data])
 
-(defn make-base-type
+(defn ^{:test true} make-base-type
   "Returns a new base type as specified.
   If :universe is supplied, the new type will be registered in the universe and
   this function returns a vector containing `[type universe]`."
   [name predicate const->datum-proc datum->const-proc & {:keys [universe data]}]
   (let [t (really-make-base-type name predicate const->datum-proc
                                  datum->const-proc data)]
-    (if universe  ;; todo: register-type! ?
-      [t (register-type! universe name t)]
-      t)))
+    (when universe
+      (register-type! universe name t))
+    t))
 
-(defn values
-  "Kind of resembles schemes `values` function but instead returns a vector of
-  all its arguments. I don't know if this is really necessary or the way to go."
+(defn ^{:test true} values
+  "kind of resembles schemes `values` function but instead returns a vector of
+  all its arguments. i don't know if this is really necessary or the way to go."
   [& values]
   (vec values))
 
-(defn double?
-  "Checks if a value is of type Double."
+(defn ^{:test true} double?
+  "checks if a value is of type double."
   [x]
   (instance? Double x))
 
-(defn boolean?
-  "Checks if a value if of type Boolean"
+(defn ^{:test true} boolean?
+  "checks if a value if of type boolean"
   [x]
   (instance? Boolean x))
 
-(defn byte-vector? [x]
-  (and (vector? x) (every? #(instance? Byte %) x)))
+(defn ^{:test false} byte-vector? [x]
+  (and (vector? x) (every? #(instance? byte %) x)))
 
 ;; Some base types
 (def string% (make-base-type 'string string? values values))
@@ -62,8 +62,8 @@
   (really-make-nullable-type underlying) nullable-type?
   [underlying nullable-type-underlying])
 
-(defn nullable
-  "If base is a nullable-type, return it. Otherwise wrap it in nullable-type."
+(defn ^{:test true} make-nullable-type
+  "if base is a nullable-type, return it. otherwise wrap it in nullable-type."
   [base]
   (if (nullable-type? base)
     base
@@ -77,15 +77,33 @@
   (make-set-type member-type) set-type?
   [member-type set-type-member-type])
 
-(def nullable-integer& (nullable integer%))
+(def nullable-integer% (make-nullable-type integer%))
 
-(defn type-member?
+(defn null?
+  [v]
+  (if (seq? v)
+    (empty? v)
+    (nil? v)))
+
+(defn zip
+  [xs ys]
+  (mapv (fn [k v] [k v]) xs ys))
+
+(defn all?
+  [bs]
+  (reduce #(and %1 %2) true bs))
+
+(defn any?
+  [bs]
+  (reduce #(or %1 %2) false bs))
+
+(defn ^{:test true} type-member?
   "Checks if `thing` is a member of a type."
   [thing ty]
   (cond
-    (nullable-type? thing) (or (empty? thing)
-                               (type-member? thing
-                                             (nullable-type-underlying ty)))
+    (nullable-type? ty) (or (null? thing)
+                            (type-member? thing
+                                          (nullable-type-underlying ty)))
     (base-type? ty) ((base-type-predicate ty) thing)
     (bounded-string-type? ty) (and (string? thing)
                                    (<= (count thing)
@@ -93,15 +111,17 @@
     (product-type? ty) (let [cs (product-type-components ty)]
                          (and (vector? thing)
                               (= (count thing) (count cs))
-                              (every? type-member? thing cs)))
+                              (reduce
+                               (fn [acc [k v]] (and acc (type-member? k v)))
+                               (zip thing cs))))
     (set-type? ty) (let [mem (set-type-member-type ty)]
-                     (and (seq? thing)
+                     (and (or (vector? thing) (seq? thing))
                           (every? #(type-member? % mem) thing)))
     :else (throw (Exception. (str 'type-member? ": unhandled type: "
                                   (if (nil? thing) "nil" thing))))))
 
 (defn numeric-type?
-  "Checks if a type is numeric."
+  "checks if a type is numeric."
   [t]
   (or (= t integer%)
       (= t double%)))
@@ -110,16 +130,16 @@
   [t]
   (or (numeric-type? t)
       (= t string%)
-      ;; TODO: implement calendar-type
+      ;; todo: implement calendar-type
       #_(= t calendar-time%)))
 
-(def string%-nullable (nullable string%))
-(def integer%-nullable (nullable integer%))
-(def double%-nullable (nullable double%))
-(def blob%-nullable (nullable blob%))
+(def string%-nullable (make-nullable-type string%))
+(def integer%-nullable (make-nullable-type integer%))
+(def double%-nullable (make-nullable-type double%))
+(def blob%-nullable (make-nullable-type blob%))
 
 (defn type=?
-  "Checks if two types are the same."
+  "checks if two types are the same."
   [t1 t2]
   (cond
     (base-type? t1) (= t1 t2)
