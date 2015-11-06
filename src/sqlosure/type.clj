@@ -47,10 +47,10 @@
   (and (vector? x) (every? #(instance? byte %) x)))
 
 ;; Some base types
-(def string% (make-base-type 'string string? values values))
-(def integer% (make-base-type 'integer integer? values values))
-(def double% (make-base-type 'double double? values values))
-(def boolean% (make-base-type 'boolean boolean? values values))
+(def string% (make-base-type 'string string? identity identity))
+(def integer% (make-base-type 'integer integer? identity identity))
+(def double% (make-base-type 'double double? identity identity))
+(def boolean% (make-base-type 'boolean boolean? identity identity))
 ;; Clojure itself has no byte type. Maybe use Java's?
 (def blob% (make-base-type 'blob byte-vector? 'lose 'lose))
 
