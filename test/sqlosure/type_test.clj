@@ -82,3 +82,56 @@
   (is (ordered-type? double%))
   (is (ordered-type? string%))
   (is (not (ordered-type? boolean%))))
+
+(deftest type=?-test
+  (is (type=? string% string%))
+  (is (not (type=? string%-nullable string%)))
+  (let [string-5% (make-bounded-string-type 6)]
+    (is (type=? string-5% string-5%))
+    (is (not (type=? string% string-5%))))
+  (let [my-product1% (make-product-type [string% integer%])
+        my-product2% (make-product-type [integer% string%])]
+    (is (type=? my-product1% my-product1%))
+    (is (not (type=? my-product1% my-product2%)))
+    (is (not (type=? string% my-product2%))))
+  (let [my-set1% (make-set-type string%)
+        my-set2% (make-set-type integer%)]
+    (is (type=? my-set1% my-set1%))
+    (is (not (type=? my-set1% string%)))))
+
+(deftest type->datum-test
+  (is (= (type->datum string%) (list 'string)))
+  (is (= (type->datum integer%) (list 'integer)))
+  (is (= (type->datum string%-nullable) (list 'nullable (list 'string))))
+  (is (= (type->datum (make-product-type [string% integer%]))
+         (list 'product [(list 'string) (list 'integer)])))
+  (is (= (type->datum (make-set-type string%))
+         (list 'set (list 'string))))
+  (is (= (type->datum (make-bounded-string-type 5))
+         (list 'bounded-string 5))))
+
+(deftest datum->type-test
+  (let [test-universe (u/make-universe)
+        my-bounded-string% (make-bounded-string-type 6)
+        my-product% (make-product-type [string% integer%])
+        my-set% (make-set-type double%)]
+    (is (= (datum->type (list 'string) test-universe) string%))
+    (is (= (datum->type (list 'integer) test-universe) integer%))
+    (is (= (datum->type (list 'double) test-universe) double%))
+    (is (= (datum->type (list 'boolean) test-universe) boolean%))
+    (is (= (datum->type (list 'blob) test-universe) blob%))
+    (is (= (datum->type (list 'bounded-string 6) test-universe)
+           my-bounded-string%))
+    (is (= (datum->type (list 'nullable (list 'string)) test-universe)
+           (make-nullable-type string%)
+           string%-nullable))
+    (is (= (datum->type (list 'product [(list 'string) (list 'integer)])
+                        test-universe)
+           my-product%))
+    (is (= (datum->type (list 'set (list 'double)) test-universe)
+           my-set%))
+    (do
+      (is (thrown? Exception (datum->type (list 'long) test-universe)))
+      (u/register-type! test-universe 'long double%)
+      (is (= (datum->type (list 'long) test-universe)
+             double%)))))

@@ -1,7 +1,7 @@
 (ns ^{:doc "Types."
       :author "Marco Schneider, based on Mike Sperbers schemeql2"}
     sqlosure.type
-  (:require [sqlosure.universe :refer [register-type!]]
+  (:require [sqlosure.universe :refer [register-type! universe-lookup-type]]
             [active.clojure.record :refer [define-record-type]]))
 
 ;;; ----------------------------------------------------------------------------
@@ -120,13 +120,13 @@
     :else (throw (Exception. (str 'type-member? ": unhandled type: "
                                   (if (nil? thing) "nil" thing))))))
 
-(defn numeric-type?
+(defn ^{:test true} numeric-type?
   "checks if a type is numeric."
   [t]
   (or (= t integer%)
       (= t double%)))
 
-(defn ordered-type?
+(defn ^{:test true} ordered-type?
   [t]
   (or (numeric-type? t)
       (= t string%)
@@ -138,7 +138,7 @@
 (def double%-nullable (make-nullable-type double%))
 (def blob%-nullable (make-nullable-type blob%))
 
-(defn type=?
+(defn ^{:test true} type=?
   "checks if two types are the same."
   [t1 t2]
   (cond
@@ -154,38 +154,42 @@
                             (let [c1 (product-type-components t1)
                                   c2 (product-type-components t2)]
                               (and (= (count c1) (count c2))
-                                   (every? type=? c1 c2))))
+                                   (every? (fn [[t1 t2]] (type=? t1 t2)) (zip c1 c2)))))
     (set-type? t1) (and (set-type? t2)
                         (type=? (set-type-member-type t1)
                                 (set-type-member-type t2)))
     :else (throw (Exception. (str 'type=? ": unknown type: " t1)))))
 
-(defn type->datum
+(defn ^{:test true} type->datum
   [t]
   (cond
-    (nullable-type? t) (list 'nullable (nullable-type-underlying t))
-    (product-type? t) (cons 'product (map type->datum
-                                          (product-type-components t)))
-    (set-type? t) (cons 'set-type (type->datum (set-type-member-type t)))
-    (bounded-string-type? t) (list 'bounded-string (bounded-string-type-max-size t))
+    (nullable-type? t) (list 'nullable
+                             (type->datum (nullable-type-underlying t)))
+    (product-type? t) (list 'product (mapv type->datum
+                                           (product-type-components t)))
+    (set-type? t) (list 'set
+                        (type->datum (set-type-member-type t)))
+    (bounded-string-type? t) (list 'bounded-string
+                                   (bounded-string-type-max-size t))
     (base-type? t) (list (base-type-name t))
     :else (throw (Exception. (str 'type->datum ": unknown type: " t)))))
 
-(defn datum->type
+(defn ^{:test true} datum->type
   [d universe]
   (case (first d)
     nullable (really-make-nullable-type (datum->type (second d) universe))
-    product (make-product-type (map #(datum->type % universe) (second d)))
+    product (make-product-type (map #(datum->type % universe)
+                                    (second d)))
     set (make-set-type (datum->type (second d) universe))
     string string%
     integer integer%
     double double%
     boolean boolean%
-                                        ; calendar-time calendar-time%
+    ;; calendar-time calendar-time%
     blob blob%
     bounded-string (make-bounded-string-type (second d))
-    ;; TODO
-    :else nil #_(or (universe-lookup-type universe ()))))
+    (or (universe-lookup-type universe (first d))
+        (throw (Exception. (str 'datum->type ": unknown type " (first d)))))))
 
 (defn pair?
   "Returns true if v is a sequence not empty (like schemes pair? function)."
