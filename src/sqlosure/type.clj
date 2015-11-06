@@ -139,7 +139,7 @@
 (def blob%-nullable (make-nullable-type blob%))
 
 (defn ^{:test true} type=?
-  "checks if two types are the same."
+  "Checks if two types are the same."
   [t1 t2]
   (cond
     (base-type? t1) (= t1 t2)
@@ -161,6 +161,11 @@
     :else (throw (Exception. (str 'type=? ": unknown type: " t1)))))
 
 (defn ^{:test true} type->datum
+  "`type->datum` takes a type and returns it into a recursive list of it's
+  subtypes. If the `type` is invalid, throws an exception.
+  Examples:
+  * `(type->datum string%) => (string)`
+  * `(type->datum (make-product-type [string% double%])) => (product (string) (double)`"
   [t]
   (cond
     (nullable-type? t) (list 'nullable
@@ -175,6 +180,13 @@
     :else (throw (Exception. (str 'type->datum ": unknown type: " t)))))
 
 (defn ^{:test true} datum->type
+  "`datum->type` takes a datum (as produced by `type->datum`) and a universe and
+  returns the corresponding type. If the type is not a base type defined in
+  `type.clj`, try looking it up in the supplied universe. If it's not found,
+  throws an exception.
+  Examples:
+  * `(datum->type (string) => string`
+  * `(datum->type (product (string) (double))) => (make-product-type [string% double%])`"
   [d universe]
   (case (first d)
     nullable (really-make-nullable-type (datum->type (second d) universe))
@@ -199,6 +211,13 @@
     false))
 
 (defn ^{:test true} const->datum
+  "`const->datum` takes a type and a value and applies the types and returns the
+  corresponding clojure value. If the type or value are invalid, throws an
+  exception.
+  Example:
+  * `(const->datum string% \"foobar\") => \"foobar\"`
+  * `(const->datum (make-product-type [string% integer%]) [\"foo\" 42])
+     => [\"foo\" 42]`"
   [t val]
   (cond
     (base-type? t) ((base-type-const->datum-proc t) val)
@@ -217,6 +236,12 @@
     :else (throw (Exception. (str 'const->datum ": invalid type " t val)))))
 
 (defn ^{:test true} datum->const
+  "`datum->const` takes a type and a datum and turns the datum in the
+  corresponding clojure data. If type is invalid or datum does not match the
+  type, throws an exception.
+  Example:
+  * `(datum->const double% 42) => 42`'
+  * `(datum->const (make-set-type integer%) [42 23]) => [42 23]`"
   [t d]
   (cond
     (base-type? t) ((base-type-datum->const-proc t) d)
@@ -241,3 +266,4 @@
                                             ": invalid set type datum for type "
                                             t " with value " d))))
     :else (throw (Exception. (str 'datum->const " invalid type " t)))))
+
