@@ -288,3 +288,13 @@
     (let [o (make-order {(make-attribute-ref "one") :ascending} tbl1)]
       (is (= (rel-scheme-alist (query-scheme o))
              {"one" string% "two" integer%})))))
+
+(deftest query?-test
+  ;; everything else is basically the same...
+  (is (query? the-empty))
+  (is (query? tbl1))
+  (is (query? (make-project {"one" (make-attribute-ref "one")
+                             "two" (make-attribute-ref "two")} tbl1)))
+  (is (not (query? [(make-attribute-ref 42)])))
+  (is (query? []))
+  (is (query? nil)))
