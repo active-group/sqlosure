@@ -1,28 +1,23 @@
 (ns ^{:doc "Structured representation of SQL Link to relational algebra"
       :author "Marco Schneider, based on Mike Sperbers schemeql2"}
     sqlosure.sql
-  (:require [sqlosure.relational-algebra :refer [make-base-relation]]
+  (:require [sqlosure.relational-algebra :refer :all]
             [sqlosure.universe :refer [make-universe make-derived-universe]]
+            [sqlosure.type :refer [boolean% numeric-type? type=? make-set-type]]
             [active.clojure.record :refer [define-record-type]]))
 
 (define-record-type sql-table
   (really-make-sql-table name scheme) sql-table?
-  [name sql-table-name
-   scheme sql-table-scheme])
+  [name sql-table-name  ;; (sql-table -> string)
+   scheme sql-table-scheme  ;; (sql-table -> rel-scheme)
+   ])
 
-(defn make-sql-table
+(defn ^{:test true} make-sql-table
   [name scheme & {:keys [universe]}]
-  (make-base-relation (symbol name) scheme universe
-                      (really-make-sql-table name scheme)))
+  (make-base-relation (symbol name) scheme
+                      :universe universe
+                      :handle (really-make-sql-table name scheme)))
 
-;; sql-table-name = string
-;; sql-column = string
-
-;; sql-select is one of:
-;; :sql-select
-;; :sql-select-combine
-;; :sql-select-table
-;; :sql-select-empty
 (define-record-type sql-select
   (make-sql-select options attributes nullary? tables criteria group-by having
                    order-by extra)
@@ -106,11 +101,11 @@
 (def op-or (make-sql-operator "OR" 2))
 (def op-like (make-sql-operator "LIKE" 2))
 (def op-in (make-sql-operator "IN" 2))
-(def op-cat (make-sql-operator "+" 2))
+(def op-cat (make-sql-operator "CAT" 2))
 (def op-+ (make-sql-operator "+" 2))
 (def op-- (make-sql-operator "-" 2))
 (def op-* (make-sql-operator "*" 2))
-;; Use to be op//
+;; Used to be op//
 (def op-div (make-sql-operator "/" 2))
 (def op-mod (make-sql-operator "MOD" 2))
 (def op-bit-not (make-sql-operator "~" 1))
@@ -166,4 +161,108 @@
   []
   (make-derived-universe sql-universe))
 
-;; and$ ...
+(defn ^{:test true} check-numerical [t fail]
+  (if (numeric-type? t)
+    true
+    (fail 'numerical-type t)))
+
+(def not$ (make-monomorphic-combinator 'not [boolean%] boolean%
+                                       not
+                                       :universe sql-universe))
+
+(def or$ (make-monomorphic-combinator 'or [boolean% boolean%] boolean%
+                                      (fn [a b]
+                                        (or a b (if (or (empty? a)
+                                                        (empty? b))
+                                                  nil false)))
+                                      :universe sql-universe
+                                      :data op-or))
+
+(def and$ (make-monomorphic-combinator 'and [boolean% boolean%] boolean%
+                                       (fn [a b]
+                                         (and (not-empty a) (not-empty b) a b)
+                                         :universe sql-universe
+                                         :data op-and)))
+
+(defn ^{:test true} >=$
+  [expr1 expr2]
+  (let [rator (make-rator '>=
+                          (fn [fail t1 t2]
+                            (when fail
+                              (do
+                                (check-numerical t1 fail)
+                                (check-numerical t2 fail)
+                                (when-not (type=? t1 t2) (fail t1 t2))))
+                            boolean%)
+                          (null-lift-binary-predicate >=)
+                          :universe sql-universe
+                          :data op->=)]
+    (make-application rator expr1 expr2)))
+
+(defn plus$
+  [expr1 expr2]
+  (let [rator (make-rator '+
+                          (fn [fail t1 t2]
+                            (when fail
+                              (do
+                                (check-numerical t1 fail)
+                                (check-numerical t2 fail)))
+                            t1)
+                          +
+                          :universe sql-universe
+                          :data op-+)]
+    (make-application rator expr1 expr2)))
+
+(defn minus$
+  [expr1 expr2]
+  (let [rator (make-rator '-
+                          (fn [fail t1 t2]
+                            (when fail
+                              (do
+                                (check-numerical t1 fail)
+                                (check-numerical t2 fail)
+                                t1)
+                              -
+                              :universe sql-universe
+                              :data op--)))]
+    (make-application rator expr1 expr2)))
+
+(defn =$
+  [expr1 expr2]
+  (let [rator (make-rator '=
+                          (fn [fail t1 t2]
+                            (when (and fail (not (type=? t1 t2)))
+                              (fail t1 t2))
+                            boolean%)
+                          =
+                          :universe sql-universe
+                          :data op-=)]
+    (make-application rator expr1 expr2)))
+
+(make-rator '= (fn [fail t1 t2] (when (and fail (not (type=? t1 t2)))
+                                  (fail t1 t2))
+                 boolean%)
+            =
+            :universe sql-universe
+            :data op-=)
+
+(=$ (make-attribute-ref "two")
+    (make-attribute-ref "one"))
+
+(defn member
+  [x xs]
+  (if-let [res (not-empty (drop-while #(not= % x) xs))]
+    res
+    false))
+
+(defn in$
+  [expr1 expr2]
+  (let [rator (make-rator 'in
+                          (fn [fail t1 t2]
+                            (when (and fail (not (type=? (make-set-type t1) t2)))
+                              (fail (make-set-type t1) t2))
+                            boolean%)
+                          contains?
+                          :universe sql-universe
+                          :data op-in)]
+    (make-application rator expr1 expr2)))
