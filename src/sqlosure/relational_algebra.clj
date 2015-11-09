@@ -452,7 +452,7 @@ Replaced alist with hash-map."
 
 (defn ^{:test false} query->datum [q]
   (cond
-    (empty? q) 'enpty
+    (empty? q) 'empty
     (base-relation? q) (list 'base-relation (base-relation-name q))
     (project? q) (list 'project (map #(cons (first %) (expression->datum (rest %)))
                                      (project-alist q))

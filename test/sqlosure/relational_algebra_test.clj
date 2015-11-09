@@ -325,3 +325,37 @@
                      (list 'const '(integer) 2)))
          (expression->datum (make-aggregation :count (make-tuple [(make-const integer% 40)
                                                                   (make-const integer% 2)]))))))
+
+(deftest query->datum-test
+  (is (= 'empty (query->datum (make-empty-val))))
+  (is (= (list 'base-relation 'tbl1) (query->datum tbl1)))
+  (is (= (list 'project (list (list "two" 'attribute-ref "two")
+                              (list "one" 'attribute-ref "one"))
+               '(base-relation tbl1))
+         (query->datum (make-project {"two" (make-attribute-ref "two")
+                                      "one" (make-attribute-ref "one")}
+                                     tbl1))))
+  (let [test-universe (make-universe)
+        SUBB (make-base-relation 'SUBB
+                                 (make-rel-scheme {"C" string%})
+                                 test-universe
+                                 "SUBB")
+        SUBA (make-base-relation 'SUBA
+                                 (make-rel-scheme {"C" string%})
+                                 test-universe
+                                 "SUBA")
+        r (make-restrict (sql/>=$ (make-scalar-subquery
+                                   (make-project {"C" (make-attribute-ref "C")}
+                                                 SUBB))
+                                  (make-attribute-ref "C"))
+                         SUBA)]
+    (is (= (list 'restrict
+                 (list 'application
+                       '>=
+                       (list (list 'scalar-subquery
+                                   (list 'project
+                                         (list (list "C" 'attribute-ref "C"))
+                                         (list 'base-relation 'SUBB)))
+                             (list 'attribute-ref "C")))
+                 (list 'base-relation 'SUBA))
+           (query->datum r)))))
