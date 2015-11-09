@@ -320,7 +320,9 @@ Replaced alist with hash-map."
                                                    ": type violation, expected "
                                                    expected ", found " thing)))))))
 
-(defn ^{:test true} aggregate? [expr]
+(defn ^{:test true} aggregate?
+  "Returns true if `expr` is or contains an aggregation."
+  [expr]
   (cond
     (attribute-ref? expr) false
     (const? expr) false
@@ -413,14 +415,19 @@ Replaced alist with hash-map."
       (top? q) (next-step (top-query q))
       :else (throw (Exception. (str 'query-scheme ": unknown query " q))))))
 
-(defn ^{:test true} query-scheme [q & {:keys [typecheck?]}]
+(defn ^{:test true} query-scheme
+  "Return the query scheme of query `q` as a `rel-scheme`.
+  If :typecheck is provided, perform basic validation of types."
+  [q & {:keys [typecheck?]}]
   (query-scheme* q the-empty-environment
                  (and typecheck?
                       (fn [expected thing]
                         (throw (Exception. (str 'query-scheme " type violation "
                                                 expected thing)))))))
 
-(defn ^{:test false} query? [obj]
+(defn ^{:test true} query?
+  "Returns true if the `obj` is a query."
+  [obj]
   (or (empty? obj) (base-relation? obj) (project? obj) (restrict? obj)
       (combine? obj) (grouping-project? obj) (order? obj) (top? obj)))
 
