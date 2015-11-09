@@ -394,12 +394,13 @@ Replaced alist with hash-map."
                        s1))
       (grouping-project? q) (let [base-scheme (next-step (grouping-project-query q))]
                               (make-rel-scheme
-                               (map (fn [p]
-                                      (let [typ (expression-type* (to-env base-scheme) (rest p) fail)]
-                                        (when (and fail (t/product-type? typ))
-                                          (fail ": non-product type " typ))
-                                        (cons (first p) typ)))
-                                    (grouping-project-alist q))))
+                               (into (hash-map)
+                                     (map (fn [[k v]]
+                                            (let [typ (expression-type* (to-env base-scheme) v fail)]
+                                              (when (and fail (t/product-type? typ))
+                                                (fail ": non-product type " typ))
+                                              [k typ]))
+                                          (grouping-project-alist q)))))
       (order? q) (let [scheme (next-step (order-query q))
                        env (to-env scheme)]
                    (when fail

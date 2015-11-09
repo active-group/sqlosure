@@ -235,8 +235,34 @@
              (into (rel-scheme-alist (base-relation-scheme rel1))
                    (rel-scheme-alist (base-relation-scheme rel2)))))
       (is (= (rel-scheme-alist (query-scheme q))
-             (rel-scheme-alist (rel-scheme-difference (base-relation-scheme rel1)
-                                                      (base-relation-scheme rel2))))))))
+             (rel-scheme-alist (rel-scheme-difference
+                                (base-relation-scheme rel1)
+                                (base-relation-scheme rel2))))))
+    ;; grouping project
+    (let [gp (make-grouping-project
+              {"one" (make-attribute-ref "one")
+               "foo" (make-aggregation :avg
+                                       (make-attribute-ref "two"))} tbl1)
+          gp2 (make-grouping-project
+              {"one" (make-attribute-ref "one")
+               "foo" (make-aggregation :avg
+                                       (make-attribute-ref "two"))}
+              (make-base-relation 'tbl1
+                                  (make-rel-scheme {"two" string%
+                                                    "one" integer%})
+                                  (make-universe)
+                                  "tbl1"))]
+      (is (= (rel-scheme-alist (query-scheme gp))
+             {"one" string%
+              "foo" integer%}))
+      (is (thrown? Exception  ;; should fail (types do not match)
+                   (query-scheme gp2 :typecheck? true))))
+    ;; order
+    (let [o (make-order {(make-attribute-ref "one") :ascending} tbl1)]
+      (is (= (rel-scheme-alist (query-scheme o))
+             {"one" string% "two" integer%})))))
+
+(query-scheme (make-order {(make-attribute-ref "one") :ascending} tbl1))
 
 (deftest aggregate?-test
   (is (not (aggregate? (make-attribute-ref "one"))))
