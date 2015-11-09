@@ -433,7 +433,11 @@ Replaced alist with hash-map."
 
 (declare query->datum)
 
-(defn ^{:test false} expression->datum [e]
+(defn ^{:test true} expression->datum
+  "Takes an expression and returns a data representation of it.
+  Example:
+  * `(expression->datum (make-attribute-ref \"foo\")) => (attribute-ref \"foo\")'"
+  [e]
   (fold-expression
    (fn [name] (list 'attribute-ref name))
    (fn [ty val] (list 'const (t/type->datum ty) (t/const->datum ty val)))
