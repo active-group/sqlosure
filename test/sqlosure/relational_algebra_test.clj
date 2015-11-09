@@ -178,6 +178,33 @@
     ;; scalar subquery
     ))
 
+(deftest aggregate?-test
+  (is (not (aggregate? (make-attribute-ref "one"))))
+  (is (not (aggregate? (make-const string% "foobar"))))
+  (is (not (aggregate? (make-null string%))))
+  (is (not (aggregate? (sql/=$ (make-const boolean% true) (make-const boolean% false)))))
+  (is (aggregate? (sql/=$ (make-const boolean% false)
+                          (make-aggregation :min (make-tuple [(make-const integer% 42)
+                                                              (make-const integer% 23)])))))
+  ;; tuple + app
+  (is (aggregate? (sql/=$ (make-aggregation :min (make-tuple [(make-const integer% 42)
+                                                              (make-const integer% 23)]))
+                          (make-const boolean% false))))
+  (is (not (aggregate? (make-case-expr
+                        {(sql/plus$ (make-const string% "foobar")
+                                    (make-const integer% 42))
+                         (make-const boolean% true?)}
+                        (make-const boolean% false)))))
+  ;; case
+  (is (aggregate? (make-case-expr
+                   {(sql/plus$ (make-const string% "foobar")
+                               (make-aggregation :min (make-tuple [(make-const integer% 42)
+                                                                   (make-const integer% 23)])))
+                    (make-const boolean% true?)}
+                   (make-const boolean% false))))
+  ;; scalar
+  (is (not (aggregate? (make-scalar-subquery tbl1)))))
+
 (deftest query-scheme-test
   (let [test-universe (make-universe)
         SUBB (make-base-relation 'SUBB
@@ -261,108 +288,3 @@
     (let [o (make-order {(make-attribute-ref "one") :ascending} tbl1)]
       (is (= (rel-scheme-alist (query-scheme o))
              {"one" string% "two" integer%})))))
-
-(query-scheme (make-order {(make-attribute-ref "one") :ascending} tbl1))
-
-(deftest aggregate?-test
-  (is (not (aggregate? (make-attribute-ref "one"))))
-  (is (not (aggregate? (make-const string% "foobar"))))
-  (is (not (aggregate? (make-null string%))))
-  (is (not (aggregate? (sql/=$ (make-const boolean% true) (make-const boolean% false)))))
-  (is (aggregate? (sql/=$ (make-const boolean% false)
-                          (make-aggregation :min (make-tuple [(make-const integer% 42)
-                                                              (make-const integer% 23)])))))
-  ;; tuple + app
-  (is (aggregate? (sql/=$ (make-aggregation :min (make-tuple [(make-const integer% 42)
-                                                              (make-const integer% 23)]))
-                          (make-const boolean% false))))
-  (is (not (aggregate? (make-case-expr
-                        {(sql/plus$ (make-const string% "foobar")
-                                    (make-const integer% 42))
-                         (make-const boolean% true?)}
-                        (make-const boolean% false)))))
-  ;; case
-  (is (aggregate? (make-case-expr
-                   {(sql/plus$ (make-const string% "foobar")
-                               (make-aggregation :min (make-tuple [(make-const integer% 42)
-                                                                   (make-const integer% 23)])))
-                    (make-const boolean% true?)}
-                   (make-const boolean% false))))
-  ;; scalar
-  (is (not (aggregate? (make-scalar-subquery tbl1)))))
-
-#_ ((deftest query?-test
-       (is (query? '())
-
-           (query? nil))
-       (is (query? (make-base-relation "name" "scheme"))
-           (query? (make-base-relation "name" "scheme" :universe (make-universe)
-                                       :handle "some handle"))))
-
-    (deftest relational-op?-test
-      (is (every? relational-op? [:product :union :intersection :quotient :difference]))
-      (is (not-every? relational-op? [:some-key "some string" 42 'some-symbol])))
-
-    (def test-universe (make-universe))
-
-
-    (deftest query-scheme-test
-      (let [project-q (make-project {"two" (make-attribute-ref "two")
-                                     "one" (make-attribute-ref "one")}
-                                    tbl1)
-            order-q (make-order {(make-attribute-ref "one") :ascending} tbl1)]
-        (is (rel-scheme=? (query-scheme tbl1) (query-scheme order-q)))
-        (is (rel-scheme=? (query-scheme tbl1) (query-scheme
-                                               (make-project {"eq" (=$ (make-attribute-ref "two")
-                                                                       (make-attribute-ref "two"))}
-                                                             tbl1))))))
-
-    (make-project {"eq" (=$ (make-attribute-ref "two")
-                            (make-attribute-ref "two"))}
-                  tbl1)
-
-    (deftest make-combine-test
-      (is (= (make-combine :union "some query" "other query")
-             (make-union "some query" "other query")))
-      (is (thrown? Exception (make-combine :not-valid "some query" "other query"))))
-
-    (deftest make-project-test
-      (let [q (make-project {"two" (make-attribute-ref "two")
-                             "one" (make-attribute-ref "one")} "some query")]
-        (is (and (= (project-alist q) {"two" (make-attribute-ref "two")
-                                       "one" (make-attribute-ref "one")})
-                 (= (project-query q) "some query")))
-        (is (thrown? Exception (make-project ["not" "a" "map"] "some query")))))
-
-    ;; union, difference, intersection and quotient are basically the same...
-    (deftest make-product-test
-      (is (= (make-product "some query" "other query") (really-make-combine :product "some query" "other query")))
-      (is (= (make-product "some query" nil) (make-product nil "some query") "some query")))
-
-    (deftest order-op?-test
-      (is (and (order-op? :ascending) (order-op? :descending)))
-      (is (not (or (order? :some-key) (order-op? nil)))))
-
-    (deftest aggregations-op?-test
-      (is (and (aggregations-op? :count) (aggregations-op? :sum)
-               (aggregations-op? :avg) (aggregations-op? :min)
-               (aggregations-op? :max) (aggregations-op? :std-dev)
-               (aggregations-op? :std-dev-p) (aggregations-op? :var)
-               (aggregations-op? :var-p)))
-      (is (not (or (aggregations-op? :some-key) (aggregations-op? nil)))))
-
-    ;; A few example expressions
-    (def project-1 (make-project {"one" (make-attribute-ref "one")
-                                  "two" (make-attribute-ref "two")}
-                                 tbl1))
-
-    (def project-2
-      (make-project
-       {"foo"
-        (make-case-expr
-         {(=$ (make-attribute-ref "two")   ;; alist
-              (make-attribute-ref "two"))
-          (make-attribute-ref "one")}      ;; default
-         (make-attribute-ref "one"))}
-       tbl1))
-    )
