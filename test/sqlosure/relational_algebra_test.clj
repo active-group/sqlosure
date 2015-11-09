@@ -298,3 +298,30 @@
   (is (not (query? [(make-attribute-ref 42)])))
   (is (query? []))
   (is (query? nil)))
+
+#_ (attribute-ref const null app tuple aggr case scalar-sub set-sub)
+
+(deftest expression->datum-test
+  (is (= (list 'attribute-ref "two") (expression->datum
+                                      (make-attribute-ref "two"))))
+  (is (= (list 'const (list 'string) "foobar")
+         (expression->datum
+          (make-const string% "foobar"))))
+  (is (= (list 'null-type (list 'string))
+         (expression->datum
+          (make-null string%))))
+  (is (= (list 'application '>= (list (list 'const '(integer) 42)
+                                      (list 'const '(integer) 23)))
+         (expression->datum (sql/>=$ (make-const integer% 42)
+                                     (make-const integer% 23)))))
+  (is (= (list 'tuple
+               (list 'const '(string) "foobar")
+               (list 'const '(integer) 42))
+         (expression->datum (make-tuple [(make-const string% "foobar")
+                                         (make-const integer% 42)]))))
+  (is (= (list 'aggregation :count
+               (list 'tuple
+                     (list 'const '(integer) 40)
+                     (list 'const '(integer) 2)))
+         (expression->datum (make-aggregation :count (make-tuple [(make-const integer% 40)
+                                                                  (make-const integer% 2)]))))))
