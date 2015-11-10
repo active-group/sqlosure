@@ -83,8 +83,8 @@
 (def tbl1 (make-base-relation 'tbl1
                               (make-rel-scheme {"one" string%
                                                 "two" integer%})
-                              (make-universe)
-                              "tbl1"))
+                              :universe (make-universe)
+                              :handle "tbl1"))
 
 (deftest make-project-test
   (let [p (make-project {"two" (make-attribute-ref "two")
@@ -209,12 +209,12 @@
   (let [test-universe (make-universe)
         SUBB (make-base-relation 'SUBB
                                  (make-rel-scheme {"C" string%})
-                                 test-universe
-                                 "SUBB")
+                                 :universe test-universe
+                                 :handle "SUBB")
         SUBA (make-base-relation 'SUBA
                                  (make-rel-scheme {"C" string%})
-                                 test-universe
-                                 "SUBA")]
+                                 :universe test-universe
+                                 :handle "SUBA")]
     ;; empty val
     (is (= the-empty-rel-scheme (query-scheme (make-empty-val))))
     ;; base relation
@@ -299,8 +299,6 @@
   (is (query? []))
   (is (query? nil)))
 
-#_ (attribute-ref const null app tuple aggr case scalar-sub set-sub)
-
 (deftest expression->datum-test
   (is (= (list 'attribute-ref "two") (expression->datum
                                       (make-attribute-ref "two"))))
@@ -362,12 +360,71 @@
 
 (deftest datum->query-test
   (let [test-universe (register-base-relation! (make-universe)
-                                               'tbl1 tbl1)]
+                                               'tbl1 tbl1)
+        query->datum->query #(-> % query->datum (datum->query test-universe))]
     (is (= the-empty (datum->query '(empty-val) test-universe)))
     (is (= tbl1 (datum->query '(base-relation tbl1) test-universe)))
     (is (thrown? Exception  ;; Should throw because universe does not contain
-                            ;; the relation.
-                 (datum->query '(base-relation tbl1) (make-universe))))))
+                 ;; the relation.
+                 (datum->query '(base-relation tbl1) (make-universe))))
+    (let [p (make-project {"two" (make-attribute-ref "two")
+                           "one" (make-attribute-ref "one")}
+                          tbl1)]
+      (is (= p (query->datum->query p)))
+      (is (thrown? Exception  ;; Should throw because tbl1 is not registered in
+                   ;; universe.
+                   (datum->query (query->datum p) (make-universe)))))
+    (let [sql-universe* (make-derived-universe sql-universe)
+          SUBB (make-base-relation 'SUBB
+                                   (make-rel-scheme {"C" string%})
+                                   :universe sql-universe*
+                                   :handle "SUBB")
+          SUBA (make-base-relation 'SUBA
+                                   (make-rel-scheme {"C" string%})
+                                   :universe sql-universe*
+                                   :handle "SUBA")
+          r (make-restrict (sql/=$ (make-scalar-subquery
+                                    (make-project {"C" (make-attribute-ref "C")}
+                                                  SUBB))
+                                   (make-attribute-ref "C"))
+                           SUBA)]
+      (is (= (make-restrict
+              (make-application
+               (universe-lookup-rator sql-universe* '=)
+               (make-scalar-subquery (make-project {"C" (make-attribute-ref "C")}
+                                                   SUBB))
+               (make-attribute-ref "C"))
+              SUBA)
+             (datum->query (query->datum r) sql-universe*)))
+      (is (thrown? Exception  ;; Should throw because of unregistered
+                              ;; relations.
+                   (datum->query (query->datum r) sql-universe))))
+    (let [rel1 (make-base-relation 'tbl1
+                                   (make-rel-scheme {"one" string%
+                                                     "two" integer%})
+                                   :universe test-universe
+                                   :handle "tbl1")
+          rel2 (make-base-relation 'tbl2
+                                   (make-rel-scheme {"three" boolean%
+                                                     "four" double%})
+                                   :universe test-universe
+                                   :handle "tbl2")
+          p (make-product rel1 rel2)
+          q (make-quotient rel1 rel2)
+          u (make-union rel1 rel2)]
+      (is (= p (query->datum->query p)))
+      (is (= q (query->datum->query q)))
+      (is (= u (query->datum->query u))))
+    (let [gp (make-grouping-project
+              {"one" (make-attribute-ref "one")
+               "foo" (make-aggregation :avg
+                                       (make-attribute-ref "two"))}
+              tbl1)]
+      (is (= gp (query->datum->query gp))))
+    (let [o (make-order {(make-attribute-ref "one") :ascending} tbl1)]
+      (is (= o (query->datum->query o))))
+    (let [t (make-top 10 tbl1)]
+      (is (= t (query->datum->query t))))))
 
 (deftest datum->expression-test
   (let [test-universe (make-universe)

@@ -7,6 +7,7 @@ Replaced alist with hash-map."
                                              universe-base-relation-table
                                              register-rator!]]
             [sqlosure.type :as t :refer [make-product-type integer% numeric-type? ordered-type? type=? pair?]]
+            [sqlosure.utils :refer [third]]
             [clojure.set :refer [difference union]]
             [clojure.pprint :refer [pprint]]
             [active.clojure.record :refer [define-record-type]]))
@@ -268,7 +269,6 @@ Replaced alist with hash-map."
 
 (defn- expression-type*
   [env expr fail]
-  (println fail)
   (fold-expression
    (fn [name] (or (lookup-env name env)
                   (throw (Exception. (str 'expression-type ": unknown attribute "
@@ -450,7 +450,8 @@ Replaced alist with hash-map."
    (fn [subquery] (list 'set-subquery-query (query->datum subquery)))
    e))
 
-(defn ^{:test false} query->datum [q]
+(defn ^{:test false} query->datum
+  [q]
   (cond
     (empty? q) (list 'empty-val)
     (base-relation? q) (list 'base-relation (base-relation-name q))
@@ -464,17 +465,16 @@ Replaced alist with hash-map."
                        (query->datum (combine-query-1 q))
                        (query->datum (combine-query-2 q)))
     (grouping-project? q) (list 'grouping-project
-                                (map #(cons (first %) (expression->datum (rest %)))
+                                (map (fn [[k v]]
+                                       (cons k (expression->datum v)))
                                      (grouping-project-alist q))
                                 (query->datum (grouping-project-query q)))
-    (order? q) (list 'order (map #(cons (expression->datum (first %)) (rest %))
-                                 (order-alist q))
+    (order? q) (list 'order (map (fn [[k v]]
+                                   (list (expression->datum k) v))
+                                    (order-alist q))
                      (query->datum (order-query q)))
     (top? q) (list 'top (top-count q) (query->datum (top-query q)))
     :else (throw (Exception. (str 'query->datum " unknown query " q)))))
-
-(defn ^{:test false} third [xs]
-  (-> xs rest rest first))
 
 (declare datum->expression)
 
@@ -487,21 +487,28 @@ Replaced alist with hash-map."
                         (throw (Exception. (str 'datum->query
                                                 " unknown base relation "
                                                 (second d)))))
-      project (make-project (map #(cons (first %) (datum->expression (rest %) universe))
-                                 (second d))
+      project (make-project (into (hash-map)
+                                  (map (fn [p]
+                                         [(first p)
+                                          (datum->expression (rest p) universe)])
+                                       (second d)))
                             (next-step (third d)))
       restrict (make-restrict (datum->expression (second d) universe)
                               (next-step (third d)))
-      (product union intersection quotient difference)
+      (:product :union :intersection :quotient :difference)
       (make-combine (first d) (next-step (second d))
                     (next-step (third d)))
       grouping-project (make-grouping-project
-                        (map #(cons (first %) (datum->expression (rest %) universe))
-                             (second d))
+                        (into (hash-map)
+                              (map (fn [p]
+                                     [(first p)
+                                      (datum->expression (rest p) universe)])
+                                   (second d)))
                         (next-step (third d)))
-      order (make-order (map #(cons (datum->expression (first %) universe)
-                                    (rest %))
-                             (second d))
+      order (make-order (into (hash-map)
+                              (map (fn [p]
+                                     [(datum->expression (first p) universe) (second p)])
+                                   (second d)))
                         (next-step (third d)))
       top (make-top (second d) (next-step (third d)))
       :else (throw (Exception. (str 'datum->query " invalid datum " d))))))
@@ -682,3 +689,4 @@ Replaced alist with hash-map."
    (fn [alist default] (apply + default (map #(+ (first %) (rest %)) alist)))
    (fn [_] 0)
    (fn [_] 0)))
+
