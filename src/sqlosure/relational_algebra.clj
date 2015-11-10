@@ -454,7 +454,8 @@ Replaced alist with hash-map."
   (cond
     (empty? q) 'empty
     (base-relation? q) (list 'base-relation (base-relation-name q))
-    (project? q) (list 'project (map #(cons (first %) (expression->datum (rest %)))
+    (project? q) (list 'project (map (fn [[k v]]
+                                       (cons k (expression->datum v)))
                                      (project-alist q))
                        (query->datum (project-query q)))
     (restrict? q) (list 'restrict (expression->datum (restrict-exp q))
