@@ -359,3 +359,60 @@
                              (list 'attribute-ref "C")))
                  (list 'base-relation 'SUBA))
            (query->datum r)))))
+
+(deftest datum->query-test
+  (let [test-universe (register-base-relation! (make-universe)
+                                               'tbl1 tbl1)]
+    (is (= the-empty (datum->query '(empty-val) test-universe)))
+    (is (= tbl1 (datum->query '(base-relation tbl1) test-universe)))
+    (is (thrown? Exception  ;; Should throw because universe does not contain
+                            ;; the relation.
+                 (datum->query '(base-relation tbl1) (make-universe))))))
+
+(deftest datum->expression-test
+  (let [test-universe (make-universe)
+        expression->datum->expression #(-> %
+                                           expression->datum
+                                           (datum->expression test-universe))]
+    (is (= (expression->datum->expression (make-attribute-ref "two"))
+           (make-attribute-ref "two")))
+    (is (= (expression->datum->expression (make-const string% "foobar"))
+           (make-const string% "foobar")))
+    (is (= (expression->datum->expression (make-null string%))
+           (make-null string%)))
+    (let [a (make-application (make-rator '+
+                                          (fn [fail t1 t2]
+                                            (when fail
+                                              (do
+                                                (check-numerical t1 fail)
+                                                (check-numerical t2 fail)))
+                                            t1)
+                                          +
+                                          :universe sql-universe
+                                          :data op-+)
+                              (make-const integer% 40)
+                              (make-const integer% 2))]
+      (is (= (datum->expression (expression->datum a) sql-universe)
+             a)))
+    (is (= (expression->datum->expression (make-tuple [(make-const integer% 40)
+                                                       (make-const integer% 2)]))
+           (make-tuple [(make-const integer% 40)
+                        (make-const integer% 2)])))
+    (is (= (expression->datum->expression (make-aggregation
+                                           :count (make-tuple [(make-const integer% 40)
+                                                               (make-const integer% 2)])))
+           (make-aggregation
+            :count (make-tuple [(make-const integer% 40)
+                                (make-const integer% 2)]))))
+    (is (= (datum->expression (expression->datum
+                               (make-case-expr {(sql/=$ (make-const integer% 42)
+                                                        (make-const integer% 42))
+                                                (make-const boolean% true)}
+                                               (make-const boolean% false)))
+                              sql-universe)
+           (make-case-expr {(make-application
+                             (universe-lookup-rator sql-universe '=)
+                             (make-const integer% 42)
+                             (make-const integer% 42))
+                            (make-const boolean% true)}
+                           (make-const boolean% false))))))

@@ -506,6 +506,37 @@ Replaced alist with hash-map."
       top (make-top (second d) (next-step (third d)))
       :else (throw (Exception. (str 'datum->query " invalid datum " d))))))
 
+(defn datum->expression
+  "Takes a datum and returns the corresponding expression. This is the inverse
+  function of expression->datum, so
+  `(= d (datum->expression (expression->datum d) u))`
+  should hold."
+  [d universe]
+  (letfn [(next-step [d*]
+            (datum->expression d* universe))]
+    (case (first d)
+      attribute-ref (make-attribute-ref (second d))
+      const (let [ty (t/datum->type (second d) universe)]
+                  (make-const ty (t/datum->const ty (third d))))
+      null-type (make-null (t/datum->type (second d) universe))
+      application (apply make-application
+                         (or (u/universe-lookup-rator universe (second d))
+                             (throw (Exception. (str 'datum->expression
+                                                     ": unkown rator "
+                                                     (second d)))))
+                         (map next-step (third d)))
+      tuple (make-tuple (map next-step (rest d)))
+      aggregation (make-aggregation (second d)
+                                        (next-step (third d)))
+      case-expr (make-case-expr (into (hash-map)
+                                          (map (fn [[k v]] [(next-step k)
+                                                            (next-step v)])
+                                               (second d)))
+                                (next-step (third d)))
+      scalar-subquery (make-scalar-subquery (datum->query (second d) universe))
+      set-subquery (make-set-subquery (datum->query (second d) universe))
+      (throw (Exception. (str 'datum->expression ": invalid datum " d))))))
+
 (defn ^{:test false} make-monomorphic-rator
   [name domain-types range-type proc & {:keys [universe data]}]
   (make-rator name
