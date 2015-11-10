@@ -327,7 +327,7 @@
                                                                   (make-const integer% 2)]))))))
 
 (deftest query->datum-test
-  (is (= 'empty (query->datum (make-empty-val))))
+  (is (= (list 'empty-val) (query->datum (make-empty-val))))
   (is (= (list 'base-relation 'tbl1) (query->datum tbl1)))
   (is (= (list 'project (list (list "two" 'attribute-ref "two")
                               (list "one" 'attribute-ref "one"))
