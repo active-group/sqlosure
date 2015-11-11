@@ -593,4 +593,41 @@
                               (make-const integer% 42)
                               (make-const integer% 2))]
     (is (= res (substitute-attribute-refs
-                {"fourtytwo" (make-const integer% 42)} a)))))
+                {"fourtytwo" (make-const integer% 42)} a))))
+  (is (= (make-tuple [(make-const integer% 42)
+                      (make-attribute-ref "three")
+                      (make-const string% "foobar")])
+         (substitute-attribute-refs {"two" (make-const integer% 42)}
+                                    (make-tuple [(make-attribute-ref "two")
+                                                 (make-attribute-ref "three")
+                                                 (make-const string% "foobar")]))))
+  (is (= (make-aggregation
+          :count (make-tuple [(make-const integer% 40)
+                              (make-const integer% 2)]))
+         (substitute-attribute-refs
+          {"fourty" (make-const integer% 40)}
+          (make-aggregation
+           :count (make-tuple [(make-attribute-ref "fourty")
+                               (make-const integer% 2)])))))
+  (is (= (make-case-expr {(make-application
+                           (universe-lookup-rator sql-universe '=)
+                           (make-const integer% 42)
+                           (make-const integer% 42))
+                          (make-const boolean% true)}
+                         (make-const boolean% true))
+         (substitute-attribute-refs
+          {"true" (make-const boolean% true)
+           "fourtytwo" (make-const integer% 42)}
+          (make-case-expr {(make-application
+                            (universe-lookup-rator sql-universe '=)
+                            (make-attribute-ref "fourtytwo")
+                            (make-const integer% 42))
+                           (make-attribute-ref "true")}
+                          (make-attribute-ref "true"))))))
+
+(deftest cull-substitution-alist-test
+  (is (empty? (cull-substitution-alist
+               {"one" (make-attribute-ref "one")}
+               tbl1)))
+  (is (= {"three" (make-attribute-ref "three")}
+         (cull-substitution-alist {"three" (make-attribute-ref "three")} tbl1))))

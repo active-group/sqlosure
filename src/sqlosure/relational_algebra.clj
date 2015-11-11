@@ -655,11 +655,12 @@ Replaced alist with hash-map."
    (fn [subquery] (make-set-subquery (query-substitute-attribute-refs alist subquery)))
    expr))
 
-(defn call-substitution-alist [alist underlying]
+(defn cull-substitution-alist
+  "Takes an map and a 'underlying' map of substitutions and returns a map of
+  substitutions not already featured in `underlying`."
+  [alist underlying]
   (let [underlying-alist (rel-scheme-alist (query-scheme underlying))]
-    (filter #(not (contains? underlying-alist (first %))) alist)))
-
-(declare cull-substitution-alist)
+    (into (hash-map) (filter #(not (contains? underlying-alist (first %))) alist))))
 
 (defn ^{:test false} query-substitute-attribute-refs
   [alist q]
