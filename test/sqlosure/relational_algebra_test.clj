@@ -509,3 +509,60 @@
                                                               (make-const integer% 42))
                                                       (make-const boolean% true)}
                                                      (make-attribute-ref "three"))))))
+
+(deftest query-attribute-names-test
+  (is (nil? (query-attribute-names the-empty)))
+  (is (nil? (query-attribute-names tbl1)))
+  (is (= ["two" "one"] (query-attribute-names
+                        (make-project {"two" (make-attribute-ref "two")
+                                       "one" (make-attribute-ref "one")}
+                                      tbl1))))
+  (let [test-universe (make-universe)
+        SUBB (make-base-relation 'SUBB
+                                 (make-rel-scheme {"C" string%})
+                                 :universe test-universe
+                                 :handle "SUBB")
+        SUBA (make-base-relation 'SUBA
+                                 (make-rel-scheme {"C" string%})
+                                 :universe test-universe
+                                 :handle "SUBA")
+        r (make-restrict (sql/=$ (make-scalar-subquery
+                                  (make-project {"C" (make-attribute-ref "C")
+                                                 "D" (make-attribute-ref "D")}
+                                                SUBB))
+                                 (make-attribute-ref "C"))
+                         SUBA)]
+    (is (= ["C" "D"] (query-attribute-names r))))
+  (let [test-universe (make-universe)
+        rel1 (make-base-relation 'tbl1
+                                 (make-rel-scheme {"one" string%
+                                                   "two" integer%})
+                                 test-universe
+                                 "tbl1")
+        rel2 (make-base-relation 'tbl2
+                                 (make-rel-scheme {"three" boolean%
+                                                   "four" double%})
+                                 test-universe
+                                 "tbl2")
+        p1 (make-project {"two" (make-attribute-ref "two")
+                          "one" (make-attribute-ref "one")}
+                         tbl1)
+        p2 (make-project {"three" (make-attribute-ref "three")
+                          "four" (make-attribute-ref "four")}
+                         tbl1)
+        c (make-product rel1 p1)
+        q (make-quotient p1 rel1)
+        u (make-union p1 p2)]
+    (is (= ["two" "one"] (query-attribute-names c)))
+    (is (= ["two" "one"] (query-attribute-names q)))
+    (is (= ["two" "one" "three" "four"] (query-attribute-names u))))
+  (is (= ["one" "two"] (query-attribute-names
+                        (make-grouping-project
+                         {"one" (make-attribute-ref "one")
+                          "foo" (make-aggregation
+                                 :avg
+                                 (make-attribute-ref "two"))} tbl1))))
+  (is (= ["one" "two"] (query-attribute-names
+                        (make-order {(make-attribute-ref "one") :ascending}
+                                    tbl1))))
+  (is (nil? (query-attribute-names (make-top 10 tbl1)))))

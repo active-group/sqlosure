@@ -591,40 +591,52 @@ Replaced alist with hash-map."
    query-attribute-names
    expr))
 
-(defn ^{:test false} query-attribute-names [q]
-  (cond
-    (empty-val? q) nil
-    (base-relation? q) nil
-    (project? q)
-    (let [sub (project-query q)]
-      (vec (union (difference
-                   (set (expression-attribute-names (rest (project-alist q))))
-                   (set (map first (rel-scheme-alist (query-scheme sub)))))
-                  (set (query-attribute-names sub)))))
-    (restrict? q)
-    (let [sub (restrict-query q)]
-      (vec (union
-            (difference (set (expression-attribute-names (restrict-exp q)))
-                        (set (map first (rel-scheme-alist (query-scheme sub)))))
-            (set (query-attribute-names sub)))))
-    (combine? q) (vec (union (set (query-attribute-names (combine-query-1 q)))
-                             (set (query-attribute-names (combine-query-2 q)))))
-    (grouping-project? q)
-    (let [sub (grouping-project-query q)]
-      (vec (union
-            (difference (set (distinct (map #(expression-attribute-names (rest %))
-                                            (grouping-project-alist q))))
-                        (set (map first (rel-scheme-alist (query-scheme sub)))))
-            (set (query-attribute-names sub)))))
-    (order? q)
-    (let [sub (order-query q)]
-      (set (union (difference
-                   (set (distinct (map #(expression-attribute-names (first %))
-                                       (order-alist q))))
-                   (set (map first (rel-scheme-alist (query-scheme sub)))))
-                  (set (query-attribute-names sub)))))
-    (top? q) (query-attribute-names (top-query q))
-    :else (throw (Exception. (str 'query-attribute-names " unknown query " q)))))
+(defn ^{:test true} query-attribute-names
+  "Takes a query and returns a seq of all attribute-ref's names."
+  [q]
+  (letfn [(flat-distinct-vec [xs]
+            (-> xs flatten distinct vec))]
+    (cond
+      (empty-val? q) nil
+      (base-relation? q) nil
+      (project? q)
+      (let [subq (project-query q)
+            alist (project-alist q)]
+        (flat-distinct-vec
+         (concat
+          (distinct (map (fn [[k v]]
+                           (expression-attribute-names v)) alist))
+          (map first (rel-scheme-alist (query-scheme subq)))
+          (query-attribute-names subq))))
+      (restrict? q)
+      (let [sub (restrict-query q)]
+        (flat-distinct-vec
+         (concat
+          (expression-attribute-names (restrict-exp q))
+          (map first (rel-scheme-alist (query-scheme sub)))
+          (query-attribute-names sub))))
+      (combine? q) (flat-distinct-vec
+                    (concat (query-attribute-names (combine-query-1 q))
+                            (query-attribute-names (combine-query-2 q))))
+      (grouping-project? q)
+      (let [subq (grouping-project-query q)
+            alist (grouping-project-alist q)]
+        (flat-distinct-vec
+         (concat
+          (distinct (map (fn [[k v]]
+                           (expression-attribute-names v)) alist))
+          (map first (rel-scheme-alist (query-scheme subq)))
+          (query-attribute-names subq))))
+      (order? q)
+      (let [subq (order-query q)
+            alist (order-alist q)]
+        (flat-distinct-vec (concat
+                            (map (fn [[k _]] (expression-attribute-names k))
+                                 alist)
+                            (map first (rel-scheme-alist (query-scheme subq)))
+                            (query-attribute-names subq))))
+      (top? q) (query-attribute-names (top-query q))
+      :else (throw (Exception. (str 'query-attribute-names " unknown query " q))))))
 
 (declare query-substitute-attribute-refs)
 
