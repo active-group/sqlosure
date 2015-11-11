@@ -574,17 +574,19 @@ Replaced alist with hash-map."
 
 (declare query-attribute-names)
 
-(defn ^{:test false} expression-attribute-names [expr]
+(defn ^{:test true} expression-attribute-names
+  "Takes an expression and returns a seq all attribute-ref's names."
+  [expr]
   (fold-expression
    list
-   (fn [ty val] nil)
-   (fn [ty] nil)
+   (constantly nil)
+   (constantly nil)
    (fn [rator rands] (vec (distinct rands)))
-   (fn [exprs] (vec (distinct exprs)))
-   (fn [op expr] expr)
+   (fn [exprs] (vec (flatten (distinct exprs)))) ;; tuple
+   (fn [_ expr] expr)
    (fn [alist default]
-     (vec (union (set default) (map #(union (set [%]) (set (rest %)))
-                                    alist))))
+     (vec (concat default
+                  (distinct (flatten (into [] alist))))))
    query-attribute-names
    query-attribute-names
    expr))

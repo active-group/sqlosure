@@ -473,3 +473,39 @@
                              (make-const integer% 42))
                             (make-const boolean% true)}
                            (make-const boolean% false))))))
+
+(deftest expression-attribute-names-test
+  (is (= '("two") (expression-attribute-names (make-attribute-ref "two"))))
+  (is (= nil (expression-attribute-names (make-const string% "foobar"))))
+  (is (= nil (expression-attribute-names (make-null string%))))
+  (is (= [nil]
+         (expression-attribute-names (sql/plus$ (make-const integer% 40)
+                                                (make-const integer% 2)))))
+  (is (= [nil]
+         (expression-attribute-names (sql/plus$ (make-const integer% 21)
+                                                (make-const integer% 21)))))
+  ;; I'm not sure this is right...
+  (is (= [nil]
+         (expression-attribute-names (make-tuple [(make-const integer% 40)
+                                                  (make-const integer% 2)]))))
+  (is (= [nil "two"]
+         (expression-attribute-names (make-tuple [(make-const integer% 40)
+                                                  (make-attribute-ref "two")]))))
+  (is (= [nil]
+         (expression-attribute-names (make-aggregation
+                                      :count (make-tuple [(make-const integer% 40)
+                                                          (make-const integer% 2)])))))
+  (is (= [nil "two"]
+         (expression-attribute-names (make-aggregation
+                                      :count (make-tuple [(make-const integer% 40)
+                                                          (make-attribute-ref "two")])))))
+  (is (= [nil]
+         (expression-attribute-names (make-case-expr {(sql/=$ (make-const integer% 42)
+                                                              (make-const integer% 42))
+                                                      (make-const boolean% true)}
+                                                     (make-const boolean% false)))))
+  (is (= ["three" "two" nil]
+         (expression-attribute-names (make-case-expr {(sql/=$ (make-attribute-ref "two")
+                                                              (make-const integer% 42))
+                                                      (make-const boolean% true)}
+                                                     (make-attribute-ref "three"))))))
