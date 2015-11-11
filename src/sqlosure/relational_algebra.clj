@@ -450,7 +450,7 @@ Replaced alist with hash-map."
    (fn [subquery] (list 'set-subquery-query (query->datum subquery)))
    e))
 
-(defn ^{:test false} query->datum
+(defn ^{:test true} query->datum
   [q]
   (cond
     (empty? q) (list 'empty-val)
@@ -478,7 +478,7 @@ Replaced alist with hash-map."
 
 (declare datum->expression)
 
-(defn ^{:test false} datum->query
+(defn ^{:test true} datum->query
   [d universe]
   (letfn [(next-step [d*] (datum->query d* universe))]
     (case (first d)
@@ -556,7 +556,9 @@ Replaced alist with hash-map."
                       (when-not (type=? dd ad)
                         (fail dd ad)))))
                 range-type)
-              proc universe data))
+              proc
+              :universe universe
+              :data data))
 
 (defn ^{:test false} null-lift-binary-predicate [pred]
   (fn [v1 v2]
