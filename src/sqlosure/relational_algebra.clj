@@ -642,10 +642,12 @@ Replaced alist with hash-map."
 
 (defn ^{:test false} substitute-attribute-refs [alist expr]
   (fold-expression
-   (fn [name] (when (contains? alist name) (rest name)))
+   (fn [name] (if-let [r (get alist name)]
+                r
+                (make-attribute-ref name)))
    make-const
    make-null
-   make-application
+   (fn [rator rands] (apply make-application rator rands))
    make-tuple
    make-aggregation
    make-case-expr

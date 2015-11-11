@@ -566,3 +566,31 @@
                         (make-order {(make-attribute-ref "one") :ascending}
                                     tbl1))))
   (is (nil? (query-attribute-names (make-top 10 tbl1)))))
+
+(deftest substitute-attribute-refs-test
+  (is (= (make-const string% "foobar")
+         (substitute-attribute-refs {"two" (make-const string% "foobar")}
+                                    (make-attribute-ref "two"))))
+  (is (= (make-attribute-ref "one")
+         (substitute-attribute-refs {} (make-attribute-ref "one"))))
+  (is (= (make-const string% "foobar")
+         (substitute-attribute-refs {} (make-const string% "foobar"))))
+  (is (= (make-null string%)
+         (substitute-attribute-refs {} (make-null string%))))
+  (let [a (make-application (make-rator '+
+                                        (fn [fail t1 t2]
+                                          (when fail
+                                            (do
+                                              (check-numerical t1 fail)
+                                              (check-numerical t2 fail)))
+                                          t1)
+                                        +
+                                        :universe sql-universe
+                                        :data op-+)
+                            (make-attribute-ref "fourtytwo")
+                            (make-const integer% 2))
+        res (make-application (universe-lookup-rator sql-universe '+)
+                              (make-const integer% 42)
+                              (make-const integer% 2))]
+    (is (= res (substitute-attribute-refs
+                {"fourtytwo" (make-const integer% 42)} a)))))
