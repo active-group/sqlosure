@@ -32,6 +32,30 @@
    order-by sql-select-order-by
    extra sql-select-extra])
 
+(defn set-sql-select-attributes [sql-select attributes]
+  (assoc sql-select :attributes attributes))
+
+(defn set-sql-select-nullary? [sql-select nullary?]
+  (assoc sql-select :nullary? nullary?))
+
+(defn set-sql-select-tables [sql-select tables]
+  (assoc sql-select :tables tables))
+
+(defn set-sql-select-criteria [sql-select criteria]
+  (assoc sql-select :criteria criteria))
+
+(defn set-sql-select-group-by [sql-select group-by*]
+  (assoc sql-select :group-by group-by*))
+
+(defn set-sql-select-having [sql-select having]
+  (assoc sql-select :having having))
+
+(defn set-sql-select-order-by [sql-select order-by]
+  (assoc sql-select :order-by order-by))
+
+(defn set-sql-select-extra [sql-select extra]
+  (assoc sql-select :extra extra))
+
 (defn ^{:test false} new-sql-select
   "Create a new, empty sql-select."
   []
