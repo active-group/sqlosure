@@ -694,9 +694,11 @@ Replaced alist with hash-map."
                                (next-step sub)))
       (top? q) (make-top (top-count q) (next-step (top-query q)))
       :else (throw (Exception. (str 'query-substitute-attribute-refs
-                                    " unknown query " q))))))
+                                    ": unknown query " q))))))
 
-(defn ^{:test false} count-aggregations [e]
+(defn ^{:test true} count-aggregations
+  "Count all aggregations in an expression."
+  [e]
   (fold-expression
    (fn [_] 0)
    (fn [_ _] 0)
@@ -704,8 +706,10 @@ Replaced alist with hash-map."
    (fn [_ rands] (apply + rands))
    (fn [exprs] (apply + exprs))
    (fn [_ expr] (inc expr))
-   ;; what what what?
-   (fn [alist default] (apply + default (map #(+ (first %) (rest %)) alist)))
+   (fn [alist default] (apply + default (map (fn [[k v]]
+                                               (+ k v))
+                                             alist)))
    (fn [_] 0)
-   (fn [_] 0)))
+   (fn [_] 0)
+   e))
 

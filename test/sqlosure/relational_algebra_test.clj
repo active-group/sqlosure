@@ -631,3 +631,34 @@
                tbl1)))
   (is (= {"three" (make-attribute-ref "three")}
          (cull-substitution-alist {"three" (make-attribute-ref "three")} tbl1))))
+
+(deftest count-aggregations-test
+  (let [aggr (make-aggregation
+              :count (make-tuple [(make-const integer% 40)
+                                  (make-const integer% 2)]))]
+    (is (= 0 (count-aggregations (make-attribute-ref "foobar"))))
+    (is (= 0 (count-aggregations (make-const string% "foobar"))))
+    (is (= 0 (count-aggregations (make-null string%))))
+    ;; application, tuple, aggregation
+    (let [app1 (sql/plus$ (make-const integer% 42)
+                          (make-const integer% 23))
+          app2 (sql/plus$ aggr
+                          aggr)
+          app3 (sql/plus$ aggr
+                          (make-aggregation
+                           :count (make-tuple [(make-const integer% 40)
+                                               (sql/plus$ aggr
+                                                          aggr)])))]
+      (is (= 0 (count-aggregations app1)))
+      (is (= 2 (count-aggregations app2)))
+      (is (= 4 (count-aggregations app3))))
+    (let [c1 (make-case-expr {(sql/=$ (make-const integer% 42)
+                                      (make-const integer% 42))
+                              (make-const boolean% true)}
+                             (make-const boolean% false))
+          c2 (make-case-expr {(sql/=$ (make-const integer% 42)
+                                      (make-const integer% 42))
+                              (make-const boolean% true)}
+                             aggr)]
+      (is (= 0 (count-aggregations c1)))
+      (is (= 1 (count-aggregations c2))))))
