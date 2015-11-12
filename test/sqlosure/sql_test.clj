@@ -1,28 +1,27 @@
 (ns sqlosure.sql-test
   (:require [sqlosure.sql :refer :all]
             [sqlosure.relational-algebra :refer :all]
-            [sqlosure.universe :refer [make-universe universe? universe-base-relation-table]]
+            [sqlosure.universe :as u :refer [make-universe universe? universe-base-relation-table]]
             [sqlosure.type :refer [integer% double% string%]]
             [clojure.test :refer :all]
             [clojure.pprint :refer [pprint]]))
 
-(def test-universe (make-universe))
-
 (deftest make-sql-table-test
-  (let [test-table (make-sql-table "tbl1"
+  (let [test-universe (make-universe)
+        test-table (make-sql-table "tbl1"
                                    (make-rel-scheme {"one" string%
                                                      "two" integer%}))
-        [test-table2 new-universe] (make-sql-table
-                                    "tbl2"
-                                    (make-rel-scheme {"one" string%
-                                                      "two" integer%})
-                                    :universe test-universe)]
+        test-table2 (make-sql-table
+                     "tbl2"
+                     (make-rel-scheme {"one" string%
+                                       "two" integer%})
+                     :universe test-universe)]
     (is (= (base-relation-name test-table) 'tbl1))
     (is (= (sql-table-scheme (base-relation-handle test-table))
            (make-rel-scheme {"one" string% "two" integer%})))
     (is (and (= (sql-table-scheme (base-relation-handle test-table2))
                 (make-rel-scheme {"one" string% "two" integer%}))
-             (= (get (universe-base-relation-table new-universe) 'tbl2)
+             (= ((u/universe-get-base-relation-table test-universe) 'tbl2)
                 test-table2)))))
 
 (deftest sql-order?-test
