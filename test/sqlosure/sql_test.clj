@@ -44,6 +44,9 @@
     (is (and (check-numerical integer% fail) (check-numerical double% fail)))
     (is (thrown? Exception (check-numerical string% fail)))))
 
+(deftest make-sql-universe-test
+  (is (= @sql-universe @(make-sql-universe))))
+
 (deftest >=$-test
   (let [test-expr (>=$ (make-sql-expr-const 1) (make-sql-expr-const 2))]
     ))

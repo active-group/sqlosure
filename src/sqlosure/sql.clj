@@ -157,7 +157,7 @@
 
 (def sql-universe (make-universe))
 
-(defn make-sql-universe
+(defn ^{:test true} make-sql-universe
   []
   (make-derived-universe sql-universe))
 
