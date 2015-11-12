@@ -32,14 +32,14 @@
    order-by sql-select-order-by
    extra sql-select-extra])
 
-(defn new-sql-select
+(defn ^{:test false} new-sql-select
   "Create a new, empty sql-select."
   []
   (make-sql-select nil nil false nil nil nil false nil nil))
 
 (def ^{:private true} sql-order #{:ascending :descending})
 
-(defn sql-order?
+(defn ^{:test true} sql-order?
   "Is a key a sql-order?"
   [k]
   (contains? sql-order k))
@@ -52,7 +52,7 @@
 
 (def ^{:private true} sql-combine-op #{:union :intersection :difference})
 
-(defn sql-combine-op?
+(defn ^{:test true} sql-combine-op?
   "Is a key a sql-combine-op?"
   [k]
   (contains? sql-combine-op k))
@@ -82,13 +82,13 @@
    ;; -1 means postfix
    arity sql-operator-arity])
 
-(defn make-sql-expr-app
+(defn ^{:test true} make-sql-expr-app
   [rator & rands]
   (if (= (Math/abs (sql-operator-arity rator))
          (count rands))
     (really-make-sql-expr-app rator rands)
     (throw (Exception. (str 'make-sql-expr-app
-                            " number or arguments does not match arity of "
+                            ": number or arguments does not match arity of "
                             'rator)))))
 
 (def op-= (make-sql-operator "=" 2))
