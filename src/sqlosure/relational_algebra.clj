@@ -305,7 +305,7 @@ Replaced alist with hash-map."
                     (t/make-set-type (key (first alist)))))
    expr))
 
-(defn ^{:test false} expression-type
+(defn ^{:test true} expression-type
   "`expression-type` takes an environment map and an expression and tries to
   find the expressions type (either based on expr itself or on the
   mappings of the env)."
@@ -335,7 +335,7 @@ Replaced alist with hash-map."
     (set-subquery? expr) false
     :alse (throw (Exception. (str 'aggregate? " invalid expression " expr)))))
 
-(defn- ^{:test false} query-scheme* [q env fail]
+(defn- ^{:test true} query-scheme* [q env fail]
   (letfn [(to-env [scheme]
             (compose-environments (rel-scheme->environment scheme) env))
           (next-step [q*]
@@ -471,7 +471,7 @@ Replaced alist with hash-map."
                                     (order-alist q))
                      (query->datum (order-query q)))
     (top? q) (list 'top (top-count q) (query->datum (top-query q)))
-    :else (throw (Exception. (str 'query->datum " unknown query " q)))))
+    :else (throw (Exception. (str 'query->datum ": unknown query " q)))))
 
 (declare datum->expression)
 
@@ -482,7 +482,7 @@ Replaced alist with hash-map."
       empty-val the-empty
       base-relation (or (u/universe-lookup-base-relation universe (second d))
                         (throw (Exception. (str 'datum->query
-                                                " unknown base relation "
+                                                ": unknown base relation "
                                                 (second d)))))
       project (make-project (into (hash-map)
                                   (map (fn [p]
@@ -637,7 +637,7 @@ Replaced alist with hash-map."
 
 (declare query-substitute-attribute-refs)
 
-(defn ^{:test false} substitute-attribute-refs [alist expr]
+(defn ^{:test true} substitute-attribute-refs [alist expr]
   (fold-expression
    (fn [name] (if-let [r (get alist name)]
                 r
@@ -652,12 +652,15 @@ Replaced alist with hash-map."
    (fn [subquery] (make-set-subquery (query-substitute-attribute-refs alist subquery)))
    expr))
 
-(defn cull-substitution-alist
+(defn ^{:test true} cull-substitution-alist
   "Takes an map and a 'underlying' map of substitutions and returns a map of
   substitutions not already featured in `underlying`."
   [alist underlying]
   (let [underlying-alist (rel-scheme-alist (query-scheme underlying))]
-    (into (hash-map) (filter #(not (contains? underlying-alist (first %))) alist))))
+    (into (hash-map)
+          (filter (fn [[k v]]
+                    (not (contains? underlying-alist k)))
+                  alist))))
 
 (defn ^{:test false} query-substitute-attribute-refs
   [alist q]
@@ -667,8 +670,11 @@ Replaced alist with hash-map."
       (base-relation? q) q
       (project? q) (let [sub (project-query q)
                          culled (cull-substitution-alist alist sub)]
-                     (make-project (map #(cons (first %) (substitute-attribute-refs culled (rest %))))
-                                   (next-step sub)))
+                     (make-project
+                      (into (hash-map)
+                            (map (fn [[k v]] [k (substitute-attribute-refs culled v)])
+                                 (project-alist q)))
+                      (next-step sub)))
       (restrict? q) (let [sub (restrict-query q)
                           culled (cull-substitution-alist alist sub)]
                       (make-restrict (substitute-attribute-refs culled (restrict-exp q))
