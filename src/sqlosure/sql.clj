@@ -239,17 +239,10 @@
                           :data op-=)]
     (make-application rator expr1 expr2)))
 
-(make-rator '= (fn [fail t1 t2] (when (and fail (not (type=? t1 t2)))
-                                  (fail t1 t2))
-                 boolean%)
-            =
-            :universe sql-universe
-            :data op-=)
-
-(=$ (make-attribute-ref "two")
-    (make-attribute-ref "one"))
-
-(defn member
+(defn ^{:test true} member
+  "Locates the first element of xs that is equal to x. If such an element
+  exists, the rest of xs starting with that element is returned. Otherwise,
+  the result is false (Scheme's member function)."
   [x xs]
   (if-let [res (not-empty (drop-while #(not= % x) xs))]
     res

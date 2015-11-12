@@ -47,6 +47,7 @@
 (deftest make-sql-universe-test
   (is (= @sql-universe @(make-sql-universe))))
 
-(deftest >=$-test
-  (let [test-expr (>=$ (make-sql-expr-const 1) (make-sql-expr-const 2))]
-    ))
+(deftest member-test
+  (is (false? (member 4 [1 2 3])))
+  (is (= [2 3] (member 2 [1 2 3])))
+  (is (false? (member 42 nil))))
