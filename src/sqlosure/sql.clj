@@ -50,6 +50,10 @@
    left sql-select-combine-left
    right sql-select-combine-right])
 
+(define-record-type sql-select-table
+  (make-sql-select-table name) sql-select-table?
+  [name sql-select-table-name])
+
 (def ^{:private true} sql-combine-op #{:union :intersection :difference})
 
 (defn ^{:test true} sql-combine-op?
