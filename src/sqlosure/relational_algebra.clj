@@ -3,13 +3,10 @@ relational-algebra.scm.
 Replaced alist with hash-map."
       :author "Marco Schneider, based on Mike Sperbers schemeql2"}
     sqlosure.relational-algebra
-  (:require [sqlosure.universe :as u :refer [register-base-relation!
-                                             universe-base-relation-table
-                                             register-rator!]]
-            [sqlosure.type :as t :refer [make-product-type integer% numeric-type? ordered-type? type=? pair?]]
+  (:require [sqlosure.universe :as u]
+            [sqlosure.type :as t]
             [sqlosure.utils :refer [third]]
             [clojure.set :refer [difference union]]
-            [clojure.pprint :refer [pprint]]
             [active.clojure.record :refer [define-record-type]]))
 
 (define-record-type rel-scheme
@@ -74,7 +71,7 @@ Replaced alist with hash-map."
   [name scheme & {:keys [universe handle]}]
   (let [rel (really-make-base-relation name scheme handle)]
     (when universe
-      (register-base-relation! universe name rel))
+      (u/register-base-relation! universe name rel))
     rel))
 
 ;;; ----------------------------------------------------------------------------
@@ -113,7 +110,7 @@ Replaced alist with hash-map."
   [name range-type-proc proc & {:keys [universe data]}]
   (let [r (really-make-rator name range-type-proc proc data)]
     (when universe
-      (register-rator! universe name r))
+      (u/register-rator! universe name r))
     r))
 
 ;;; ----------------------------------------------------------------------------
@@ -276,24 +273,24 @@ Replaced alist with hash-map."
    (fn [ty val] ty)
    identity
    (fn [rator rands] (apply (rator-range-type-proc rator) fail rands))
-   make-product-type
+   t/make-product-type
    (fn [op t] (let [op (aggregation-operator expr)]
                 (if (= :count op)
-                  integer%
+                  t/integer%
                   (do
 
                     (when fail
                       (cond
                         (contains? #{:sum :avg :std-dev :std-dev-p :var :var-p} op)
-                        (when-not (numeric-type? t) (fail 'numeric-type t))
+                        (when-not (t/numeric-type? t) (fail 'numeric-type t))
                         (contains? #{:min :max} op)
-                        (when-not (ordered-type? t) (fail 'ordered-type t))))
+                        (when-not (t/ordered-type? t) (fail 'ordered-type t))))
                     t))))
    (fn [alist t] (if fail
                    (for [[p r] alist]
                      (do
-                       (when-not (type=? t/boolean% p) (fail 'boolean p))
-                       (when-not (type=? t r) (fail t r))))
+                       (when-not (t/type=? t/boolean% p) (fail 'boolean p))
+                       (when-not (t/type=? t r) (fail t r))))
                    t))
    (fn [subquery] (let [scheme (query-scheme* subquery env fail)
                         alist (rel-scheme-alist scheme)]
@@ -384,7 +381,7 @@ Replaced alist with hash-map."
 
                                      (for [[k v] a2]
                                        (when-let [p2 (get v a1)]
-                                         (when-not (type=? v p2)
+                                         (when-not (t/type=? v p2)
                                            (fail v p2))))))
                                  (rel-scheme-difference s1 s2))
                      (:union :intersection :difference)
@@ -553,7 +550,7 @@ Replaced alist with hash-map."
                     (when-not (= (count domain-types) (count arg-types))
                       (fail domain-types arg-types))
                     (for [dd domain-types ad arg-types]
-                      (when-not (type=? dd ad)
+                      (when-not (t/type=? dd ad)
                         (fail dd ad)))))
                 range-type)
               proc
