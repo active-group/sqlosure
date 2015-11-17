@@ -632,6 +632,24 @@
   (is (= {"three" (make-attribute-ref "three")}
          (cull-substitution-alist {"three" (make-attribute-ref "three")} tbl1))))
 
+(deftest query-substitute-attribute-refs-test
+  (is (= the-empty (query-substitute-attribute-refs {} the-empty)))
+  (is (= tbl1 (query-substitute-attribute-refs {} tbl1)))
+ #_ (is (= (make-project {"two" (make-const integer% 2)
+                        "one" (make-const integer% 1)}
+                       tbl1)
+         )))
+
+(=  (make-project {"two" (make-attribute-ref "two")
+                   "one" (make-attribute-ref "one")}
+                  tbl1)
+    (query-substitute-attribute-refs
+     {"one" (make-const integer% 1)
+      "two" (make-const integer% 2)}
+     (make-project {"two" (make-attribute-ref "two")
+                    "one" (make-attribute-ref "one")}
+                   tbl1)))
+
 (deftest count-aggregations-test
   (let [aggr (make-aggregation
               :count (make-tuple [(make-const integer% 40)
