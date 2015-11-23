@@ -62,9 +62,7 @@ application domain."
 
 (defn register-rator!
   "Takes a universe, a name for a rator and returns a new universe
-  which contains the new name->rator-relation mapping.
-  
-  immutable first."
+  which contains the new name->rator-relation mapping."
   [universe name rator]
   (update-universe! universe :rator-table assoc name rator)
   universe)
