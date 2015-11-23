@@ -31,6 +31,8 @@
 (declare query->sql)
 
 (defn expression->sql
+  "Takes a relational algebra expression and returns the corresponding
+  sql-statement."
   [expr]
   (cond
     (rel/attribute-ref? expr) (sql/make-sql-expr-column
@@ -64,6 +66,7 @@
   (into {} (map (fn [[k v]] [k (expression->sql v)])) alist))
 
 (defn ^{:test true} add-table
+  "Takes an sql-select statement and adds a table to its select-tables list."
   [sql q]
   (sql/set-sql-select-tables sql
                              (conj (sql/sql-select-tables sql) [nil q])))
@@ -87,10 +90,10 @@
                          (sql/set-sql-select-attributes sql (alist->sql alist))))
     (rel/restrict? q) (let [sql (x->sql-select (query->sql
                                                 (rel/restrict-query q)))]
-                        (sql/set-sql-select-criteria
-                         sql
-                         {(expression->sql (rel/restrict-exp q))
-                          (sql/sql-select-criteria sql)}))
+                        (-> sql
+                            (sql/set-sql-select-criteria
+                             (cons (expression->sql (rel/restrict-exp q))
+                                   (sql/sql-select-criteria sql)))))
     (rel/grouping-project? q)
     (let [sql (x->sql-select (query->sql (rel/grouping-project-query q)))
           alist (rel/grouping-project-alist q)]
