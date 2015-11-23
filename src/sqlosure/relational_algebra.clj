@@ -254,7 +254,7 @@ Replaced alist with hash-map."
       (tuple? expr) (on-tuple (map next-step (tuple-expressions expr)))
       (aggregation? expr) (on-aggregation (aggregation-operator expr)
                                           (next-step (aggregation-expr expr)))
-      (case-expr? expr) (on-case (into (hash-map) (map (fn [[k v]] [(next-step k)
+      (case-expr? expr) (on-case (into {} (map (fn [[k v]] [(next-step k)
                                                                     (next-step v)])
                                                        (case-expr-alist expr)))
                                  (next-step (case-expr-default expr)))
@@ -349,7 +349,7 @@ Replaced alist with hash-map."
                        (for [[_ v] m]
                          (when (aggregate? v) (fail ": non-aggregate " v))))
                      (make-rel-scheme
-                      (into (hash-map)
+                      (into {}
                             (map (fn [[k v]]
                                    (let [typ (expression-type* (to-env base-scheme)
                                                                v fail)]
@@ -393,7 +393,7 @@ Replaced alist with hash-map."
                        s1))
       (grouping-project? q) (let [base-scheme (next-step (grouping-project-query q))]
                               (make-rel-scheme
-                               (into (hash-map)
+                               (into {}
                                      (map (fn [[k v]]
                                             (let [typ (expression-type* (to-env base-scheme) v fail)]
                                               (when (and fail (t/product-type? typ))
@@ -484,7 +484,7 @@ Replaced alist with hash-map."
                         (throw (Exception. (str 'datum->query
                                                 ": unknown base relation "
                                                 (second d)))))
-      project (make-project (into (hash-map)
+      project (make-project (into {}
                                   (map (fn [p]
                                          [(first p)
                                           (datum->expression (rest p) universe)])
@@ -496,13 +496,13 @@ Replaced alist with hash-map."
       (make-combine (first d) (next-step (second d))
                     (next-step (third d)))
       grouping-project (make-grouping-project
-                        (into (hash-map)
+                        (into {}
                               (map (fn [p]
                                      [(first p)
                                       (datum->expression (rest p) universe)])
                                    (second d)))
                         (next-step (third d)))
-      order (make-order (into (hash-map)
+      order (make-order (into {}
                               (map (fn [p]
                                      [(datum->expression (first p) universe) (second p)])
                                    (second d)))
@@ -532,7 +532,7 @@ Replaced alist with hash-map."
       tuple (make-tuple (map next-step (rest d)))
       aggregation (make-aggregation (second d)
                                         (next-step (third d)))
-      case-expr (make-case-expr (into (hash-map)
+      case-expr (make-case-expr (into {}
                                           (map (fn [[k v]] [(next-step k)
                                                             (next-step v)])
                                                (second d)))
@@ -657,7 +657,7 @@ Replaced alist with hash-map."
   substitutions not already featured in `underlying`."
   [alist underlying]
   (let [underlying-alist (rel-scheme-alist (query-scheme underlying))]
-    (into (hash-map)
+    (into {}
           (filter (fn [[k v]]
                     (not (contains? underlying-alist k)))
                   alist))))
@@ -671,7 +671,7 @@ Replaced alist with hash-map."
       (project? q) (let [sub (project-query q)
                          culled (cull-substitution-alist alist sub)]
                      (make-project
-                      (into (hash-map)
+                      (into {}
                             (map (fn [[k v]] [k (substitute-attribute-refs culled v)])
                                  (project-alist q)))
                       (next-step sub)))
@@ -715,4 +715,3 @@ Replaced alist with hash-map."
    (fn [_] 0)
    (fn [_] 0)
    e))
-
