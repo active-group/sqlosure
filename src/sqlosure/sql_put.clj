@@ -105,7 +105,7 @@
   (print "WHEN ")
   (put-sql-expression param (first p))
   (print " THEN ")
-  (put-sql-expression param (rest p)))
+  (put-sql-expression param (second p)))
 
 (defn put-where
   [param exprs]
