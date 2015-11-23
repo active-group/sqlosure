@@ -19,13 +19,20 @@
                       :handle (really-make-sql-table name scheme)))
 
 (define-record-type sql-select
-  (make-sql-select options attributes nullary? tables criteria group-by having
-                   order-by extra)
+  (make-sql-select options
+                   attributes
+                   nullary?
+                   tables
+                   criteria
+                   group-by
+                   having
+                   order-by
+                   extra)
   sql-select?
   [options sql-select-options
    attributes sql-select-attributes
    nullary? sql-select-nullary?
-   tables sql-select-tables
+   tables sql-select-tables  ;; (vec-of ["alias" sql-select-table])
    criteria sql-select-criteria
    group-by sql-select-group-by
    having sql-select-having
