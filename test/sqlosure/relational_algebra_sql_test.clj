@@ -76,3 +76,49 @@
   (is (thrown? Exception  ;; Should throw because string% and integer% are not
                           ;; expressions.
                (alist->sql {"one" string% "two" integer%}))))
+
+(deftest add-table-test
+  (is (= tbl1 (-> (new-sql-select)
+                  (add-table tbl1)
+                  sql-select-tables
+                  first
+                  second)))
+  (let [q (-> (new-sql-select) (add-table tbl1) (add-table tbl2))]
+    (is (= 2 (count (sql-select-tables q))))
+    (is (= (list tbl2 tbl1)
+           (map second (sql-select-tables q))))))
+
+(deftest query->sql-test
+  (is (= (make-sql-select-table (base-relation-handle tbl1))
+         (query->sql tbl1)))
+  (let [p (make-project {"two" (make-attribute-ref "two")
+                         "one" (make-attribute-ref "one")}
+                        tbl1)
+        res (set-sql-select-attributes (x->sql-select (query->sql tbl1))
+                                       (alist->sql (project-alist p)))
+        nullary-p (make-project {} tbl1)]
+    (is (sql-select-nullary? (query->sql nullary-p)))
+    (is (= res (query->sql p))))
+  (let [test-universe (make-universe)
+        t1 (make-sql-table 't1
+                           (make-rel-scheme {"C" string%})
+                           :universe test-universe
+                           :handle "t1")
+        r (make-restrict (>=$ (make-const integer% 42)
+                              (make-attribute-ref "C"))
+                         t1)]
+    (is (= [(query->sql t1)]
+           (mapv second (sql-select-tables (query->sql r)))))
+    (is (= (expression->sql (>=$ (make-const integer% 42)
+                                 (make-attribute-ref "C")))
+           (sql-select-criteria (query->sql r))))))
+
+(let [test-universe (make-universe)
+      t1 (make-sql-table 't1
+                         (make-rel-scheme {"C" string%})
+                         :universe test-universe
+                         :handle "t1")
+      r (make-restrict (>=$ (make-const integer% 42)
+                            (make-attribute-ref "C"))
+                       t1)]
+  (:criteria (query->sql r)))
