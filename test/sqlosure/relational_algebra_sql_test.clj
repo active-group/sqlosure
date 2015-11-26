@@ -5,7 +5,6 @@
             [sqlosure.type :refer :all]
             [sqlosure.universe :refer [make-universe]]
             [clojure.pprint :refer [pprint]]
-            [sqlosure.sql :as sql]
             [clojure.test :refer :all]))
 
 (def test-universe (make-sql-universe))
@@ -21,6 +20,7 @@
                            {"three" blob%
                             "four" double%})
                           :universe test-universe))
+
 (deftest x->sql-select-test
   (is (= (new-sql-select) (x->sql-select the-sql-select-empty)))
   (let [sel (set-sql-select-attributes
