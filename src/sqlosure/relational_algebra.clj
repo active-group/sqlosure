@@ -685,15 +685,14 @@ Replaced alist with hash-map."
       (grouping-project? q) (let [sub (grouping-project-query q)
                                   culled (cull-substitution-alist alist sub)]
                               (make-grouping-project
-                               (map #(cons (first %)
-                                           (substitute-attribute-refs culled (rest %)))
-                                    (grouping-project-alist q))
+                               (into {} (map (fn [[k v]] [k (substitute-attribute-refs culled v)])
+                                             (grouping-project-alist q)))
                                (next-step sub)))
       (order? q) (let [sub (order-query q)
                        culled (cull-substitution-alist alist sub)]
-                   (make-order (map #(cons (substitute-attribute-refs culled (first %))
-                                           (rest %))
-                                    (order-alist q))
+                   (make-order (into {} (map (fn [[k v]]
+                                               [(substitute-attribute-refs culled k) v])
+                                             (order-alist q)))
                                (next-step sub)))
       (top? q) (make-top (top-count q) (next-step (top-query q)))
       :else (throw (Exception. (str 'query-substitute-attribute-refs
