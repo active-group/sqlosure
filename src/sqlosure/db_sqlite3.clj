@@ -7,13 +7,18 @@
             [clojure.java.jdbc :refer :all]
             [clojure.string :as s]))
 
-(defn- sqlite3-db
-  [subname]
+(defn- sqlite3-db [conn]
   {:classname "org.sqlite.JDBC"
    :subprotocol "sqlite"
-   :subname subname})
+   :subname (db/db-connection-handle conn)})
 
-(defn sqlite3-put-combine
+(defn- put-select [conn select]
+  (put/sql-select->string (db/db-connection-sql-put-parameterization conn) select))
+
+(defn- put-expr [conn select]
+  (put/sql-expression->string (db/db-connection-sql-put-parameterization conn) select))
+
+(defn- sqlite3-put-combine
   "sqlite3 specific printer for combine queries."
   [param op left right]
   (print "SELECT * FROM (")
@@ -25,72 +30,101 @@
   (put/put-sql-select param right)
   (print ")"))
 
-(defn sqlite3-put-literal
+(defn- sqlite3-put-literal
   "sqlite3 specific printer for literals."
   [val]
   (if (or (= true val) (= false val))
     (if val (print 1) (print 0))
     (put/default-put-literal val)))
 
-(def sqlite3-sql-put-parameterization
+(def ^{:private true} sqlite3-sql-put-parameterization
   "Printer for sqliter3."
   (put/make-sql-put-parameterization sqlite3-put-combine sqlite3-put-literal))
 
-(defn sqlite3-value->value
+(defn- sqlite3-value->value
+  "Takes a sqlosure.type and a value returned from sqlite3 and converts it back
+  to the corresponding Clojure value."
   [tt val]
   (cond
     (or (= tt t/string%) (= tt t/integer%) (= tt t/double%) (= tt t/blob%)) val
     (= tt t/boolean%) (not= val 0)
     :else (throw (Exception. (str 'sqlite3-value->value ": unkown type " tt val)))))
 
-(defn value->sqlite3-value
+(defn- value->sqlite3-value
+  "Takes a sqlosure.type and a value and converts it to it's corresponding
+  sqlite3 value."
   [tt val]
   (cond
     (or (= tt t/string%) (= tt t/integer%) (= tt t/double%) (= tt t/blob%)) val
     (= tt t/boolean%) (if val 1 0)
-    :else (throw (Exception. (str 'value->sqlite3-value ": unknown type " tt val)))))
+    :else (throw (Exception.
+                  (str 'value->sqlite3-value ": unknown type " tt val)))))
 
-(defn sqlite3-close
+(defn- sqlite3-close
   "Takes the sqlite3 connection and closes it."
   [handle]
   (.close (get-connection handle)))
 
-(defn sqlite3-query
-  [conn q]
-  (query (sqlite3-db (db/db-connection-handle conn))
-         [q]))
+(defn- query-row-fn
+  "Takes a relational scheme and a row returned by a query, then returns a map
+  of the key-value pairs with values converted from sqlite3 to Clojure values."
+  [scheme row]
+  (let [alist (rel/rel-scheme-alist scheme)]
+    (into {} (map (fn [[k v] tt] [k (sqlite3-value->value tt v)])
+                  row
+                  (vals alist)))))
 
-(defn sqlite3-insert
+(defn- sqlite3-query
+  "Takes a db-connection, a sql-select statement and a relational scheme and
+  runs the query against the connected database."
+  [conn select scheme]
+  (query (sqlite3-db conn)
+         [(put-select conn select)]
+         :row-fn #(query-row-fn scheme %)))
+
+(defn- sqlite3-insert
+  "Takes a db-connection, a table name (string), a relational scheme and a
+  vector of vals to be inserted and inserts a new record into the connected
+  database's table."
   [conn table scheme vals]
   (let [alist (rel/rel-scheme-alist scheme)]
-    (insert! conn
+    (insert! (sqlite3-db conn)
              table
              (into
               {}
               (map (fn [[k t] v]
                      [k (value->sqlite3-value t v)]) alist vals)))))
 
-(defn sqlite3-delete
+(defn- sqlite3-delete
+  "Takes a db-connection, a table name (string) and a sql-expr criterion and
+  deleted the matching records from the connected database's table."
   [conn table criterion]
-  (execute! conn
+  (execute! (sqlite3-db conn)
             [(str "DELETE FROM " table " WHERE "
-                   (put/sql-expression->string sqlite3-sql-put-parameterization
-                                               criterion))]))
+                  (put-expr conn criterion))]))
 
-(defn sqlite3-update
-  [conn table criterion alist]
+(defn- sqlite3-update
+  "Takes a db-connection, a table-name (string), a relational scheme, a sql-expr
+  criterion and a map of column-name->new-value and applies the update to the
+  connected database's table."
+  [conn table scheme criterion alist]
   (let [clauses (map (fn [[k v]]
                        (str k "="
-                            (put/sql-expression->string
-                             sqlite3-sql-put-parameterization v)))
+                            (put-expr conn v)))
                      alist)]
-    (execute! conn [(str "UPDATE " table " SET "
-                          (s/join ", " clauses)
-                          " WHERE "
-                          (put/sql-expression->string sqlite3-sql-put-parameterization
-                                                      criterion))])))
+    (execute! (sqlite3-db conn)
+              [(str "UPDATE " table " SET "
+                    (s/join ", " clauses)
+                    " WHERE "
+                    (put-expr conn criterion))])))
 
-(defn sqlite3->db-connection
+(defn- sqlite3-run-rql
+  [conn sql]
+  (execute! (sqlite3-db conn) [sql]))
+
+(defn- sqlite3->db-connection
+  "Takes the filename of a sqlite3 database-file and returns a new sqlite3
+  db-connection."
   [filename]
   (db/make-db-connection "sqlite3"  ;; type
                          filename  ;; name
@@ -98,14 +132,20 @@
                          filename   ;; handle
                          sqlite3-sql-put-parameterization
                          nil ;; As long as we're not explicitly keeping the
-                         ;; connection alive, we don't have to close.
-                         (fn [conn query]
-                           (sqlite3-query conn query))
+                         ;; connection alive, we don't have to close. Solution?
+                         (fn [conn query scheme]
+                           (sqlite3-query conn query scheme))
                          (fn [conn table scheme vals]
-                           (sqlite3-insert (sqlite3-db filename) table scheme vals))
+                           (sqlite3-insert conn table scheme vals))
                          (fn [conn table criterion]
-                           (sqlite3-delete (sqlite3-db filename) table criterion))
-                         (fn [conn table criterion alist]
-                           (sqlite3-update (sqlite3-db filename) table criterion alist))
+                           (sqlite3-delete conn table criterion))
+                         (fn [conn table scheme criterion alist]
+                           (sqlite3-update conn table scheme criterion alist))
                          (fn [conn sql]
-                           (query (sqlite3-db filename) sql))))
+                           (query conn sql))))
+
+(defn open-db-connection-sqlite3
+  "Takes the filename of a sqlite3 database-file and returns a new sqlite3
+  db-connection."
+  [filename]
+  (sqlite3->db-connection filename))
