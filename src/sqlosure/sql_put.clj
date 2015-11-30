@@ -80,7 +80,8 @@
                       (print "'"))
     (nil? val) (print "NULL")
     (or (= true val) (= false val)) (if val (print "TRUE") (print "FALSE"))
-    :else (throw (Exception. (str 'default-put-literal ": unhandled literal " val)))))
+    :else (throw (Exception. (str 'default-put-literal
+                                  ": unhandled literal " val)))))
 
 (defn default-put-combine
   [param op left right]
@@ -146,27 +147,28 @@
 (defn put-sql-select-1
   [param sel]
   (cond
-    (sql/sql-select? sel) (do
-                            (print "SELECT")
-                            (put-adding-if-non-null (sql/sql-select-options sel)
-                                                    #(print (s/join " " %)))
-                            (put-space)
-                            (put-attributes param (sql/sql-select-attributes sel))
-                            (put-adding-if-non-null (sql/sql-select-tables sel)
-                                                    #(put-tables param %))
-                            (put-adding-if-non-null (sql/sql-select-criteria sel)
-                                                    #(put-where param %))
-                            (put-adding-if-non-null (sql/sql-select-group-by sel)
-                                                    #(put-group-by param %))
-                            (when-let [h (sql/sql-select-having sel)]
-                              (put-space)
-                              (put-having param h))
-                            (put-adding-if-non-null (sql/sql-select-order-by sel)
-                                                    #(put-order-by param %))
-                            (let [extra (sql/sql-select-extra sel)]
-                              (when-not (empty? extra)
-                                (do (put-space)
-                                    (s/join " " extra)))))
+    (sql/sql-select? sel)
+    (do
+      (print "SELECT")
+      (put-adding-if-non-null (sql/sql-select-options sel)
+                              #(print (s/join " " %)))
+      (put-space)
+      (put-attributes param (sql/sql-select-attributes sel))
+      (put-adding-if-non-null (sql/sql-select-tables sel)
+                              #(put-tables param %))
+      (put-adding-if-non-null (sql/sql-select-criteria sel)
+                              #(put-where param %))
+      (put-adding-if-non-null (sql/sql-select-group-by sel)
+                              #(put-group-by param %))
+      (when-let [h (sql/sql-select-having sel)]
+        (put-space)
+        (put-having param h))
+      (put-adding-if-non-null (sql/sql-select-order-by sel)
+                              #(put-order-by param %))
+      (let [extra (sql/sql-select-extra sel)]
+        (when-not (empty? extra)
+          (do (put-space)
+              (s/join " " extra)))))
     (sql/sql-select-combine? sel) ((sql-put-parameterization-combine-proc param)
                                    param
                                    (sql/sql-select-combine-op sel)
@@ -209,26 +211,32 @@
                                        (put-space)
                                        (put-sql-expression param (second rands))
                                        (print ")"))
-                                 :else (throw (Exception. (str 'put-sql-expression
-                                                               ": unhandled operator arity " op)))))
+                                 :else (throw (Exception.
+                                               (str 'put-sql-expression
+                                                    ": unhandled operator arity " op)))))
     (sql/sql-expr-const? expr) (put-literal param (sql/sql-expr-const-val expr))
-    (sql/sql-expr-tuple? expr) (do (print "(")
-                                   (put-joining-infix (sql/sql-expr-tuple-expressions expr)
-                                                      ", " (fn [b] (put-sql-expression param b)))
-                                   (print ")"))
-    (sql/sql-expr-case? expr) (do (print "(CASE ")
-                                  (map #(put-when param %) (sql/sql-expr-case-branches expr))
-                                  (print " ELSE ")
-                                  (put-sql-expression param (sql/sql-expr-case-default expr))
-                                  (print ")"))
-    (sql/sql-expr-exists? expr) (do (print "EXISTS ")
-                                    (print "(")
-                                    (put-sql-select param (sql/sql-expr-exists-select expr))
-                                    (print ")"))
-    (sql/sql-expr-subquery? expr) (do (print "(")
-                                      (put-sql-select param (sql/sql-expr-subquery-query expr))
-                                      (print ")"))
-    :else (throw (Exception. (str 'put-sql-expression ": unhandled expression " expr)))))
+    (sql/sql-expr-tuple? expr)
+    (do (print "(")
+        (put-joining-infix (sql/sql-expr-tuple-expressions expr)
+                           ", " (fn [b] (put-sql-expression param b)))
+        (print ")"))
+    (sql/sql-expr-case? expr)
+    (do (print "(CASE ")
+        (map #(put-when param %) (sql/sql-expr-case-branches expr))
+        (print " ELSE ")
+        (put-sql-expression param (sql/sql-expr-case-default expr))
+        (print ")"))
+    (sql/sql-expr-exists? expr)
+    (do (print "EXISTS ")
+        (print "(")
+        (put-sql-select param (sql/sql-expr-exists-select expr))
+        (print ")"))
+    (sql/sql-expr-subquery? expr)
+    (do (print "(")
+        (put-sql-select param (sql/sql-expr-subquery-query expr))
+        (print ")"))
+    :else (throw (Exception.
+                  (str 'put-sql-expression ": unhandled expression " expr)))))
 
 (defn sql-expression->string
   [param expr]
