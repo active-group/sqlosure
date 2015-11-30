@@ -17,30 +17,30 @@ Replaced alist with hash-map."
 (def the-empty-rel-scheme (make-rel-scheme nil))
 (def the-empty-environment nil)
 
-(defn ^{:test true} rel-scheme=?
+(defn rel-scheme=?
   "Returns true if t1 and t2 are the same."
   [t1 t2]
   ;; TODO: Couldn't this just be (= t1 t2)?
   (= (rel-scheme-alist t1) (rel-scheme-alist t2)))
 
-(defn ^{:test true} rel-scheme-difference
+(defn rel-scheme-difference
   "Return a new rel-scheme resulting of the (set-)difference of s1's and s2's
   alist."
   [s1 s2]
   (make-rel-scheme (into {} (difference (set (rel-scheme-alist s1))
                                         (set (rel-scheme-alist s2))))))
 
-(defn ^{:test true} rel-scheme-unary?
+(defn rel-scheme-unary?
   "Returns true if the rel-scheme's alist consist of only one pair."
   [scheme]
   (= 1 (count (rel-scheme-alist scheme))))
 
-(defn ^{:test true} rel-scheme->environment
+(defn rel-scheme->environment
   "Returns the relation table of a rel-scheme."
   [s]
   (rel-scheme-alist s))
 
-(defn ^{:test true} compose-environments
+(defn compose-environments
   "Combine two environments. e1 takes precedence over e2."
   [e1 e2]
   (cond
@@ -48,7 +48,7 @@ Replaced alist with hash-map."
     (empty? e2) e1
     :else (merge e2 e1)))
 
-(defn ^{:test true} lookup-env
+(defn lookup-env
   "Lookup a name in an environment.
   TODO: Should this return `false` as in the original?"
   [name env]
@@ -64,7 +64,7 @@ Replaced alist with hash-map."
    scheme base-relation-scheme
    handle base-relation-handle])
 
-(defn ^{:test true} make-base-relation
+(defn make-base-relation
   "Returns a new base relation.
   If :handle is supplied, use is as base-relation-handle, defaults to nil.
   If :universe is supplied, return a vector of [relation universe]"
@@ -95,7 +95,7 @@ Replaced alist with hash-map."
   [rator application-rator
    rands application-rands])
 
-(defn ^{:test true} make-application
+(defn make-application
   [rator & rands]
   (really-make-application rator rands))
 
@@ -106,7 +106,7 @@ Replaced alist with hash-map."
    proc rator-proc
    data rator-data])
 
-(defn ^{:test true} make-rator
+(defn make-rator
   [name range-type-proc proc & {:keys [universe data]}]
   (let [r (really-make-rator name range-type-proc proc data)]
     (when universe
@@ -122,7 +122,7 @@ Replaced alist with hash-map."
   [alist project-alist  ;; (project -> hash-map)
    query project-query])
 
-(defn ^{:test true} make-project
+(defn make-project
   [alist query]
   (if (map? alist)
     (if (empty? alist)
@@ -134,7 +134,7 @@ Replaced alist with hash-map."
 
 (declare query-scheme)
 
-(defn ^{:test false} make-extend
+(defn make-extend
   "Creates a projection of some attributes while keeping all other atrtibutes in
   the relation visible too."
   [alist query]
@@ -163,10 +163,10 @@ Replaced alist with hash-map."
 
 (def ^{:private true} relational-ops #{:product :union :intersection :quotient :difference})
 
-(defn ^{:test true} relational-op? [k]
+(defn relational-op? [k]
   (contains? relational-ops k))
 
-(defn ^{:test true} make-combine [rel-op query-1 query-2]
+(defn make-combine [rel-op query-1 query-2]
   (if-not (relational-op? rel-op)
     (throw (Exception. (str 'make-combine " not a relational operator " rel-op)))
     (cond
@@ -175,19 +175,19 @@ Replaced alist with hash-map."
       (empty? query-2) query-1
       :else (really-make-combine rel-op query-1 query-2))))
 
-(defn ^{:test true} make-product [query-1 query-2]
+(defn make-product [query-1 query-2]
   (make-combine :product query-1 query-2))
 
-(defn ^{:test true} make-union [query-1 query-2]
+(defn make-union [query-1 query-2]
   (make-combine :union query-1 query-2))
 
-(defn ^{:test false} make-intersection [query-1 query-2]
+(defn make-intersection [query-1 query-2]
   (make-combine :intersection query-1 query-2))
 
-(defn ^{:test false} make-quotient [query-1 query-2]
+(defn make-quotient [query-1 query-2]
   (make-combine :quotient query-1 query-2))
 
-(defn ^{:test false} make-difference [query-1 query-2]
+(defn make-difference [query-1 query-2]
   (make-combine :difference query-1 query-2))
 
 (define-record-type empty-val
@@ -197,7 +197,7 @@ Replaced alist with hash-map."
 
 (def ^{:private true} order-op #{:ascending :descending})
 
-(defn ^{:test true} order-op? [k]
+(defn order-op? [k]
   (contains? order-op k))
 
 (define-record-type order
@@ -218,7 +218,7 @@ Replaced alist with hash-map."
 (def ^{:private true} aggregations-op #{:count :sum :avg :min :max :std-dev
                                         :std-dev-p :var :var-p})
 
-(defn ^{:test true} aggregations-op? [k]
+(defn aggregations-op? [k]
   (contains? aggregations-op k))
 
 (define-record-type aggregation
@@ -239,7 +239,7 @@ Replaced alist with hash-map."
   (make-set-subquery query) set-subquery?
   [query set-subquery-query])
 
-(defn ^{:test false} fold-expression
+(defn fold-expression
   [on-attribute-ref on-const on-null on-application on-tuple on-aggregation
    on-case on-scalar-subquery on-set-subquery expr]
   (let [next-step #(fold-expression on-attribute-ref on-const on-null on-application
@@ -305,7 +305,7 @@ Replaced alist with hash-map."
                     (t/make-set-type (key (first alist)))))
    expr))
 
-(defn ^{:test true} expression-type
+(defn expression-type
   "`expression-type` takes an environment map and an expression and tries to
   find the expressions type (either based on expr itself or on the
   mappings of the env)."
@@ -317,7 +317,7 @@ Replaced alist with hash-map."
                                                    ": type violation, expected "
                                                    expected ", found " thing)))))))
 
-(defn ^{:test true} aggregate?
+(defn aggregate?
   "Returns true if `expr` is or contains an aggregation."
   [expr]
   (cond
@@ -335,7 +335,7 @@ Replaced alist with hash-map."
     (set-subquery? expr) false
     :alse (throw (Exception. (str 'aggregate? " invalid expression " expr)))))
 
-(defn- ^{:test true} query-scheme* [q env fail]
+(defn- query-scheme* [q env fail]
   (letfn [(to-env [scheme]
             (compose-environments (rel-scheme->environment scheme) env))
           (next-step [q*]
@@ -412,7 +412,7 @@ Replaced alist with hash-map."
       (top? q) (next-step (top-query q))
       :else (throw (Exception. (str 'query-scheme ": unknown query " q))))))
 
-(defn ^{:test true} query-scheme
+(defn query-scheme
   "Return the query scheme of query `q` as a `rel-scheme`.
   If :typecheck is provided, perform basic validation of types."
   [q & {:keys [typecheck?]}]
@@ -422,7 +422,7 @@ Replaced alist with hash-map."
                         (throw (Exception. (str 'query-scheme " type violation "
                                                 expected thing)))))))
 
-(defn ^{:test true} query?
+(defn query?
   "Returns true if the `obj` is a query."
   [obj]
   (or (empty? obj) (base-relation? obj) (project? obj) (restrict? obj)
@@ -430,7 +430,7 @@ Replaced alist with hash-map."
 
 (declare query->datum)
 
-(defn ^{:test true} expression->datum
+(defn expression->datum
   "Takes an expression and returns a data representation of it.
   Example:
   * `(expression->datum (make-attribute-ref \"foo\")) => (attribute-ref \"foo\")'"
@@ -447,7 +447,7 @@ Replaced alist with hash-map."
    (fn [subquery] (list 'set-subquery-query (query->datum subquery)))
    e))
 
-(defn ^{:test true} query->datum
+(defn query->datum
   [q]
   (cond
     (empty? q) (list 'empty-val)
@@ -475,7 +475,7 @@ Replaced alist with hash-map."
 
 (declare datum->expression)
 
-(defn ^{:test true} datum->query
+(defn datum->query
   [d universe]
   (letfn [(next-step [d*] (datum->query d* universe))]
     (case (first d)
@@ -541,7 +541,7 @@ Replaced alist with hash-map."
       set-subquery (make-set-subquery (datum->query (second d) universe))
       (throw (Exception. (str 'datum->expression ": invalid datum " d))))))
 
-(defn ^{:test false} make-monomorphic-rator
+(defn make-monomorphic-rator
   [name domain-types range-type proc & {:keys [universe data]}]
   (make-rator name
               (fn [fail & arg-types]
@@ -557,12 +557,12 @@ Replaced alist with hash-map."
               :universe universe
               :data data))
 
-(defn ^{:test false} null-lift-binary-predicate [pred]
+(defn null-lift-binary-predicate [pred]
   (fn [v1 v2]
     (when-not (or (empty? v1) (empty? v2))
       (pred v1 v2))))
 
-(defn ^{:test false} make-monomorphic-combinator
+(defn make-monomorphic-combinator
   [name domains range proc & {:keys [universe data]}]
   (let [rator (make-monomorphic-rator name domains range proc
                                       :universe universe :data data)]
@@ -571,7 +571,7 @@ Replaced alist with hash-map."
 
 (declare query-attribute-names)
 
-(defn ^{:test true} expression-attribute-names
+(defn expression-attribute-names
   "Takes an expression and returns a seq all attribute-ref's names."
   [expr]
   (fold-expression
@@ -588,7 +588,7 @@ Replaced alist with hash-map."
    query-attribute-names
    expr))
 
-(defn ^{:test true} query-attribute-names
+(defn query-attribute-names
   "Takes a query and returns a seq of all attribute-ref's names."
   [q]
   (letfn [(flat-distinct-vec [xs]
@@ -637,7 +637,7 @@ Replaced alist with hash-map."
 
 (declare query-substitute-attribute-refs)
 
-(defn ^{:test true} substitute-attribute-refs [alist expr]
+(defn substitute-attribute-refs [alist expr]
   (fold-expression
    (fn [name] (if-let [r (get alist name)]
                 r
@@ -652,7 +652,7 @@ Replaced alist with hash-map."
    (fn [subquery] (make-set-subquery (query-substitute-attribute-refs alist subquery)))
    expr))
 
-(defn ^{:test true} cull-substitution-alist
+(defn cull-substitution-alist
   "Takes an map and a 'underlying' map of substitutions and returns a map of
   substitutions not already featured in `underlying`."
   [alist underlying]
@@ -662,7 +662,7 @@ Replaced alist with hash-map."
                     (not (contains? underlying-alist k)))
                   alist))))
 
-(defn ^{:test false} query-substitute-attribute-refs
+(defn query-substitute-attribute-refs
   [alist q]
   (letfn [(next-step [qq] (query-substitute-attribute-refs alist qq))]
     (cond
@@ -699,7 +699,7 @@ Replaced alist with hash-map."
       :else (throw (Exception. (str 'query-substitute-attribute-refs
                                     ": unknown query " q))))))
 
-(defn ^{:test true} count-aggregations
+(defn count-aggregations
   "Count all aggregations in an expression."
   [e]
   (fold-expression
