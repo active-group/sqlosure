@@ -28,23 +28,33 @@
     (set-db-connection-handle conn nil)))
 
 (defn db-query
-  ;; In the original implementation, there also was a 'scheme' argument which
-  ;; never got used.. Can't we just get rid of this?
-  [conn select]
+  "Takes a db-connection, a sql-select and a relational scheme and runs the
+  select query against the connected database."
+  [conn select scheme]
   ((db-connection-querier conn) conn select scheme))
 
 (defn db-insert
+  "Takes a db-connection, a table name (string), a relational scheme and a
+  vector of values and inserts it into the connected database."
   [conn table scheme vals]
   ((db-connection-inserter conn) conn table scheme vals))
 
 (defn db-delete
+  "Takes a db-connection, a table name (string) and a sql expression
+  representing the criterion for deleten and deletes the matching records from
+  the connected database."
   [conn table criterion]
   ((db-connection-deleter conn) conn table criterion))
 
 (defn db-update
+  "Takes a db-connection, a table name (string), a relational scheme, a sql
+  expression representing the criterion for records to update and a map
+  of column-name->new-value and applies the update to the connected database's
+  table."
   [conn table scheme criterion alist]
   ((db-connection-updater conn) conn table scheme criterion alist))
 
 (defn db-run-sql
+  "Run a plain sql expression against the connected database."
   [conn sql]
   ((db-connection-sql-runner conn) conn sql))
