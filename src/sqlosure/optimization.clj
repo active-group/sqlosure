@@ -3,12 +3,6 @@
             [sqlosure.relational-algebra-sql :as rs]
             [clojure.set :as set]))
 
-(defn optimize-query
-  [q]
-  (-> q
-      push-restrict
-      merge-project))
-
 (defn project-alist-substitute-attribute-refs
   [alist palist]
   (into {} (map (fn [[k v]] [k (r/substitute-attribute-refs alist v)])
@@ -16,18 +10,24 @@
 
 (defn order-alist-attribute-names
   [alist]
-  (distinct (map r/expression-attribute-names (vals alist))))
-
-(defn intersect-live
-  [live q]
-  (into []
-        (set/intersection
-         (into #{} live)
-         (into #{} (keys (r/rel-scheme-alist (r/query-scheme q)))))))
+  (flatten (distinct (map r/expression-attribute-names (keys alist)))))
 
 (defn query->alist
   [q]
   (-> q r/query-scheme r/rel-scheme-alist))
+
+(defn intersect-live
+  "Takes a sequence of 'live' values and a query and returns the intersection of
+  all refs in both the live-list and the rel-scheme-alist of the query."
+  [live q]
+  (into []
+        (set/intersection
+         (into #{} live)
+         (into #{} (keys (query->alist q))))))
+
+(defn elem?
+  [coll e]
+  (some #(= % e) coll))
 
 (defn remove-dead
   [q]
@@ -36,21 +36,22 @@
          (cond
            (nil? q) q
            (r/base-relation? q) q
-           (r/project? q) (let [new-alist (into {} (filter (fn [[k v]] (contains? live k))
+           (r/project? q) (let [new-alist (into {} (filter (fn [[k _]] (elem? live k))
                                                            (r/project-alist q)))]
                             (r/make-project new-alist
                                             (worker (map (fn [[k v]] (r/expression-attribute-names v))
                                                         new-alist)
-                                                   (r/project-query q))))
+                                                    (r/project-query q))))
            (r/restrict? q) (let [e (r/restrict-exp q)]
                              (r/make-restrict e
                                               (worker (concat (r/expression-attribute-names e)
                                                               live)
                                                       (r/restrict-query q))))
            (r/order? q) (let [alist (r/order-alist q)]
-                          (r/make-order alist (worker (concat (order-alist-attribute-names alist)
-                                                              live)
-                                                      (r/order-query q))))
+                          (r/make-order alist
+                                        (worker (concat (order-alist-attribute-names alist)
+                                                        live)
+                                                (r/order-query q))))
            (r/top? q) (r/make-top (r/top-count q) (worker live (r/top-query q)))
            (r/combine? q) (let [q1 (r/combine-query-1 q)
                                 q2 (r/combine-query-2 q)]
@@ -70,8 +71,7 @@
                                                                                             new-alist))
                                                                                 (r/project-query q))))
            :else (throw (Exception. (str 'remove-dead ": unknown query " q)))))]
-    (worker (keys (r/rel-scheme-alist (r/query-scheme q)))
-            q)))
+    (worker (keys (query->alist q)) q)))
 
 (defn merge-project
   [q]
@@ -104,7 +104,7 @@
                 (r/make-project pa pq)))))
         :else (r/make-project pa pq)))
     (r/restrict? q) (r/make-restrict (r/restrict-exp q) (merge-project (r/restrict-query q)))
-    (r/order? q) (r/make-order  (r/order-alist q) (merge-project (r/order-query q)))
+    (r/order? q) (r/make-order (r/order-alist q) (merge-project (r/order-query q)))
     (r/top? q) (r/make-top (r/top-count q) (merge-project (r/top-query q)))
     (r/combine? q) (r/make-combine (r/combine-rel-op q)
                                    (merge-project (r/combine-query-1 q))
@@ -203,3 +203,9 @@
     (r/grouping-project? q) (r/make-grouping-project (r/grouping-project-alist q)
                                                      (push-restrict (r/grouping-project-query q)))
     :else (throw (Exception. (str 'push-restrict ": unknown query " q)))))
+
+(defn optimize-query
+  [q]
+  (-> q
+      push-restrict
+      merge-project))
