@@ -214,7 +214,7 @@
     (sql/sql-expr-const? expr) (put-literal param (sql/sql-expr-const-val expr))
     (sql/sql-expr-tuple? expr) (do (print "(")
                                    (put-joining-infix (sql/sql-expr-tuple-expressions expr)
-                                                      ", " (fn [a b] (put-sql-expression a param b)))
+                                                      ", " (fn [b] (put-sql-expression param b)))
                                    (print ")"))
     (sql/sql-expr-case? expr) (do (print "(CASE ")
                                   (map #(put-when param %) (sql/sql-expr-case-branches expr))
