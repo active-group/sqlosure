@@ -72,13 +72,15 @@
                              (conj (sql/sql-select-tables sql) [nil q])))
 
 (defn query->sql
+  "Takes a query in abstract relational algegbra and returns the corresponding
+  abstract sql."
   [q]
   (cond
     (rel/base-relation? q)
     (if-not (sql/sql-table? (rel/base-relation-handle q))
       (throw (Exception.
               (str 'query->sql ": base-relation not an SQL table " q)))
-      (sql/make-sql-select-table (rel/base-relation-handle q)))
+      (sql/make-sql-select-table (sql/sql-table-name (rel/base-relation-handle q))))
     (rel/project? q) (let [sql (x->sql-select (query->sql
                                                (rel/project-query q)))
                            alist (rel/project-alist q)]
