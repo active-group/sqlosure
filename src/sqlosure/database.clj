@@ -8,13 +8,20 @@
             [sqlosure.sql :as sql]))
 
 (defn run-query
+  "Takes a database connection and a query and runs it against the database."
   [conn q]
   (let [qq (o/optimize-query q)]
     (c/db-query conn (rsql/query->sql qq) (rel/query-scheme qq))))
 
 (defn insert
-  [conn sql-table & rest]
-  ())
+  "Takes a database connection"
+  [conn sql-table & args]
+  (let [[scheme vals] (if (and (t/pair? args) (rel/rel-scheme? (first args)))
+                        [(first args) (rest args)]
+                        [(rel/query-scheme sql-table) args])]
+    (c/db-insert conn (sql/sql-table-name (rel/base-relation-handle sql-table))
+                 scheme
+                 vals)))
 
 (defn delete
   [conn sql-table criterion-proc]
@@ -27,7 +34,7 @@
                   (rel/rel-scheme-alist (rel/query-scheme sql-table))))))))
 
 (defn update
-  [conn sql-table criterion-proc alist-first & rest]
+  [conn sql-table criterion-proc alist-first & args]
   (let [name (sql/sql-table-name (rel/base-relation-handle sql-table))
         scheme (rel/query-scheme sql-table)
         attr-exprs (map (fn [[k v]] (rel/make-attribute-ref k))
@@ -39,7 +46,7 @@
                               [k (rsql/expression->sql v)])
                             (if (fn? alist-first)
                               (apply alist-first attr-exprs)
-                              (cons alist-first rest)))))))
+                              (cons alist-first args)))))))
 
 (def close-database c/close-db-connection)
 (def run-sql c/db-run-sql)
