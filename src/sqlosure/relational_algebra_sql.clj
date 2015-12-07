@@ -1,6 +1,7 @@
 (ns sqlosure.relational-algebra-sql
   (:require [sqlosure.relational-algebra :as rel]
-            [sqlosure.sql :as sql]))
+            [sqlosure.sql :as sql]
+            [active.clojure.condition :as c]))
 
 (defn x->sql-select
   "Takes a sql expression and turns it into a sql-select."
@@ -58,7 +59,7 @@
                                  (query->sql (rel/scalar-subquery-query expr)))
     (rel/set-subquery? expr) (sql/make-sql-expr-subquery
                               (query->sql (rel/set-subquery-query expr)))
-    :else (throw (Exception. (str 'expression->subquery ": unknown expression " expr)))))
+    :else (c/assertion-violation (str 'expression->subquery ": unknown expression " expr))))
 
 (defn ^{:test true} alist->sql
   "Takes a map and returns a corresponding sql statement."
