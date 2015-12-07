@@ -12,7 +12,7 @@
    scheme sql-table-scheme  ;; (sql-table -> rel-scheme)
    ])
 
-(defn ^{:test true} make-sql-table
+(defn make-sql-table
   [name scheme & {:keys [universe]}]
   (make-base-relation (symbol name) scheme
                       :universe universe
@@ -205,7 +205,9 @@
                                        not
                                        :universe sql-universe))
 
-(def or$ (make-monomorphic-combinator 'or [boolean% boolean%] boolean%
+(def or$ (make-monomorphic-combinator 'or
+                                      [boolean% boolean%]
+                                      boolean%
                                       (fn [a b]
                                         (or a b (if (or (empty? a)
                                                         (empty? b))
