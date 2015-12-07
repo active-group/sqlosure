@@ -4,15 +4,19 @@
             [clojure.set :as set]))
 
 (defn project-alist-substitute-attribute-refs
+  "Takes an alist and a project query's alist and substitutes all of the
+  latter's refs."
   [alist palist]
   (into {} (map (fn [[k v]] [k (r/substitute-attribute-refs alist v)])
                 palist)))
 
 (defn order-alist-attribute-names
+  "Takes an order query's alist and returns it's referenced attributes."
   [alist]
   (flatten (distinct (map r/expression-attribute-names (keys alist)))))
 
 (defn query->alist
+  "Return the rel-scheme-alist of a query's query-scheme."
   [q]
   (-> q r/query-scheme r/rel-scheme-alist))
 
@@ -26,6 +30,7 @@
          (into #{} (keys (query->alist q))))))
 
 (defn elem?
+  "Does a collection contain e?"
   [coll e]
   (some #(= % e) coll))
 
@@ -241,6 +246,7 @@
     :else (throw (Exception. (str 'push-restrict ": unknown query " q)))))
 
 (defn optimize-query
+  "Takes a query and performs some optimizations."
   [q]
   (-> q
       push-restrict
