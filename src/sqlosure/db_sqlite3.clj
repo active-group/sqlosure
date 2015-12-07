@@ -79,7 +79,7 @@
   runs the query against the connected database."
   [conn select scheme]
   (query (sqlite3-db conn)
-         [(put-select conn select)]
+         [(put-select conn select)]  ;; TODOO: this has to be handled via jdbc (types?)
          :row-fn #(query-row-fn scheme %)))
 
 (defn- sqlite3-insert
