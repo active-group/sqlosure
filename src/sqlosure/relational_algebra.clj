@@ -566,7 +566,7 @@ Replaced alist with hash-map."
   [name domains range proc & {:keys [universe data]}]
   (let [rator (make-monomorphic-rator name domains range proc
                                       :universe universe :data data)]
-    (fn [exprs]
+    (fn [& exprs]
       (apply make-application rator exprs))))
 
 (declare query-attribute-names)
