@@ -20,11 +20,9 @@ We can now execute queries against this table as follows
 (ns sqlosure.test
   (:require [sqlosure.sql :as sql :refer [=$ or$]]
             [sqlosure.relational-algebra :as rel :refer [make-const]]
-            [sqlosure.relational-algebra-sql :refer :all]
             [sqlosure.type :as t]
-            [sqlosure.db-connection :as dbc]
-            ;; [sqlosure.db-sqlite3 :refer :all]
-            [sqlosure.db-postgresql :refer :all]
+            ;; [sqlosure.db-sqlite3 :refer :all]  ;; either postgres or sqlite3
+            [sqlosure.db-postgresql :refer [open-db-connetion-postgresql]]
             [sqlosure.database :as db :refer [run-query insert delete update]]))
 
 ;; Our table we want to query.
