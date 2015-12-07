@@ -118,7 +118,7 @@
                     " WHERE "
                     (put-expr conn criterion))])))
 
-(defn- sqlite3-run-rql
+(defn- sqlite3-run-sql
   [conn sql]
   (execute! (sqlite3-db conn) [sql]))
 
