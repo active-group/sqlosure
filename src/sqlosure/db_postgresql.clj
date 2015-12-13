@@ -12,12 +12,7 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
   "Takes a postgresql db-connection and returns the corresponding
   jdbc-connection map."
   [conn]
-  (let [conn-data (:data conn)]
-    {:classname "org.postgresql.Driver"
-     :subprotocol "postgresql"
-     :subname (str "//"  (:db-host conn-data) ":" (:db-port conn-data) "/" (:db-name conn-data))
-     :user (:db-user conn-data)
-     :password (:db-password conn-data)}))
+  (:data conn))
 
 (defn- put-expr [conn select]
   (put/sql-expression->string (db/db-connection-sql-put-parameterization conn) select))
@@ -92,15 +87,22 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
   [conn sql]
   (execute! (postgresql-db conn) [sql]))
 
-(defn- postgresql->db-connection
+(defn- postgresql-db-spec
+  "Returns a usual jdbc connection spec for the connection to a postgresql server."
   [db-host db-port db-name db-user db-password]
+  {:classname "org.postgresql.Driver"
+   :subprotocol "postgresql"
+   :subname (str "//"  db-host ":" db-port "/" db-name)
+   :user db-user
+   :password db-password})
+
+(defn postgresql->db-connection
+  "Returns a db-connection for a db name and (jdbc) connection specification, with specializations for postgresql."
+  [db-name db-spec]
   (db/make-db-connection "postgresql"  ;; type
                          db-name       ;; name
-                         {:db-host db-host  ;; data
-                          :db-port db-port
-                          :db-name db-name
-                          :db-user db-user
-                          :db-password db-password}
+                         db-spec       ;; data
+                         
                          db-name  ;; handle
                          postgresql-sql-put-parameterization
                          nil
