@@ -29,11 +29,28 @@
 
 (deftest put-literal-test
   (let [p default-sql-put-parameterization]
-    (is (= "42" (with-out-str (put-literal p 42))))
-    (is (= "'foobar'" (with-out-str (put-literal p "foobar"))))
-    (is (= "NULL" (with-out-str (put-literal p nil))))
-    (is (= "TRUE" (with-out-str (put-literal p true))))
-    (is (= "FALSE" (with-out-str (put-literal p false))))))
+    (is (= ["?" 42] (with-out-str-and-value (put-literal p 42))))
+    (is (= ["?" "foobar"] (with-out-str-and-value (put-literal p "foobar"))))
+    (is (= ["?" nil] (with-out-str-and-value (put-literal p nil))))
+    (is (= ["?" true] (with-out-str-and-value (put-literal p true))))
+    (is (= ["?" false] (with-out-str-and-value (put-literal p false))))))
+
+(with-out-str-and-value
+  (put-sql-select default-sql-put-parameterization (-> (new-sql-select)
+                                                       (set-sql-select-tables
+                                                        [["S" (make-sql-select-table "SUPPLIERS")]
+                                                         [nil (make-sql-select-table "CUSTOMERS")]])
+                                                       (set-sql-select-attributes
+                                                        {"UID" (make-sql-expr-column "UID")})
+                                                       (set-sql-select-order-by
+                                                        [[(make-sql-expr-column "uid") :ascending]])
+                                                       (set-sql-select-criteria
+                                                        [(make-sql-expr-app op-<
+                                                                            (make-sql-expr-column "foo")
+                                                                            (make-sql-expr-const 10))
+                                                         (make-sql-expr-app op-=
+                                                                            (make-sql-expr-column "uid")
+                                                                            (make-sql-expr-const 5))]))))
 
 (deftest put-sql-select-test
   (let [put-sql-select*
@@ -48,8 +65,8 @@
                                         (make-rel-scheme {"one" string%
                                                           "two" integer%})))
           q (query->sql o)]
-      (is (= "SELECT * FROM tbl1 ORDER BY one ASC"
-             (with-out-str
+      (is (= ["SELECT * FROM tbl1 ORDER BY one ASC" '()]
+             (with-out-str-and-value
                (put-sql-select default-sql-put-parameterization q)))))
     (let [q1 (-> (new-sql-select)
                  (set-sql-select-tables
@@ -74,20 +91,22 @@
                   [(make-sql-expr-app op-<
                                       (make-sql-expr-column "cost")
                                       (make-sql-expr-const 100))]))]
-      (is (= (with-out-str (put-sql-select* q1))
-             (str "SELECT UID "
-                  "FROM SUPPLIERS AS S, CUSTOMERS "
-                  "WHERE (foo < 10) AND (uid = 5) "
-                  "ORDER BY uid ASC")))
-      (is (= (with-out-str (put-sql-select*
-                            (make-sql-select-combine :union q1 q2)))
-             (str "(SELECT UID FROM SUPPLIERS AS S, CUSTOMERS "
-                  "WHERE (foo < 10) AND (uid = 5) "
-                  "ORDER BY uid ASC) "
-                  "UNION "
-                  "(SELECT cost "
-                  "FROM PARTS "
-                  "WHERE (cost < 100))"))))))
+      (is (= (with-out-str-and-value (put-sql-select* q1))
+             [(str "SELECT UID "
+                    "FROM SUPPLIERS AS S, CUSTOMERS "
+                    "WHERE (foo < ?) AND (uid = ?) "
+                    "ORDER BY uid ASC")
+              '(10 5)]))
+      (is (= (with-out-str-and-value (put-sql-select*
+                                      (make-sql-select-combine :union q1 q2)))
+             [(str "(SELECT UID FROM SUPPLIERS AS S, CUSTOMERS "
+                    "WHERE (foo < ?) AND (uid = ?) "
+                    "ORDER BY uid ASC) "
+                    "UNION "
+                    "(SELECT cost "
+                    "FROM PARTS "
+                    "WHERE (cost < ?))")
+              '(10 5 100)])))))
 
 (deftest put-joining-infix-test
   (is (= "foo bar baz"
@@ -105,11 +124,11 @@
                                     ["b" (make-sql-select-table "bar")]])))))
 
 (deftest default-put-literal-test
-  (is (= "42" (with-out-str (default-put-literal 42))))
-  (is (= "'foobar'" (with-out-str (default-put-literal "foobar"))))
-  (is (= "NULL" (with-out-str (default-put-literal nil))))
-  (is (= "TRUE" (with-out-str (default-put-literal true))))
-  (is (= "FALSE" (with-out-str (default-put-literal false)))))
+  (is (= ["?" 42] (with-out-str-and-value (default-put-literal 42))))
+  (is (= ["?" "foobar"] (with-out-str-and-value (default-put-literal "foobar"))))
+  (is (= ["?" nil] (with-out-str-and-value (default-put-literal nil))))
+  (is (= ["?" true] (with-out-str-and-value (default-put-literal true))))
+  (is (= ["?" false] (with-out-str-and-value (default-put-literal false)))))
 
 (deftest default-put-combine-test
   (let [q1 (-> (new-sql-select)
@@ -135,25 +154,28 @@
                 [(make-sql-expr-app op-<
                                     (make-sql-expr-column "cost")
                                     (make-sql-expr-const 100))]))]
-    (is (= (with-out-str (default-put-combine default-sql-put-parameterization
+    (is (= (with-out-str-and-value (default-put-combine default-sql-put-parameterization
                                               :union q1 q2))
-           (str "(SELECT UID FROM SUPPLIERS AS S, CUSTOMERS "
-                "WHERE (foo < 10) AND (uid = 5) "
-                "ORDER BY uid ASC) "
-                "UNION "
-                "(SELECT cost "
-                "FROM PARTS "
-                "WHERE (cost < 100))")))))
+           [(str "(SELECT UID FROM SUPPLIERS AS S, CUSTOMERS "
+                  "WHERE (foo < ?) AND (uid = ?) "
+                  "ORDER BY uid ASC) "
+                  "UNION "
+                  "(SELECT cost "
+                  "FROM PARTS "
+                  "WHERE (cost < ?))")
+            [10 5 100]]))))
 
 (deftest put-when-test
-  (is (= "WHEN 'foo' THEN 'bar'"
-         (with-out-str (put-when default-sql-put-parameterization
-                                 [(make-sql-expr-const "foo")
-                                  (make-sql-expr-const "bar")])))))
+  (is (= ["WHEN ? THEN ?" ["foo" "bar"]]
+         (with-out-str-and-value (put-when default-sql-put-parameterization
+                                           [(make-sql-expr-const "foo")
+                                            (make-sql-expr-const "bar")])))))
+
+(= '("foo" "bar") ["foo" "bar"] (list "foo" "bar"))
 
 (deftest put-where-test
-  (is (= "WHERE (foo = 'bar')")
-      (with-out-str (put-where default-sql-put-parameterization [(make-sql-expr-app op-=
+  (is (= ["WHERE (foo = ?)" '("bar")])
+      (with-out-str-and-value (put-where default-sql-put-parameterization [(make-sql-expr-app op-=
                                                                                     (make-sql-expr-column "cost")
                                                                                     (make-sql-expr-const 100))
                                                                  (make-sql-expr-app op-=
@@ -182,24 +204,24 @@
                           [(make-sql-expr-column "two") :descending]])))))
 
 (deftest put-having-test
-  (is (= "HAVING (year < 2000)"
-         (with-out-str (put-having default-sql-put-parameterization
-                                   (make-sql-expr-app
-                                    op-<
-                                    (make-sql-expr-column "year")
-                                    (make-sql-expr-const 2000))))))
-  (is (= "HAVING ((year < 2000), (director = 'Luc Besson'))"
-         (with-out-str (put-having
-                        default-sql-put-parameterization
-                        (make-sql-expr-tuple
-                         [(make-sql-expr-app
-                           op-<
-                           (make-sql-expr-column "year")
-                           (make-sql-expr-const 2000))
-                          (make-sql-expr-app
-                           op-=
-                           (make-sql-expr-column "director")
-                           (make-sql-expr-const "Luc Besson"))]))))))
+  (is (= ["HAVING (year < ?)" '(2000)]
+         (with-out-str-and-value (put-having default-sql-put-parameterization
+                                             (make-sql-expr-app
+                                              op-<
+                                              (make-sql-expr-column "year")
+                                              (make-sql-expr-const 2000))))))
+  (is (= ["HAVING ((year < ?), (director = ?))" '(2000 "Luc Besson")]
+         (with-out-str-and-value (put-having
+                                  default-sql-put-parameterization
+                                  (make-sql-expr-tuple
+                                   [(make-sql-expr-app
+                                     op-<
+                                     (make-sql-expr-column "year")
+                                     (make-sql-expr-const 2000))
+                                    (make-sql-expr-app
+                                     op-=
+                                     (make-sql-expr-column "director")
+                                     (make-sql-expr-const "Luc Besson"))]))))))
 
 (deftest put-attributes-test
   (is (= "*" (with-out-str (put-attributes default-sql-put-parameterization nil))))
