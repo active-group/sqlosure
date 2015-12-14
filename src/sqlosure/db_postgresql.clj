@@ -52,7 +52,7 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
   runs the query against the connected database."
   [conn select scheme]
   (query (postgresql-db conn)
-         [(put-select conn select)]
+         (put-select conn select)
          :row-fn #(query-row-fn scheme %)))
 
 (defn- postgresql-insert
@@ -66,7 +66,7 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
              (into
               {}
               (map (fn [[k t] v]
-                     [k (value->postgresql-value t v)]) alist vals)))))
+                     [k v]) alist vals)))))
 
 (defn- postgresql-delete
   "Takes a db-connection, a table name (string) and a sql-expr criterion and
