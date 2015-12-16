@@ -84,12 +84,13 @@
 
 (defn get-query+scheme*
   [thunk]
-  (let [[rel _ query] (thunk)]
+  (let [[rel state] (thunk)]
     (let [alias (relation-alias rel)
           scheme (relation-scheme rel)
           alist (mapmap (fn [[k _]]
                           [k (rel/make-attribute-ref (fresh-name k alias))])
-                        (rel/rel-scheme-alist scheme))]
+                        (rel/rel-scheme-alist scheme))
+          query (get state ::query)]
       [(rel/make-project alist query) scheme])))
 
 ;; A map representing the empty state for building up the query.
