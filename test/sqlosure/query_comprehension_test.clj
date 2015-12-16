@@ -1,6 +1,7 @@
 (ns sqlosure.query-comprehension-test
   (:require [sqlosure.query-comprehension :refer :all]
             [sqlosure.relational-algebra :refer :all]
+            [sqlosure.relational-algebra-sql :refer :all]
             [sqlosure.database :refer :all]
             [sqlosure.db-postgresql :refer :all]
             [sqlosure.type :refer :all]
@@ -10,13 +11,34 @@
             [active.clojure.monad :refer :all]
             [clojure.test :refer :all]))
 
-(def tbl1 (sql/make-sql-table "tbl1"
-                              (make-rel-scheme {"one" string%
-                                                "two" integer%})))
+(def test-universe (make-universe))
 
-(def tbl2 (sql/make-sql-table "tbl2"
-                              (make-rel-scheme {"three" blob%
-                                                "four" string%})))
+(def tbl1 (make-sql-table "tbl1"
+                          (make-rel-scheme {"one" string%
+                                            "two" integer%})
+                          :universe test-universe))
+
+(def tbl2 (make-sql-table "tbl2"
+                          (make-rel-scheme {"three" blob%
+                                            "four" string%})
+                          :universe test-universe))
+
+(defn put-query [query]
+  (put/sql-select->string
+   put/default-sql-put-parameterization
+   (query->sql query)))
+
+(let [movies-table (make-sql-table 'movies
+                                       (make-rel-scheme {"title" string%
+                                                         "director" string%
+                                                         "year" integer%
+                                                         "any_good" boolean%})
+                                       :universe (make-universe)
+                                       :handle "movies")]
+  (put-query (get-query (monadic [movies (embed movies-table)]
+                                 (project {"title" (! movies "title")
+                                           "year" (! movies "year")})
+                                 (project {"title" (! movies "title")})))))
 
 (deftest get-query-test
   (is (rel-scheme=?
@@ -28,21 +50,16 @@
                                      (! t2 "four")))
                    (project {"foo" (! t1 "two")}))))))
 
-(get-query (monadic
-            [t1 (embed tbl1)]
-            [t2 (embed tbl2)]
-            (restrict (=$ (! t1 "one")
-                          (! t2 "four")))
-            #_(project {"foo" (! t1 "two")})))
 
-(let [movies-table (make-base-relation 'movies
-                                       (make-rel-scheme {"title" string%
-                                                         "director" string%
-                                                         "year" integer%
-                                                         "any_good" boolean%})
-                                       :universe (make-universe)
-                                       :handle "movies")
+
+(let [movies-table (make-sql-table 'movies
+                                   (make-rel-scheme {"title" string%
+                                                     "director" string%
+                                                     "year" integer%
+                                                     "any_good" boolean%})
+                                   :universe (make-universe)
+                                   :handle "movies")
       conn (open-db-connection-postgresql "localhost" 5432 "marco" "marco" "")]
-  (monadic [movies (embed movies-table)]
-           (project {"title" (! movies "title")})))
+  (run-query conn (get-query (monadic [movies (embed movies-table)]
+                                  (project {"title" (! movies "title")})))))
 

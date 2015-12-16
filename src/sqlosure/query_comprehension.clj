@@ -21,21 +21,18 @@
   [name alias]
   (str name "-" alias))
 
-(def ^{:private true} get-alias
-  (get-state-component ::alias))
-
 (def new-alias
   (monadic
    [a (get-state-component ::alias)]
    (put-state-component! ::alias (inc a))
    (free-return a)))
 
+(def current-query
+  (get-state-component ::query))
+
 (defn set-query!
   [new]
   (put-state-component! ::query new))
-
-(def current-query
-  (get-state-component ::query))
 
 (defn embed
   [q]
@@ -73,7 +70,12 @@
   [expr]
   (monadic
    [old current-query]
-   (set-query! (rel/make-restrict expr old))))
+   (set-query! (rel/make-restrict expr old))
+   #_([alias (get-state-component ::alias)]
+    [query current-query]
+    (return (make-relation
+             alias
+             (rel/query-scheme query))))))
 
 (defn !
   [rel name]
@@ -94,7 +96,7 @@
       [(rel/make-project alist query) scheme])))
 
 ;; A map representing the empty state for building up the query.
-(def the-empty-state {::query nil
+(def the-empty-state {::query rel/the-empty
                       ::alias 0})
 
 (defn get-query+scheme
