@@ -30,7 +30,7 @@
      conn name
      (rsql/expression->sql
       (apply criterion-proc
-             (map (fn [[k v]] (rel/make-attribute-ref k))
+             (map (fn [[k _]] (rel/make-attribute-ref k))
                   (rel/rel-scheme-alist (rel/query-scheme sql-table))))))))
 
 (defn update
