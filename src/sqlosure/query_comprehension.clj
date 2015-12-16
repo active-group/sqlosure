@@ -28,7 +28,7 @@
   (monadic
    [a (get-state-component ::alias)]
    (put-state-component! ::alias (inc a))
-   a))
+   (free-return a)))
 
 (defn set-query!
   [new]
