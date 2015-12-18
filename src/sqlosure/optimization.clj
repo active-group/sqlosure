@@ -148,7 +148,6 @@
 (defn push-restrict
   [q]
   {:post [(some? %)]}
-  (println "query" q)
   (cond
     (r/empty-val? q) q
     (r/base-relation? q) q
