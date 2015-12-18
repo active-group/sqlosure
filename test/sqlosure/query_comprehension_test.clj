@@ -40,19 +40,64 @@
                                            "year" (! movies "year")})
                                  (project {"title" (! movies "title")})))))
 
-(deftest get-query-test
+(deftest trivial
   (is (rel-scheme=?
        (make-rel-scheme {"foo" integer%})
-       (get-query (monadic
-                   [t1 (embed tbl1)]
-                   [t2 (embed tbl2)]
-                   (restrict (=$ (! t1 "one")
-                                     (! t2 "four")))
-                   (project {"foo" (! t1 "two")}))))))
+       (query-scheme
+        (get-query (monadic
+                    [t1 (embed tbl1)]
+                    [t2 (embed tbl2)]
+                    (restrict (=$ (! t1 "one")
+                                  (! t2 "four")))
+                    (project {"foo" (! t1 "two")})))))))
 
 
+(deftest combine
+  (is (rel-scheme=?
+       (make-rel-scheme {"foo" string%})
+       (query-scheme
+        (get-query
+         (monadic
+          [t1 (embed tbl1)]
+          [t2 (embed tbl2)]
+          (union (project {"foo" (! t1 "one")})
+                 (project {"foo" (! t2 "four")})))))))
 
-(let [movies-table (make-sql-table 'movies
+  (is (rel-scheme=?
+       (make-rel-scheme {"foo" string%})
+       (query-scheme
+        (get-query
+         (monadic
+          [t1 (embed tbl1)]
+          [t2 (embed tbl2)]
+          (subtract (project {"foo" (! t1 "one")})
+                    (project {"foo" (! t2 "four")})))))))
+
+  (is (rel-scheme=?
+       (make-rel-scheme {"bar" blob%})
+       (query-scheme
+        (get-query
+         (monadic
+          [t1 (embed tbl1)
+           t2 (embed tbl2)]
+          (divide (project {"foo" (! t1 "one")
+                            "bar" (! t2 "three")})
+                  (project {"foo" (! t2 "four")}))))))))
+
+(deftest order-t
+  (is (rel-scheme=?
+       (make-rel-scheme {"foo" integer%})
+       (query-scheme
+        (get-query
+         (monadic
+          [t1 (embed tbl1)
+           t2 (embed tbl2)]
+          (restrict (=$ (! t1 "one")
+                        (! t2 "four")))
+          (order {(! t1 "one") :ascending})
+          (project {"foo" (! t1 "two")})))))))
+
+#_(let [movies-table (make-sql-table 'movies
                                    (make-rel-scheme {"title" string%
                                                      "director" string%
                                                      "year" integer%
