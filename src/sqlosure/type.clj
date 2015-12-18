@@ -33,27 +33,6 @@
   [& values]
   (vec values))
 
-(defn ^{:test true} double?
-  "checks if a value is of type double."
-  [x]
-  (instance? Double x))
-
-(defn ^{:test true} boolean?
-  "checks if a value if of type boolean"
-  [x]
-  (instance? Boolean x))
-
-(defn ^{:test false} byte-vector? [x]
-  (and (vector? x) (every? #(instance? byte %) x)))
-
-;; Some base types
-(def string% (make-base-type 'string string? identity identity))
-(def integer% (make-base-type 'integer integer? identity identity))
-(def double% (make-base-type 'double double? identity identity))
-(def boolean% (make-base-type 'boolean boolean? identity identity))
-;; Clojure itself has no byte type. Maybe use Java's?
-(def blob% (make-base-type 'blob byte-vector? 'lose 'lose))
-
 (define-record-type bounded-string-type
   (make-bounded-string-type max-size) bounded-string-type?
   [max-size bounded-string-type-max-size])
@@ -76,8 +55,6 @@
 (define-record-type set-type
   (make-set-type member-type) set-type?
   [member-type set-type-member-type])
-
-(def nullable-integer% (make-nullable-type integer%))
 
 (defn null?
   [v]
@@ -120,23 +97,21 @@
     :else (throw (Exception. (str 'type-member? ": unhandled type: "
                                   (if (nil? thing) "nil" thing))))))
 
-(defn ^{:test true} numeric-type?
-  "checks if a type is numeric."
-  [t]
-  (or (= t integer%)
-      (= t double%)))
+(defmulti numeric-type? "Defines if a base-type is numeric, in the sense of the server's capability to call standard operations like MAX and AVG on them."
+  (fn [t] (base-type-name t))
+  :default ::default)
 
-(defn ^{:test true} ordered-type?
-  [t]
-  (or (numeric-type? t)
-      (= t string%)
-      ;; todo: implement calendar-type
-      #_(= t calendar-time%)))
+(defmethod numeric-type? ::default
+  ;; per default, types are not numeric.
+  [t] false)
 
-(def string%-nullable (make-nullable-type string%))
-(def integer%-nullable (make-nullable-type integer%))
-(def double%-nullable (make-nullable-type double%))
-(def blob%-nullable (make-nullable-type blob%))
+(defmulti ordered-type? "Defines if a base-type is ordered, in the sense of the servers' capability to make an 'order by' on them."
+  (fn [t] (base-type-name t))
+  :default ::default)
+
+(defmethod ordered-type? ::default
+  ;; per default, all numeric types are ordered.
+  [t] (numeric-type? t))
 
 (defn ^{:test true} type=?
   "Checks if two types are the same."
@@ -159,6 +134,44 @@
                         (type=? (set-type-member-type t1)
                                 (set-type-member-type t2)))
     :else (throw (Exception. (str 'type=? ": unknown type: " t1)))))
+
+;; Standard types
+
+(defn ^{:test true} double?
+  "checks if a value is of type double."
+  [x]
+  (instance? Double x))
+
+(defn ^{:test true} boolean?
+  "checks if a value if of type boolean"
+  [x]
+  (instance? Boolean x))
+
+(defn ^{:test false} byte-vector? [x]
+  (and (vector? x) (every? #(instance? byte %) x)))
+
+;; Some base types
+
+(def string% (make-base-type 'string string? identity identity))
+(def integer% (make-base-type 'integer integer? identity identity))
+(def double% (make-base-type 'double double? identity identity))
+(def boolean% (make-base-type 'boolean boolean? identity identity))
+;; Clojure itself has no byte type. Maybe use Java's?
+(def blob% (make-base-type 'blob byte-vector? 'lose 'lose))
+
+(def nullable-integer% (make-nullable-type integer%))
+
+(def string%-nullable (make-nullable-type string%))
+(def integer%-nullable (make-nullable-type integer%))
+(def double%-nullable (make-nullable-type double%))
+(def blob%-nullable (make-nullable-type blob%))
+
+(defmethod numeric-type? 'integer [_] true)
+(defmethod numeric-type? 'double [_] true)
+
+(defmethod ordered-type? 'string [_] true)
+
+;; Serialization
 
 (defn ^{:test true} type->datum
   "`type->datum` takes a type and returns it into a recursive list of it's
@@ -188,6 +201,7 @@
   * `(datum->type (string) => string`
   * `(datum->type (product (string) (double))) => (make-product-type [string% double%])`"
   [d universe]
+  ;; TODO: Make this a multimethod to support externally defined types or something?
   (case (first d)
     nullable (really-make-nullable-type (datum->type (second d) universe))
     product (make-product-type (map #(datum->type % universe)
