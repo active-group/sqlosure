@@ -269,7 +269,7 @@ Replaced alist with hash-map."
   (fold-expression
    (fn [name] (or (lookup-env name env)
                   (throw (Exception. (str 'expression-type ": unknown attribute "
-                                          env expr)))))
+                                          name " in " env)))))
    (fn [ty val] ty)
    identity
    (fn [rator rands] (apply (rator-range-type-proc rator) fail rands))
