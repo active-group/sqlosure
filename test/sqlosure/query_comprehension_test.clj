@@ -9,7 +9,8 @@
             [sqlosure.sql :refer :all]
             [sqlosure.sql-put :as put]
             [active.clojure.monad :refer :all]
-            [clojure.test :refer :all]))
+            [clojure.test :refer :all]
+            [sqlosure.optimization :as opt]))
 
 (def test-universe (make-universe))
 
@@ -39,6 +40,16 @@
                                  (project {"title" (! movies "title")
                                            "year" (! movies "year")})
                                  (project {"title" (! movies "title")})))))
+
+;; FIXME (empty string is not correct either; but this throws a NPE currently - probably bug in optimizer)
+#_(deftest const-restrict-test
+  (is (= ""
+         (query->sql (opt/optimize-query
+                      (get-query (monadic
+                                  [t1 (embed tbl1)]
+                                  (restrict (=$ (! t1 "one")
+                                                (make-const string% "foobar")))
+                                  (project {"foo" (! t1 "two")}))))))))
 
 (deftest trivial
   (is (rel-scheme=?
