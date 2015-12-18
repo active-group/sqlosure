@@ -147,8 +147,10 @@
 
 (defn push-restrict
   [q]
+  {:post [(some? %)]}
+  (println "query" q)
   (cond
-    (nil? q) q
+    (r/empty-val? q) q
     (r/base-relation? q) q
     (r/project? q) (r/make-project (r/project-alist q)
                                    (push-restrict (r/project-query q)))
@@ -186,7 +188,8 @@
                              (push-restrict (r/make-restrict re pushed))))
         (r/order? rq) (r/make-order (r/order-alist rq)
                                     (push-restrict
-                                     (r/make-restrict re (r/order-query rq))))))
+                                     (r/make-restrict re (r/order-query rq))))
+        :else (r/make-restrict re (push-restrict rq))))
     (r/order? q)
     (let [oq (r/order-query q)
           alist (r/order-alist q)]

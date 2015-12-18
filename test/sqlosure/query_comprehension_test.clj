@@ -42,7 +42,7 @@
                                  (project {"title" (! movies "title")})))))
 
 ;; FIXME (empty string is not correct either; but this throws a NPE currently - probably bug in optimizer)
-#_(deftest const-restrict-test
+(deftest const-restrict-test
   (is (= ""
          (query->sql (opt/optimize-query
                       (get-query (monadic
