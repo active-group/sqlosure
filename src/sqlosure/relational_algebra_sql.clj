@@ -182,4 +182,4 @@
       (sql/set-sql-select-extra sql (cons (str "LIMIT " (rel/top-count q))
                                           (sql/sql-select-extra sql))))
     (rel/empty-val? q) sql/the-sql-select-empty
-    :else (throw (Exception. (str 'query->sql ": unkown query " q)))))
+    :else (throw (Exception. (str 'query->sql ": unknown query " (pr-str q))))))
