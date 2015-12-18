@@ -56,16 +56,18 @@
    [alias new-alias]
    [query current-query]
    (set-query! (rel/make-extend
-                (mapmap (fn [[k v]] [(fresh-name k alias) v])
-                        alist)
+                (into {}
+                      (map (fn [[k v]] [(fresh-name k alias) v])
+                           alist))
                 query))
    (return (make-relation
             alias
             (let [scheme (rel/query-scheme query)]
               (rel/make-rel-scheme
-               (mapmap (fn [[k v]]
-                         [k (rel/expression-type (rel/rel-scheme->environment scheme) v)])
-                       alist)))))))
+               (into {}
+                     (map (fn [[k v]]
+                            [k (rel/expression-type (rel/rel-scheme->environment scheme) v)])
+                          alist))))))))
 
 (defn restrict
   [expr]
