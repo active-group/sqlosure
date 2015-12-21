@@ -1,4 +1,4 @@
-Currently supports [postgresql]() and [sqlite]().
+Currently supports [postgresql](http://www.postgresql.org/) and [sqlite](http://www.sqlite.org/).
 
 # Minimal example
 
