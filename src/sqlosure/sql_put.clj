@@ -50,12 +50,16 @@
   [param sel]
   (cond
     (or (sql/sql-select? sel)
-        (sql/sql-select-combine? sel)) (put-sql-select-1 param sel)
-    (sql/sql-select-table? sel) (do
-                                  (print "SELECT * FROM ")
-                                  (print (sql/sql-select-table-name sel))
-                                  [])
-    :else (throw (Exception. (str 'put-sql-select ": unhandled query " sel)))))
+        (sql/sql-select-combine? sel))
+    (put-sql-select-1 param sel)
+
+    (sql/sql-select-table? sel)
+    (do
+      (print "SELECT * FROM ")
+      (print (sql/sql-select-table-name sel))
+      [])
+    :else
+    (throw (Exception. (str 'put-sql-select ": unhandled query " sel)))))
 
 (defn put-joining-infix
   "Intersperse `between` between `lis`'s elements and print via `proc`."
