@@ -13,7 +13,7 @@
 
 (defn fresh-name
   [name alias]
-  (str name "-" alias))
+  (str name "_" alias))
 
 (defn set-alias!
   [a]
