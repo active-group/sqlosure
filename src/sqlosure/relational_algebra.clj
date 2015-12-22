@@ -410,7 +410,8 @@ Replaced alist with hash-map."
                            (fail ": not an ordered type " t)))))
                    scheme)
       (top? q) (next-step (top-query q))
-      :else (throw (Exception. (str 'query-scheme ": unknown query " q))))))
+      :else
+          (throw (Exception. (str 'query-scheme ": unknown query " q))))))
 
 (defn query-scheme
   "Return the query scheme of query `q` as a `rel-scheme`.

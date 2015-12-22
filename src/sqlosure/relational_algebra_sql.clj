@@ -116,13 +116,18 @@
         (let [sql1 (query->sql q1)
               sql2 (query->sql q2)]
           (cond
-            (not= :product op) (sql/make-sql-select-combine op sql1 sql2)
+            (not= :product op)
+            (sql/make-sql-select-combine op sql1 sql2)
+
             (and (sql/sql-select? sql1) (empty? (sql/sql-select-attributes sql1)))
             (add-table sql1 sql2)
+
             (and (sql/sql-select? sql2) (empty? (sql/sql-select-attributes sql2)))
             (add-table sql2 sql1)
-            :else (sql/set-sql-select-tables (sql/new-sql-select) [[nil sql1]
-                                                                   [nil sql2]])))
+
+            :else
+            (sql/set-sql-select-tables (sql/new-sql-select) [[(new-table-alias) sql1]
+                                                             [(new-table-alias) sql2]])))
         (let [scheme-1 (rel/query-scheme q1)
               scheme-2 (rel/query-scheme q2)
               diff-scheme (rel/rel-scheme-difference scheme-1 scheme-2)]
