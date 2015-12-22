@@ -26,7 +26,7 @@
   []
   (print " "))
 
-(defn put-adding-if-non-null
+(defn put-padding-if-non-null
   "When lis is not empty, prepend a space to (proc lis)."
   [lis proc]
   (when-not (empty? lis)
@@ -168,20 +168,20 @@
   (cond
     (sql/sql-select? sel)
     (let [_ (print "SELECT")
-          v1 (put-adding-if-non-null (sql/sql-select-options sel)
+          v1 (put-padding-if-non-null (sql/sql-select-options sel)
                                      #(print (s/join " " %)))
           _ (put-space)
           v2 (put-attributes param (sql/sql-select-attributes sel))
-          v2 (put-adding-if-non-null (sql/sql-select-tables sel)
+          v2 (put-padding-if-non-null (sql/sql-select-tables sel)
                                      #(put-tables param %))
-          v3 (put-adding-if-non-null (sql/sql-select-criteria sel)
+          v3 (put-padding-if-non-null (sql/sql-select-criteria sel)
                                      #(put-where param %))
-          v4 (put-adding-if-non-null (sql/sql-select-group-by sel)
+          v4 (put-padding-if-non-null (sql/sql-select-group-by sel)
                                      #(put-group-by param %))
           v5 (when-let [h (sql/sql-select-having sel)]
                (put-space)
                (put-having param h))
-          v6 (put-adding-if-non-null (sql/sql-select-order-by sel)
+          v6 (put-padding-if-non-null (sql/sql-select-order-by sel)
                                      #(put-order-by param %))
           v7 (let [extra (sql/sql-select-extra sel)]
                (when-not (empty? extra)
