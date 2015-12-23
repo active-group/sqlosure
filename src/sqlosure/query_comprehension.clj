@@ -82,6 +82,9 @@
 
 (defn !
   [rel name]
+  ;; check user args
+  (if (not (relation? rel))
+    (assertion-violation '! (str "not a relation: " rel)))
   (let [alist (rel/rel-scheme-alist (relation-scheme rel))]
     (if (contains? alist name)
       (rel/make-attribute-ref (fresh-name name (relation-alias rel)))
