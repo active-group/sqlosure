@@ -190,4 +190,8 @@
    [old current-query]
    (set-query! (rel/make-order alist old))))
 
-
+(defn top
+  [n]
+  (monadic
+   [old current-query]
+   (set-query! (rel/make-top n old))))
