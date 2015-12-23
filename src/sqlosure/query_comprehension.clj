@@ -73,12 +73,7 @@
   [expr]
   (monadic
    [old current-query]
-   (set-query! (rel/make-restrict expr old))
-   #_([alias (get-state-component ::alias)]
-    [query current-query]
-    (return (make-relation
-             alias
-             (rel/query-scheme query))))))
+   (set-query! (rel/make-restrict expr old))))
 
 (defn !
   [rel name]
