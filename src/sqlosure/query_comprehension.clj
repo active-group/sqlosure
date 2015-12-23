@@ -70,11 +70,25 @@
                           alist))))))))
 
 (defn restrict
+  "Restrict the current query by a condition.
+
+  expr -> query(nil)
+
+  Note this doesn't return anything."
   [expr]
   (monadic
    [old current-query]
    (set-query! (rel/make-restrict expr old))))
 
+(defn restricted
+  "Convenienc: Return a restricted version of a relation.
+
+  relation expr -> query(relation)."
+  [rel expr]
+  (monadic
+   (restrict expr)
+   (return rel)))
+  
 (defn !
   [rel name]
   ;; check user args
