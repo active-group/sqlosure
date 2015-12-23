@@ -186,7 +186,7 @@
           v7 (let [extra (sql/sql-select-extra sel)]
                (when-not (empty? extra)
                  (do (put-space)
-                     (s/join " " extra))))]
+                     (print (s/join " " extra)))))]
       (concat v1 v2 v3 v4 v5 v6 v7))
     (sql/sql-select-combine? sel) ((sql-put-parameterization-combine-proc param)
                                    param
