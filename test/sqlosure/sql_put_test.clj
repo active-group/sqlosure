@@ -64,10 +64,11 @@
                         (make-sql-table "tbl1"
                                         (make-rel-scheme {"one" string%
                                                           "two" integer%})))
-          q (query->sql o)]
-      (is (= ["SELECT * FROM tbl1 ORDER BY one ASC" '()]
-             (with-out-str-and-value
-               (put-sql-select default-sql-put-parameterization q)))))
+          q (query->sql o)
+          [res-str res-args] (with-out-str-and-value
+                               (put-sql-select default-sql-put-parameterization q))]
+      (is (re-matches #"SELECT \* FROM tbl1 AS GEN_ALIAS_(\d+) ORDER BY one ASC" res-str))
+      (is (= res-args '())))
     (let [q1 (-> (new-sql-select)
                  (set-sql-select-tables
                   [["S" (make-sql-select-table "SUPPLIERS")]
@@ -91,22 +92,17 @@
                   [(make-sql-expr-app op-<
                                       (make-sql-expr-column "cost")
                                       (make-sql-expr-const 100))]))]
-      (is (= (with-out-str-and-value (put-sql-select* q1))
-             [(str "SELECT UID "
-                    "FROM SUPPLIERS AS S, CUSTOMERS "
-                    "WHERE (foo < ?) AND (uid = ?) "
-                    "ORDER BY uid ASC")
-              '(10 5)]))
-      (is (= (with-out-str-and-value (put-sql-select*
-                                      (make-sql-select-combine :union q1 q2)))
-             [(str "(SELECT UID FROM SUPPLIERS AS S, CUSTOMERS "
-                    "WHERE (foo < ?) AND (uid = ?) "
-                    "ORDER BY uid ASC) "
-                    "UNION "
-                    "(SELECT cost "
-                    "FROM PARTS "
-                    "WHERE (cost < ?))")
-              '(10 5 100)])))))
+      (let [[res-str res-args]
+            (with-out-str-and-value (put-sql-select* q1))]
+        (is (re-matches #"SELECT UID FROM SUPPLIERS AS S, CUSTOMERS WHERE \(foo < \?\) AND \(uid = \?\) ORDER BY uid ASC"
+                        res-str))
+        (is (= res-args '(10 5))))
+      (let [[res-str res-args]
+            (with-out-str-and-value (put-sql-select*
+                                     (make-sql-select-combine :union q1 q2)))]
+        (is (re-matches #"\(SELECT UID FROM SUPPLIERS AS S, CUSTOMERS WHERE \(foo < \?\) AND \(uid = \?\) ORDER BY uid ASC\) UNION \(SELECT cost FROM PARTS AS GEN_ALIAS_(\d+) WHERE \(cost < \?\)\)"
+                        res-str))
+        (is (= res-args '(10 5 100)))))))
 
 (deftest put-joining-infix-test
   (is (= "foo bar baz"
@@ -153,17 +149,11 @@
                (set-sql-select-criteria
                 [(make-sql-expr-app op-<
                                     (make-sql-expr-column "cost")
-                                    (make-sql-expr-const 100))]))]
-    (is (= (with-out-str-and-value (default-put-combine default-sql-put-parameterization
-                                              :union q1 q2))
-           [(str "(SELECT UID FROM SUPPLIERS AS S, CUSTOMERS "
-                  "WHERE (foo < ?) AND (uid = ?) "
-                  "ORDER BY uid ASC) "
-                  "UNION "
-                  "(SELECT cost "
-                  "FROM PARTS "
-                  "WHERE (cost < ?))")
-            [10 5 100]]))))
+                                    (make-sql-expr-const 100))]))
+        [res-str res-args] (with-out-str-and-value (default-put-combine default-sql-put-parameterization
+                                                                        :union q1 q2))]
+    (is (re-matches #"\(SELECT UID FROM SUPPLIERS AS S, CUSTOMERS WHERE \(foo < \?\) AND \(uid = \?\) ORDER BY uid ASC\) UNION \(SELECT cost FROM PARTS AS GEN_ALIAS_(\d+) WHERE \(cost < \?\)\)" res-str))
+    (is (= res-args '(10 5 100)))))
 
 (deftest put-when-test
   (is (= ["WHEN ? THEN ?" ["foo" "bar"]]
