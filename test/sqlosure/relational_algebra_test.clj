@@ -14,7 +14,7 @@
 (def test-scheme4 (make-rel-scheme {:fizz :buzz}))
 
 
-(deftest rel-schem=?-test
+(deftest rel-scheme=?-test
   (is (rel-scheme=? (make-rel-scheme nil) the-empty-rel-scheme))
   (is (rel-scheme=? (make-rel-scheme {:foo "bar"
                                       :fizz "buzz"})
