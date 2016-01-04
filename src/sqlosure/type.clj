@@ -16,7 +16,7 @@
    datum->const-proc base-type-datum->const-proc
    data base-type-data])
 
-(defn ^{:test true} make-base-type
+(defn make-base-type
   "Returns a new base type as specified.
   If :universe is supplied, the new type will be registered in the universe and
   this function returns a vector containing `[type universe]`."
@@ -27,7 +27,7 @@
       (register-type! universe name t))
     t))
 
-(defn ^{:test true} values
+(defn values
   "kind of resembles schemes `values` function but instead returns a vector of
   all its arguments. i don't know if this is really necessary or the way to go."
   [& values]
@@ -41,7 +41,7 @@
   (really-make-nullable-type underlying) nullable-type?
   [underlying nullable-type-underlying])
 
-(defn ^{:test true} make-nullable-type
+(defn make-nullable-type
   "if base is a nullable-type, return it. otherwise wrap it in nullable-type."
   [base]
   (if (nullable-type? base)
@@ -74,7 +74,7 @@
   [bs]
   (reduce #(or %1 %2) false bs))
 
-(defn ^{:test true} type-member?
+(defn type-member?
   "Checks if `thing` is a member of a type."
   [thing ty]
   (cond
@@ -113,7 +113,7 @@
   ;; per default, all numeric types are ordered.
   [t] (numeric-type? t))
 
-(defn ^{:test true} type=?
+(defn type=?
   "Checks if two types are the same."
   [t1 t2]
   (cond
@@ -137,17 +137,17 @@
 
 ;; Standard types
 
-(defn ^{:test true} double?
+(defn double?
   "checks if a value is of type double."
   [x]
   (instance? Double x))
 
-(defn ^{:test true} boolean?
+(defn boolean?
   "checks if a value if of type boolean"
   [x]
   (instance? Boolean x))
 
-(defn ^{:test false} byte-vector? [x]
+(defn byte-vector? [x]
   (and (vector? x) (every? #(instance? byte %) x)))
 
 ;; Some base types
@@ -173,7 +173,7 @@
 
 ;; Serialization
 
-(defn ^{:test true} type->datum
+(defn type->datum
   "`type->datum` takes a type and returns it into a recursive list of it's
   subtypes. If the `type` is invalid, throws an exception.
   Examples:
@@ -192,7 +192,7 @@
     (base-type? t) (list (base-type-name t))
     :else (throw (Exception. (str 'type->datum ": unknown type: " t)))))
 
-(defn ^{:test true} datum->type
+(defn datum->type
   "`datum->type` takes a datum (as produced by `type->datum`) and a universe and
   returns the corresponding type. If the type is not a base type defined in
   `type.clj`, try looking it up in the supplied universe. If it's not found,
@@ -224,7 +224,7 @@
     (not (empty? v))
     false))
 
-(defn ^{:test true} const->datum
+(defn const->datum
   "`const->datum` takes a type and a value and applies the types and returns the
   corresponding clojure value. If the type or value are invalid, throws an
   exception.
@@ -249,7 +249,7 @@
                     (map (fn [v] (const->datum mem v)) val))
     :else (throw (Exception. (str 'const->datum ": invalid type " t val)))))
 
-(defn ^{:test true} datum->const
+(defn datum->const
   "`datum->const` takes a type and a datum and turns the datum in the
   corresponding clojure data. If type is invalid or datum does not match the
   type, throws an exception.
