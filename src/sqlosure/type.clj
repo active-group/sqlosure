@@ -2,6 +2,7 @@
       :author "Marco Schneider, based on Mike Sperbers schemeql2"}
     sqlosure.type
   (:require [sqlosure.universe :refer [register-type! universe-lookup-type]]
+            [clj-time.core :as time]
             [active.clojure.record :refer [define-record-type]]))
 
 ;;; ----------------------------------------------------------------------------
@@ -147,17 +148,28 @@
   [x]
   (instance? Boolean x))
 
-(defn byte-vector? [x]
-  (and (vector? x) (every? #(instance? byte %) x)))
+;; SEE: http://stackoverflow.com/a/14797271
+(defn test-array
+  [t]
+  (let [check (type (t []))]
+    (fn [arg] (instance? check arg))))
+
+(def byte-array?
+  (test-array byte-array))
+
+(defn date?
+  "checks whether a value is of type java.util.Date."
+  [x]
+  (instance? org.joda.time.DateTime x))
 
 ;; Some base types
-
 (def string% (make-base-type 'string string? identity identity))
 (def integer% (make-base-type 'integer integer? identity identity))
 (def double% (make-base-type 'double double? identity identity))
 (def boolean% (make-base-type 'boolean boolean? identity identity))
-;; Clojure itself has no byte type. Maybe use Java's?
-(def blob% (make-base-type 'blob byte-vector? 'lose 'lose))
+(def calendar-time% (make-base-type 'calendar-time date? identity identity))
+
+(def blob% (make-base-type 'blob byte-array? 'lose 'lose))
 
 (def nullable-integer% (make-nullable-type integer%))
 
@@ -211,7 +223,7 @@
     integer integer%
     double double%
     boolean boolean%
-    ;; calendar-time calendar-time%
+    calendar-time calendar-time%
     blob blob%
     bounded-string (make-bounded-string-type (second d))
     (or (universe-lookup-type universe (first d))
@@ -280,4 +292,3 @@
                                             ": invalid set type datum for type "
                                             t " with value " d))))
     :else (throw (Exception. (str 'datum->const " invalid type " t)))))
-
