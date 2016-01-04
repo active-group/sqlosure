@@ -39,6 +39,8 @@
    order-by sql-select-order-by
    extra sql-select-extra])
 
+; FIXME: these should be done with lenses instead
+
 (defn set-sql-select-attributes [sql-select attributes]
   (assoc sql-select :attributes attributes))
 
