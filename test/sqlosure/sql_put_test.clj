@@ -16,11 +16,11 @@
 (deftest put-space-test
   (is (= (with-out-str (print \space))) " "))
 
-(deftest put-adding-if-non-null-test
-  (is (nil? (put-adding-if-non-null nil identity)))
-  (is (nil? (put-adding-if-non-null '() identity)))
+(deftest put-padding-if-non-null-test
+  (is (nil? (put-padding-if-non-null nil identity)))
+  (is (nil? (put-padding-if-non-null '() identity)))
   (is (= " foo bar baz"
-         (with-out-str (put-adding-if-non-null ["foo" "bar" "baz"]
+         (with-out-str (put-padding-if-non-null ["foo" "bar" "baz"]
                                                #(print (s/join " " %)))))))
 
 (deftest put-as-test
