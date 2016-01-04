@@ -5,8 +5,10 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
   (:require [sqlosure.db-connection :as db]
             [sqlosure.sql-put :as put]
             [sqlosure.relational-algebra :as rel]
+            [sqlosure.type :as t]
             [clojure.java.jdbc :refer :all]
-            [clojure.string :as s]))
+            [clojure.string :as s]
+            [clj-time.jdbc]))
 
 (defn- postgresql-db
   "Takes a postgresql db-connection and returns the corresponding
