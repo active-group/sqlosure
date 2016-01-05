@@ -37,7 +37,8 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
                   (vals alist)))))
 
 ;; Parameterization as in put/default.
-(def postgresql-sql-put-parameterization put/default-sql-put-parameterization)
+(def postgresql-sql-put-parameterization
+  (put/make-sql-put-parameterization put/put-dummy-alias put/default-put-combine put/default-put-literal))
 
 (defn- put-select [conn select]
   (put/sql-select->string (db/db-connection-sql-put-parameterization conn) select))

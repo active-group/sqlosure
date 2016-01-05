@@ -16,9 +16,10 @@
                  v#)))))
 
 (define-record-type sql-put-parameterization
-  (make-sql-put-parameterization combine-proc literal-proc)
+  (make-sql-put-parameterization alias-proc combine-proc literal-proc)
   sql-put-parameterization?
-  [combine-proc sql-put-parameterization-combine-proc
+  [alias-proc sql-put-parameterization-alias-proc
+   combine-proc sql-put-parameterization-combine-proc
    literal-proc sql-put-parameterization-literal-proc])
 
 (defn put-space
@@ -33,10 +34,17 @@
     (put-space)
     (proc lis)))
 
-(defn put-as
+(defn default-put-alias
   "When alias is not nil, print \" AS alias\"."
   [alias]
   (when alias (print " AS" alias)))
+
+(defn put-dummy-alias
+  "Always print \" AS alias\", even if there is none."
+  [alias]
+  (print " AS"
+         (or alias
+             (str (gensym)))))
 
 (defn put-literal
   "Apply `params` literal-proc to val."
@@ -88,7 +96,7 @@
                            (do (print "(")
                                (put-sql-select param select)
                                (print ")")))
-                         (put-as alias)))))
+                         ((sql-put-parameterization-alias-proc param) alias)))))
 
 (defn default-put-literal
   [val]
@@ -113,7 +121,7 @@
     (concat v1 v2)))
 
 (def default-sql-put-parameterization
-  (make-sql-put-parameterization default-put-combine default-put-literal))
+  (make-sql-put-parameterization default-put-alias default-put-combine default-put-literal))
 
 (declare put-sql-expression)
 

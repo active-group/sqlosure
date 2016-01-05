@@ -39,7 +39,7 @@
 
 (def ^{:private true} sqlite3-sql-put-parameterization
   "Printer for sqliter3."
-  (put/make-sql-put-parameterization sqlite3-put-combine sqlite3-put-literal))
+  (put/make-sql-put-parameterization put/default-put-alias sqlite3-put-combine sqlite3-put-literal))
 
 (defn- sqlite3-value->value
   "Takes a sqlosure.type and a value returned from sqlite3 and converts it back
