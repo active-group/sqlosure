@@ -33,7 +33,7 @@
              (map (fn [[k _]] (rel/make-attribute-ref k))
                   (rel/rel-scheme-alist (rel/query-scheme sql-table))))))))
 
-(defn update
+(defn update!
   [conn sql-table criterion-proc alist-first & args]
   (let [name (sql/sql-table-name (rel/base-relation-handle sql-table))
         scheme (rel/query-scheme sql-table)
