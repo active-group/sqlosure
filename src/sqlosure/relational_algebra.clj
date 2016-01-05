@@ -7,7 +7,8 @@ Replaced alist with hash-map."
             [sqlosure.type :as t]
             [sqlosure.utils :refer [third]]
             [clojure.set :refer [difference union]]
-            [active.clojure.record :refer [define-record-type]]))
+            [active.clojure.record :refer [define-record-type]]
+            [active.clojure.condition :refer [assertion-violation]]))
 
 (define-record-type rel-scheme
   (make-rel-scheme alist) rel-scheme?
@@ -27,8 +28,15 @@ Replaced alist with hash-map."
   "Return a new rel-scheme resulting of the (set-)difference of s1's and s2's
   alist."
   [s1 s2]
-  (make-rel-scheme (into {} (difference (set (rel-scheme-alist s1))
-                                        (set (rel-scheme-alist s2))))))
+  (let [res (reduce (fn [m [k2 _]]
+                      (if (get m k2)
+                        (dissoc m k2)
+                        m))
+                    (rel-scheme-alist s1)
+                    (rel-scheme-alist s2))]
+    (if-not (empty? res)
+      (make-rel-scheme res)
+      (assertion-violation 'rel-scheme-difference "difference must not be empty"))))
 
 (defn rel-scheme-unary?
   "Returns true if the rel-scheme's alist consist of only one pair."
