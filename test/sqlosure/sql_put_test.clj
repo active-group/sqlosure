@@ -23,9 +23,9 @@
          (with-out-str (put-adding-if-non-null ["foo" "bar" "baz"]
                                                #(print (s/join " " %)))))))
 
-(deftest put-as-test
-  (is (nil? (put-as nil)))
-  (is (= " AS FOO" (with-out-str (put-as "FOO")))))
+(deftest default-put-alias-test
+  (is (nil? (default-put-alias nil)))
+  (is (= " AS FOO" (with-out-str (default-put-alias "FOO")))))
 
 (deftest put-literal-test
   (let [p default-sql-put-parameterization]

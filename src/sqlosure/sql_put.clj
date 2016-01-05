@@ -169,7 +169,7 @@
                                   (= col (sql/sql-expr-column-name expr)))
                            (print col)
                            (do (put-sql-expression param expr)
-                               (put-as col)))))))
+                               (default-put-alias col)))))))
 
 (defn put-sql-select-1
   [param sel]
