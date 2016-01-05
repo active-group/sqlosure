@@ -72,7 +72,7 @@
 
 (def ^{:private true} sql-order #{:ascending :descending})
 
-(defn ^{:test true} sql-order?
+(defn sql-order?
   "Is a key a sql-order?"
   [k]
   (contains? sql-order k))
@@ -89,7 +89,7 @@
 
 (def ^{:private true} sql-combine-op #{:union :intersection :difference})
 
-(defn ^{:test true} sql-combine-op?
+(defn sql-combine-op?
   "Is a key a sql-combine-op?"
   [k]
   (contains? sql-combine-op k))
@@ -119,7 +119,7 @@
    ;; -1 means postfix
    arity sql-operator-arity])
 
-(defn ^{:test true} make-sql-expr-app
+(defn make-sql-expr-app
   [rator & rands]
   (if (= (Math/abs (sql-operator-arity rator))
          (count rands))
@@ -194,11 +194,11 @@
 
 (def sql-universe (make-universe))
 
-(defn ^{:test true} make-sql-universe
+(defn make-sql-universe
   []
   (make-derived-universe sql-universe))
 
-(defn ^{:test true} check-numerical [t fail]
+(defn check-numerical [t fail]
   (if (numeric-type? t)
     true
     (fail 'numerical-type t)))
@@ -223,7 +223,7 @@
                                          :universe sql-universe
                                          :data op-and)))
 
-(defn ^{:test true} >=$
+(defn >=$
   [expr1 expr2]
   (let [rator (make-rator '>=
                           (fn [fail t1 t2]
@@ -278,7 +278,7 @@
                           :data op-=)]
     (make-application rator expr1 expr2)))
 
-(defn ^{:test true} member
+(defn member
   "Locates the first element of xs that is equal to x. If such an element
   exists, the rest of xs starting with that element is returned. Otherwise,
   the result is false (Scheme's member function)."

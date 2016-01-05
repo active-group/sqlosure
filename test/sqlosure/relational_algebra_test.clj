@@ -14,7 +14,7 @@
 (def test-scheme4 (make-rel-scheme {:fizz :buzz}))
 
 
-(deftest rel-schem=?-test
+(deftest rel-scheme=?-test
   (is (rel-scheme=? (make-rel-scheme nil) the-empty-rel-scheme))
   (is (rel-scheme=? (make-rel-scheme {:foo "bar"
                                       :fizz "buzz"})
@@ -22,9 +22,21 @@
                                       :foo "bar"}))))
 
 (deftest rel-scheme-difference-test
-  (is (= (rel-scheme-difference test-scheme1 test-scheme3) test-scheme4))
-  (is (= (rel-scheme-difference test-scheme2 test-scheme3) (make-rel-scheme {:some :thing})))
-  (is (= (rel-scheme-difference test-scheme1 the-empty-rel-scheme) test-scheme1)))
+  (is (= (rel-scheme-difference test-scheme1 test-scheme3)
+         (make-rel-scheme {:fizz :buzz})))
+  (is (= (rel-scheme-difference test-scheme2 test-scheme3)
+         (make-rel-scheme {:some :thing})))
+  (is (= (rel-scheme-difference test-scheme1 the-empty-rel-scheme)
+         test-scheme1))
+  (is (= (rel-scheme-difference (make-rel-scheme {:k1 "k1", :k2 "k2", :k3 "k3"})
+                                (make-rel-scheme {:k2 "just", :k3 "the", :k4 "keys"}))
+         (make-rel-scheme {:k1 "k1"})))
+  (is (= (rel-scheme-difference (make-rel-scheme {:k2 "just", :k3 "the", :k4 "keys"})
+                                (make-rel-scheme {:k1 "k1", :k2 "k2", :k3 "k3"}))
+         (make-rel-scheme {:k4 "keys"})))
+  (is (thrown? Exception (rel-scheme-difference
+                          (make-rel-scheme {:foo "some foo"})
+                          (make-rel-scheme {:foo :bar})))))
 
 (deftest rel-scheme-unary?-test
   (is (rel-scheme-unary? test-scheme4))
