@@ -126,8 +126,8 @@
             (add-table sql2 sql1)
 
             :else
-            (sql/set-sql-select-tables (sql/new-sql-select) [[(new-table-alias) sql1]
-                                                             [(new-table-alias) sql2]])))
+            (sql/set-sql-select-tables (sql/new-sql-select) [[nil sql1]
+                                                             [nil sql2]])))
         (let [scheme-1 (rel/query-scheme q1)
               scheme-2 (rel/query-scheme q2)
               diff-scheme (rel/rel-scheme-difference scheme-1 scheme-2)]
