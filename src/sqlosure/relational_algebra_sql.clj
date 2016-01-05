@@ -3,16 +3,6 @@
             [sqlosure.sql :as sql]
             [active.clojure.condition :as c]))
 
-;; aliases for tables
-; turns out threading through an alias source is cumbersome and difficult
-(def new-table-alias
-  (let [prefix "GEN_ALIAS_"
-        count (atom 0)]
-    (fn []
-      (let [i count]
-        (swap! count + 1)
-        (str "GEN_ALIAS_" @count)))))
-
 (defn x->sql-select
   "Takes a sql expression and turns it into a sql-select."
   [sql]
@@ -21,7 +11,7 @@
     (and (sql/sql-select? sql)
          (empty? (sql/sql-select-attributes sql))) sql
     :else (let [new (sql/new-sql-select)]
-            (sql/set-sql-select-tables new [[(new-table-alias) sql]]))))
+            (sql/set-sql-select-tables new [[nil sql]]))))
 
 (defn ^{:test true} aggregation-op->sql
   "Takes an op keyword and returns the corresponding sql-op. If there is no
@@ -80,7 +70,7 @@
   "Takes an sql-select statement and adds a table to its select-tables list."
   [sql q]
   (sql/set-sql-select-tables sql
-                             (conj (sql/sql-select-tables sql) [(new-table-alias) q])))
+                             (conj (sql/sql-select-tables sql) [nil q])))
 
 (defn query->sql
   "Takes a query in abstract relational algegbra and returns the corresponding
