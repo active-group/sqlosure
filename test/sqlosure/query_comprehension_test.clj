@@ -41,7 +41,6 @@
                                            "year" (! movies "year")})
                                  (project {"title" (! movies "title")})))))
 
-;; FIXME (empty string is not correct either; but this throws a NPE currently - probably bug in optimizer)
 (deftest const-restrict-test
   (is (= '("SELECT two AS foo FROM tbl1 WHERE (one = ?)" "foobar")
          (sqlosure.sql-put/sql-select->string
