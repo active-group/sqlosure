@@ -43,13 +43,15 @@
 
 ;; FIXME (empty string is not correct either; but this throws a NPE currently - probably bug in optimizer)
 (deftest const-restrict-test
-  (is (= ""
-         (query->sql (opt/optimize-query
-                      (get-query (monadic
-                                  [t1 (embed tbl1)]
-                                  (restrict (=$ (! t1 "one")
-                                                (make-const string% "foobar")))
-                                  (project {"foo" (! t1 "two")}))))))))
+  (is (= '("SELECT two AS foo FROM tbl1 WHERE (one = ?)" "foobar")
+         (sqlosure.sql-put/sql-select->string
+          sqlosure.sql-put/default-sql-put-parameterization
+          (query->sql (opt/optimize-query
+                       (get-query (monadic
+                                   [t1 (embed tbl1)]
+                                   (restrict (=$ (! t1 "one")
+                                                 (make-const string% "foobar")))
+                                   (project {"foo" (! t1 "two")})))))))))
 
 (deftest trivial
   (is (rel-scheme=?
