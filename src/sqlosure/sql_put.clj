@@ -90,13 +90,13 @@
   (print "FROM ")
   (put-joining-infix tables ", "
                      (fn [[alias select]]
-                       (do
-                         (if (sql/sql-select-table? select)
-                           (print (sql/sql-select-table-name select))
-                           (do (print "(")
-                               (put-sql-select param select)
-                               (print ")")))
-                         ((sql-put-parameterization-alias-proc param) alias)))))
+                       (if (sql/sql-select-table? select)
+                         (print (sql/sql-select-table-name select))
+                         (let [_ (print "(")
+                               v1 (put-sql-select param select)
+                               _ (print ")")
+                               _ ((sql-put-parameterization-alias-proc param) alias)]
+                           v1)))))
 
 (defn default-put-literal
   [val]
