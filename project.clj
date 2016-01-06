@@ -6,7 +6,6 @@
   :dependencies [[org.clojure/clojure "1.7.0"]
                  [org.clojure/core.match "0.3.0-alpha4"]
                  [org.clojure/java.jdbc "0.4.2"]
-                 [clj-time "0.11.0"]
                  ;; uncomment only one
                  ;; [org.xerial/sqlite-jdbc "3.8.11"]
                  [org.postgresql/postgresql "9.4-1206-jdbc41"]

@@ -7,8 +7,7 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
             [sqlosure.relational-algebra :as rel]
             [sqlosure.type :as t]
             [clojure.java.jdbc :refer :all]
-            [clojure.string :as s]
-            [clj-time.jdbc]))
+            [clojure.string :as s]))
 
 (defn- postgresql-db
   "Takes a postgresql db-connection and returns the corresponding

@@ -2,8 +2,8 @@
       :author "Marco Schneider, based on Mike Sperbers schemeql2"}
     sqlosure.type
   (:require [sqlosure.universe :refer [register-type! universe-lookup-type]]
-            [clj-time.core :as time]
-            [active.clojure.record :refer [define-record-type]]))
+            [active.clojure.record :refer [define-record-type]])
+  (:import [java.time LocalDate LocalDateTime]))
 
 ;;; ----------------------------------------------------------------------------
 ;;; --- TYPES
@@ -160,14 +160,21 @@
 (defn date?
   "checks whether a value is of type java.util.Date."
   [x]
-  (instance? org.joda.time.DateTime x))
+  (instance? LocalDate x))
+
+(defn timestamp?
+  "Returns true if d is a java.time.LocalDateTime."
+  [d]
+  (instance? LocalDateTime d))
 
 ;; Some base types
 (def string% (make-base-type 'string string? identity identity))
 (def integer% (make-base-type 'integer integer? identity identity))
 (def double% (make-base-type 'double double? identity identity))
 (def boolean% (make-base-type 'boolean boolean? identity identity))
-(def calendar-time% (make-base-type 'calendar-time date? identity identity))
+
+(def date% (make-base-type 'date date? identity identity))
+(def timestamp% (make-base-type 'timestamp timestamp? identity identity))
 
 (def blob% (make-base-type 'blob byte-array? 'lose 'lose))
 
@@ -223,7 +230,8 @@
     integer integer%
     double double%
     boolean boolean%
-    calendar-time calendar-time%
+    date date%
+    timestamp timestamp%
     blob blob%
     bounded-string (make-bounded-string-type (second d))
     (or (universe-lookup-type universe (first d))
