@@ -54,7 +54,7 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
   [conn select scheme]
   (let [[select-query & select-args] (put-select conn select)]
     (query (postgresql-db conn)
-           (cons select-query (coerce-time-values select-args))
+           (cons select-query (time/coerce-time-values select-args))
            :row-fn #(query-row-fn scheme %))))
 
 (defn- postgresql-insert
