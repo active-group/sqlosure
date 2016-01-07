@@ -67,7 +67,7 @@
           q (query->sql o)
           [res-str res-args] (with-out-str-and-value
                                (put-sql-select default-sql-put-parameterization q))]
-      (is (re-matches #"SELECT \* FROM tbl1 AS GEN_ALIAS_(\d+) ORDER BY one ASC" res-str))
+      (is (= "SELECT * FROM tbl1 ORDER BY one ASC" res-str))
       (is (= res-args '())))
     (let [q1 (-> (new-sql-select)
                  (set-sql-select-tables
@@ -94,13 +94,13 @@
                                       (make-sql-expr-const 100))]))]
       (let [[res-str res-args]
             (with-out-str-and-value (put-sql-select* q1))]
-        (is (re-matches #"SELECT UID FROM SUPPLIERS AS S, CUSTOMERS WHERE \(foo < \?\) AND \(uid = \?\) ORDER BY uid ASC"
+        (is (= "SELECT UID FROM SUPPLIERS AS S, CUSTOMERS WHERE (foo < ?) AND (uid = ?) ORDER BY uid ASC"
                         res-str))
         (is (= res-args '(10 5))))
       (let [[res-str res-args]
             (with-out-str-and-value (put-sql-select*
                                      (make-sql-select-combine :union q1 q2)))]
-        (is (re-matches #"\(SELECT UID FROM SUPPLIERS AS S, CUSTOMERS WHERE \(foo < \?\) AND \(uid = \?\) ORDER BY uid ASC\) UNION \(SELECT cost FROM PARTS AS GEN_ALIAS_(\d+) WHERE \(cost < \?\)\)"
+        (is (= "(SELECT UID FROM SUPPLIERS AS S, CUSTOMERS WHERE (foo < ?) AND (uid = ?) ORDER BY uid ASC) UNION (SELECT cost FROM PARTS WHERE (cost < ?))"
                         res-str))
         (is (= res-args '(10 5 100)))))))
 
@@ -152,7 +152,7 @@
                                     (make-sql-expr-const 100))]))
         [res-str res-args] (with-out-str-and-value (default-put-combine default-sql-put-parameterization
                                                                         :union q1 q2))]
-    (is (re-matches #"\(SELECT UID FROM SUPPLIERS AS S, CUSTOMERS WHERE \(foo < \?\) AND \(uid = \?\) ORDER BY uid ASC\) UNION \(SELECT cost FROM PARTS AS GEN_ALIAS_(\d+) WHERE \(cost < \?\)\)" res-str))
+    (is (= "(SELECT UID FROM SUPPLIERS AS S, CUSTOMERS WHERE (foo < ?) AND (uid = ?) ORDER BY uid ASC) UNION (SELECT cost FROM PARTS WHERE (cost < ?))" res-str))
     (is (= res-args '(10 5 100)))))
 
 (deftest put-when-test
