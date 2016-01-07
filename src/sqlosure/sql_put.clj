@@ -91,7 +91,9 @@
   (put-joining-infix tables ", "
                      (fn [[alias select]]
                        (if (sql/sql-select-table? select)
-                         (print (sql/sql-select-table-name select))
+                         (do
+                           (print (sql/sql-select-table-name select))
+                           ((sql-put-parameterization-alias-proc param) alias))
                          (let [_ (print "(")
                                v1 (put-sql-select param select)
                                _ (print ")")
