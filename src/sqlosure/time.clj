@@ -1,6 +1,22 @@
 (ns sqlosure.time
   (:require [sqlosure.type :refer [date? timestamp?]]
-            [active.clojure.condition :refer [assertion-violation]]))
+            [active.clojure.condition :refer [assertion-violation]])
+  (:import [java.time LocalDate LocalDateTime]))
+
+(defn make-date
+  "Wrapper around some common 'constructor' calls of LocalDate."
+  ([] (LocalDate/now))
+  ([year month day] (LocalDate/of year month day)))
+
+(defn make-timestamp
+  "Wrapper around some common 'constructor' calls of LocalDateTime."
+  ([] (LocalDateTime/now))
+  ([year month day hour minute]
+   (LocalDateTime/of year month day hour minute))
+  ([year month day hour minute second]
+   (LocalDateTime/of year month day hour minute second))
+  ([year month day hour minute second nano-of-second]
+   (LocalDateTime/of year month day hour minute second nano-of-second)))
 
 (defn to-sql-date
   "Takes a date object produced by java.time.LocalDate and returns a
