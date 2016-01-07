@@ -6,6 +6,7 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
             [sqlosure.sql-put :as put]
             [sqlosure.relational-algebra :as rel]
             [sqlosure.type :as t]
+            [sqlosure.time :as time]
             [clojure.java.jdbc :refer :all]
             [clojure.string :as s]))
 
@@ -21,7 +22,10 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
 (defn- postgresql-value->value
   "No conversion necessary."
   [tt val]
-  val)
+  (cond
+    (= tt t/date%) (time/from-sql-date val)
+    (= tt t/timestamp%) (time/from-sql-timestamp val)
+    :else val))
 
 (defn- value->postgresql-value
   "No conversion necessary."
@@ -48,9 +52,10 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
   "Takes a db-connection, a sql-select statement and a relational scheme and
   runs the query against the connected database."
   [conn select scheme]
-  (query (postgresql-db conn)
-         (put-select conn select)
-         :row-fn #(query-row-fn scheme %)))
+  (let [[select-query & select-args] (put-select conn select)]
+    (query (postgresql-db conn)
+           (cons select-query (coerce-time-values select-args))
+           :row-fn #(query-row-fn scheme %))))
 
 (defn- postgresql-insert
   "Takes a db-connection, a table name (string), a relational scheme and a
