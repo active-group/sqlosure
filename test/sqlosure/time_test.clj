@@ -6,12 +6,12 @@
 (def t1 (java.time.LocalDateTime/of 1989 10 31 0 0))
 
 (deftest make-date-test
-  (is (= (make-date) (java.time.LocalDate/now)))
+  (is (= (sqlosure.type/date? (make-date))))
   (is (= (make-date 1989 10 31) d1))
   (is (thrown? Exception (make-date :not-a-valid-date))))
 
 (deftest make-timestamp-test
-  (is (= (make-timestamp) (java.time.LocalDateTime/now)))
+  (is (= (sqlosure.type/timestamp? (make-timestamp))))
   (is (= (make-timestamp 1989 10 31 0 0)
          (java.time.LocalDateTime/of 1989 10 31 0 0)))
   (is (= (make-timestamp 1989 10 31 0 0 0)
