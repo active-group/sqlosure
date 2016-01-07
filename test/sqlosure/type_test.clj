@@ -1,6 +1,7 @@
 (ns sqlosure.type-test
   (:require [sqlosure.type :refer :all]
             [sqlosure.universe :as u]
+            [sqlosure.time :as time]
             [clojure.test :refer :all]))
 
 (deftest make-base-type-test
@@ -36,6 +37,11 @@
   (is (not (boolean? 42)))
   (is (not (boolean? "string")))
   (is (not (boolean? :keyword))))
+
+(deftest date?-test
+  (is (date? (time/make-date 2000 1 1)))
+  (is (date? (java.time.LocalDate/of 1989 10 31)))
+  (is (not (date? 42))))
 
 (deftest make-nullable-type-test
   (let [really-nullable (really-make-nullable-type 'string)]
