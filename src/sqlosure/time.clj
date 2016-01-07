@@ -24,7 +24,7 @@
   java.sql.Date."
   [d]
   (if (instance? LocalDate d)
-    (java.sql.Date/valueOf d)
+    (Date/valueOf d)
     (assertion-violation 'to-sql-date "value of invalid date type" d)))
 
 (defn from-sql-date
@@ -39,7 +39,7 @@
   java.sql.Timestamp."
   [t]
   (if (instance? LocalDateTime t)
-    (java.sql.Timestamp/valueOf t)
+    (Timestamp/valueOf t)
     (assertion-violation 'to-sql-timestamp "value of invalid timestamp type" t)))
 
 (defn from-sql-timestamp
