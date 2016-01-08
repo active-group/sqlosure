@@ -14,7 +14,7 @@
                           :handle "tbl1"))
 
 (deftest put-space-test
-  (is (= (with-out-str (print \space))) " "))
+  (is (= (with-out-str (print \space)) " ")))
 
 (deftest put-padding-if-non-null-test
   (is (nil? (put-padding-if-non-null nil identity)))
@@ -164,13 +164,15 @@
 (= '("foo" "bar") ["foo" "bar"] (list "foo" "bar"))
 
 (deftest put-where-test
-  (is (= ["WHERE (foo = ?)" '("bar")])
-      (with-out-str-and-value (put-where default-sql-put-parameterization [(make-sql-expr-app op-=
-                                                                                    (make-sql-expr-column "cost")
-                                                                                    (make-sql-expr-const 100))
-                                                                 (make-sql-expr-app op-=
-                                                                                    (make-sql-expr-column "foo")
-                                                                                    (make-sql-expr-const "bar"))]))))
+  (is (= ["WHERE (cost = ?) AND (foo = ?)" '(100 "bar")]
+         (with-out-str-and-value
+           (put-where default-sql-put-parameterization
+                      [(make-sql-expr-app op-=
+                                          (make-sql-expr-column "cost")
+                                          (make-sql-expr-const 100))
+                       (make-sql-expr-app op-=
+                                          (make-sql-expr-column "foo")
+                                          (make-sql-expr-const "bar"))])))))
 
 (deftest put-group-by-test
   (is (= "GROUP BY cost"
