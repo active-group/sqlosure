@@ -74,21 +74,20 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
   "Takes a db-connection, a table name (string) and a sql-expr criterion and
   deleted the matching records from the connected database's table."
   [conn table criterion]
-  (execute! (postgresql-db conn)
-            [(str "DELETE FROM " table " WHERE "
-                  (put-expr conn criterion))]))
+  (delete! (postgresql-db conn)
+           table
+           (put-expr conn criterion)))
 
 (defn- postgresql-update
   "Takes a db-connection, a table-name (string), a relational scheme, a sql-expr
   criterion and a map of column-name->new-value and applies the update to the
   connected database's table."
   [conn table scheme criterion alist]
-  (let [clauses (map (fn [[k v]] (str k "=" (put-expr conn v))) alist)]
-    (execute! (postgresql-db conn)
-              [(str "UPDATE " table " SET "
-                    (s/join ", " clauses)
-                    " WHERE "
-                    (put-expr conn criterion))])))
+  (let [clauses (into {} (map (fn [[k v]] [k (:val v)]) alist))]
+    (update! (postgresql-db conn)
+             table
+             clauses
+             (put-expr conn criterion))))
 
 (defn- postgresql-run-sql
   [conn sql]
