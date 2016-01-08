@@ -47,7 +47,7 @@
   (is (= {:foo :bar :some :thing} (rel-scheme->environment test-scheme2))))
 
 (deftest compose-environments-test
-  (is (= the-empty-environment) (compose-environments the-empty-environment the-empty-environment))
+  (is (= the-empty-environment (compose-environments the-empty-environment the-empty-environment)))
   (is (= {:foo :bar} (compose-environments {:foo :bar} the-empty-environment)))
   ;; e1 should take precedence over e2!
   (is (= {:foo :bar :fizz :buzz} (compose-environments {:foo :bar} {:foo :something-else :fizz :buzz}))))
@@ -134,7 +134,7 @@
                     (rel-scheme->environment (base-relation-scheme tbl1))
                     one-ref)))
     ;; const
-    (is (= (base-type? (expression-type the-empty-environment string-const))))
+    (is (base-type? (expression-type the-empty-environment string-const)))
     (is (= string% (expression-type the-empty-environment string-const)))
     ;; const-null
     (is (= string% (expression-type the-empty-environment string-null)))
