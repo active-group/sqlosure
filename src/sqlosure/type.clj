@@ -63,10 +63,6 @@
     (empty? v)
     (nil? v)))
 
-(defn zip
-  [xs ys]
-  (mapv (fn [k v] [k v]) xs ys))
-
 (defn all?
   [bs]
   (reduce #(and %1 %2) true bs))
