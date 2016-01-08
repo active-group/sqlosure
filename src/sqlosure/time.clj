@@ -23,8 +23,13 @@
   "Takes a date object produced by java.time.LocalDate and returns a
   java.sql.Date."
   [d]
-  (if (instance? LocalDate d)
+  (cond
+    (instance? Date d) d
+
+    (instance? LocalDate d)
     (Date/valueOf d)
+
+    :else
     (assertion-violation 'to-sql-date "value of invalid date type" d)))
 
 (defn from-sql-date
@@ -38,8 +43,13 @@
   "Takes a date object produced by java.time.LocalDateTime and returns a
   java.sql.Timestamp."
   [t]
-  (if (instance? LocalDateTime t)
+  (cond
+    (instance? Timestamp t) t
+
+    (instance? LocalDateTime t)
     (Timestamp/valueOf t)
+
+    :else
     (assertion-violation 'to-sql-timestamp "value of invalid timestamp type" t)))
 
 (defn from-sql-timestamp
