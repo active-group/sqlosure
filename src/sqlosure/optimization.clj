@@ -64,11 +64,12 @@
                       (r/order-query q))))
            (r/top? q) (r/make-top (r/top-count q) (worker live (r/top-query q)))
            (r/combine? q)
-           (let [q1 (r/combine-query-1 q)
+           (let [r (r/combine-rel-op q)
+                 q1 (r/combine-query-1 q)
                  q2 (r/combine-query-2 q)]
              (let [live1 (intersect-live live q1)]
-               (case (r/combine-rel-op q)
-                 :product
+               (case r
+                 (:product :left-outer-product)
                  (let [live2 (intersect-live live q2)]
                    (r/make-combine :product
                                    (worker live1 q1)
@@ -78,7 +79,8 @@
                   :quotient
                   (worker (keys (r/rel-scheme-alist (r/query-scheme q1))) q1)
                   (worker (keys (r/rel-scheme-alist (r/query-scheme q2))) q2))
-                 (r/make-combine (r/combine-rel-op q)
+                 
+                 (r/make-combine r
                                  (worker live1 q1)
                                  (worker live1 q2)))))
            (r/grouping-project? q)
@@ -110,8 +112,10 @@
                         (r/project-query pq))
         (r/combine? pq)
         (let [op (r/combine-rel-op pq)]
-          (if (= :product op)
+          (case op
+            (:product :left-outer-product)
             (r/make-project pa pq)
+
             (let [q1 (r/combine-query-1 pq)
                   q2 (r/combine-query-2 pq)
                   subst #(project-alist-substitute-attribute-refs

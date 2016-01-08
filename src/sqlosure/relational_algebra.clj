@@ -43,6 +43,15 @@ Replaced alist with hash-map."
   [scheme]
   (= 1 (count (rel-scheme-alist scheme))))
 
+(defn rel-scheme-nullable
+  "Makes all columns in a scheme nullable."
+  [scheme]
+  (make-rel-scheme
+   (into {}
+         (map (fn [[name type]]
+                [name (t/make-nullable-type type)])
+              (rel-scheme-alist scheme)))))
+
 (defn rel-scheme->environment
   "Returns the relation table of a rel-scheme."
   [s]
@@ -169,19 +178,25 @@ Replaced alist with hash-map."
    query-1 combine-query-1
    query-2 combine-query-2])
 
-(def ^{:private true} relational-ops #{:product :union :intersection :quotient :difference})
+(def ^{:private true} relational-ops #{:product :left-outer-product :union :intersection :quotient :difference})
 
 (defn relational-op? [k]
   (contains? relational-ops k))
 
 (defn make-combine [rel-op query-1 query-2]
-  (if-not (relational-op? rel-op)
-    (throw (Exception. (str 'make-combine " not a relational operator " rel-op)))
+  (when-not (relational-op? rel-op)
+    (throw (Exception. (str 'make-combine " not a relational operator " rel-op))))
+  (case rel-op
+    :product
     (cond
-      (not= rel-op :product) (really-make-combine rel-op query-1 query-2)
       (empty? query-1) query-2
       (empty? query-2) query-1
-      :else (really-make-combine rel-op query-1 query-2))))
+      :else (really-make-combine rel-op query-1 query-2))
+
+    (really-make-combine rel-op query-1 query-2)))
+
+(defn make-left-outer-product [query-1 query-2]
+  (make-combine :left-outer-product query-1 query-2))
 
 (defn make-product [query-1 query-2]
   (make-combine :product query-1 query-2))
@@ -380,6 +395,16 @@ Replaced alist with hash-map."
                                     (when (assoc k a2)
                                       (fail (list 'not a1) a2))))
                                 (make-rel-scheme (merge a1 a2)))
+
+                     :left-outer-product
+                     (let [a1 (rel-scheme-alist (next-step (combine-query-1 q)))
+                           a2 (rel-scheme-alist (rel-scheme-nullable (next-step (combine-query-2 q))))]
+                       (when fail
+                         (for [[k _] a1]
+                           (when (assoc k a2)
+                             (fail (list 'not a1) a2))))
+                       (make-rel-scheme (merge a1 a2)))
+
                      :quotient (let [s1 (next-step (combine-query-1 q))
                                      s2 (next-step (combine-query-2 q))]
                                  (when fail
@@ -501,7 +526,7 @@ Replaced alist with hash-map."
                             (next-step (third d)))
       restrict (make-restrict (datum->expression (second d) universe)
                               (next-step (third d)))
-      (:product :union :intersection :quotient :difference)
+      (:product :left-outer-product :union :intersection :quotient :difference)
       (make-combine (first d) (next-step (second d))
                     (next-step (third d)))
       grouping-project (make-grouping-project

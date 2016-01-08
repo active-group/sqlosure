@@ -21,7 +21,7 @@
   (is (nil? (put-padding-if-non-null '() identity)))
   (is (= " foo bar baz"
          (with-out-str (put-padding-if-non-null ["foo" "bar" "baz"]
-                                               #(print (s/join " " %)))))))
+                                                #(print (s/join " " %)))))))
 
 (deftest default-put-alias-test
   (is (nil? (default-put-alias nil)))
@@ -153,7 +153,7 @@
         [res-str res-args] (with-out-str-and-value (default-put-combine default-sql-put-parameterization
                                                                         :union q1 q2))]
     (is (= "(SELECT UID FROM SUPPLIERS AS S, CUSTOMERS WHERE (foo < ?) AND (uid = ?) ORDER BY uid ASC) UNION (SELECT cost FROM PARTS WHERE (cost < ?))" res-str))
-    (is (= res-args '(10 5 100)))))
+    (is (= '(10 5 100) res-args))))
 
 (deftest put-when-test
   (is (= ["WHEN ? THEN ?" ["foo" "bar"]]

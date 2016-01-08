@@ -35,20 +35,30 @@
   [new]
   (put-state-component! ::query new))
 
-(defn embed
-  [q]
+(defn- add-to-product
+  [make-product transform-scheme q]
   (monadic
    [alias new-alias]
    [query current-query]
-   (let [scheme (rel/query-scheme q)
+   (let [scheme (transform-scheme (rel/query-scheme q))
          alist (rel/rel-scheme-alist scheme)
          fresh (map (fn [[k _]] (fresh-name k alias)) alist)
          project-alist (into {} (map (fn [[k _] fresh]
                                        [fresh (rel/make-attribute-ref k)])
                                      alist fresh))
          qq (rel/make-project project-alist q)])
-   (set-query! (rel/make-product qq query))
+   (set-query! (make-product query qq))
    (return (make-relation alias scheme))))
+
+(defn embed
+  "Embed a RA query into the current query."
+  [q]
+  (add-to-product rel/make-product identity q))
+ 
+(defn outer
+  "Embed a RA query as an outer query into the current query."
+  [q]
+  (add-to-product rel/make-left-outer-product rel/rel-scheme-nullable q))
 
 (defn project
   [alist]

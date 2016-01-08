@@ -110,7 +110,7 @@
           (project {"foo" (! t1 "two")})))))))
 
 (deftest xy-test-1
-  (is (= '("SELECT three_1 AS res FROM (SELECT three AS three_1, four AS four_1 FROM tbl2), (SELECT one AS one_0, two AS two_0 FROM tbl1 WHERE (? = one)) WHERE (four_1 = one_0)" "foobar")
+  (is (= '("SELECT three_1 AS res FROM (SELECT one AS one_0, two AS two_0 FROM tbl1 WHERE (? = one)), (SELECT three AS three_1, four AS four_1 FROM tbl2) WHERE (four_1 = one_0)" "foobar")
          (sqlosure.sql-put/sql-select->string
           sqlosure.sql-put/default-sql-put-parameterization
           (query->sql (opt/optimize-query
