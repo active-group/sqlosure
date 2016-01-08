@@ -217,11 +217,13 @@
                                       :universe sql-universe
                                       :data op-or))
 
-(def and$ (make-monomorphic-combinator 'and [boolean% boolean%] boolean%
+(def and$ (make-monomorphic-combinator 'and
+                                       [boolean% boolean%]
+                                       boolean%
                                        (fn [a b]
-                                         (and (not-empty a) (not-empty b) a b)
-                                         :universe sql-universe
-                                         :data op-and)))
+                                         (and (not-empty a) (not-empty b) a b))
+                                       :universe sql-universe
+                                       :data op-and))
 
 (defn >=$
   [expr1 expr2]
