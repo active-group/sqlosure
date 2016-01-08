@@ -24,6 +24,12 @@ Replaced alist with hash-map."
   ;; TODO: Couldn't this just be (= t1 t2)?
   (= (rel-scheme-alist t1) (rel-scheme-alist t2)))
 
+(defn rel-scheme-concat
+  [s1 s2]
+  (make-rel-scheme (into {} ; FIXME
+                         (concat (rel-scheme-alist s1)
+                                 (rel-scheme-alist s2)))))
+
 (defn rel-scheme-difference
   "Return a new rel-scheme resulting of the (set-)difference of s1's and s2's
   alist."
