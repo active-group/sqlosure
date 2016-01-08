@@ -68,7 +68,7 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
              (into
               {}
               (map (fn [[k t] v]
-                     [k v]) alist vals)))))
+                     [k v]) alist (time/coerce-time-values vals))))))
 
 (defn- postgresql-delete
   "Takes a db-connection, a table name (string) and a sql-expr criterion and
