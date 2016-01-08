@@ -138,7 +138,7 @@ Replaced alist with hash-map."
         (make-project alist (project-query query))
         (really-make-project alist query))
       (really-make-project alist query))
-    (throw (Exception. (str 'make-project ": requires hash-map, got " alist)))))
+    (assertion-violation 'make-project "requires hash-map, got" alist)))
 
 (declare query-scheme)
 
@@ -176,7 +176,7 @@ Replaced alist with hash-map."
 
 (defn make-combine [rel-op query-1 query-2]
   (if-not (relational-op? rel-op)
-    (throw (Exception. (str 'make-combine " not a relational operator " rel-op)))
+    (assertion-violation 'make-combine "not a relational operator" rel-op)
     (cond
       (not= rel-op :product) (really-make-combine rel-op query-1 query-2)
       (empty? query-1) query-2
@@ -268,7 +268,7 @@ Replaced alist with hash-map."
                                  (next-step (case-expr-default expr)))
       (scalar-subquery? expr) (on-scalar-subquery (scalar-subquery-query expr))
       (set-subquery? expr) (on-set-subquery (set-subquery-query expr))
-      :else (throw (Exception. (str 'fold-expression " invalid expression " expr))))))
+      :else (assertion-violation 'fold-expression "invalid expression" expr))))
 
 (declare query-scheme*)
 
@@ -276,8 +276,7 @@ Replaced alist with hash-map."
   [env expr fail]
   (fold-expression
    (fn [name] (or (lookup-env name env)
-                  (throw (Exception. (str 'expression-type ": unknown attribute "
-                                          name " in " env)))))
+                  (assertion-violation 'expression-type "unknown attribute" name env)))
    (fn [ty val] ty)
    identity
    (fn [rator rands] (apply (rator-range-type-proc rator) fail rands))
@@ -321,9 +320,9 @@ Replaced alist with hash-map."
   (expression-type* env expr
                     (and typecheck?
                          (fn [expected thing]
-                           (throw (Exception. (str 'expression-type
-                                                   ": type violation, expected "
-                                                   expected ", found " thing)))))))
+                           (assertion-violation 'expression-type
+                                                "type-violation (expected/found)"
+                                                expected thing)))))
 
 (defn aggregate?
   "Returns true if `expr` is or contains an aggregation."
@@ -341,7 +340,7 @@ Replaced alist with hash-map."
                           (aggregate? (case-expr-default expr)))
     (scalar-subquery? expr) false
     (set-subquery? expr) false
-    :alse (throw (Exception. (str 'aggregate? " invalid expression " expr)))))
+    :else (assertion-violation 'aggregate? "invalid expression" expr)))
 
 (defn- query-scheme* [q env fail]
   (letfn [(to-env [scheme]
@@ -418,8 +417,7 @@ Replaced alist with hash-map."
                            (fail ": not an ordered type " t)))))
                    scheme)
       (top? q) (next-step (top-query q))
-      :else
-          (throw (Exception. (str 'query-scheme ": unknown query " q))))))
+      :else (assertion-violation 'query-scheme "unknown query" q))))
 
 (defn query-scheme
   "Return the query scheme of query `q` as a `rel-scheme`.
@@ -428,8 +426,8 @@ Replaced alist with hash-map."
   (query-scheme* q the-empty-environment
                  (and typecheck?
                       (fn [expected thing]
-                        (throw (Exception. (str 'query-scheme " type violation "
-                                                expected thing)))))))
+                        (assertion-violation 'query-scheme "type violation"
+                                             expected thing)))))
 
 (defn query?
   "Returns true if the `obj` is a query."
@@ -480,7 +478,7 @@ Replaced alist with hash-map."
                                     (order-alist q))
                      (query->datum (order-query q)))
     (top? q) (list 'top (top-count q) (query->datum (top-query q)))
-    :else (throw (Exception. (str 'query->datum ": unknown query " q)))))
+    :else (assertion-violation 'query->datum "unknown query" q)))
 
 (declare datum->expression)
 
@@ -490,9 +488,9 @@ Replaced alist with hash-map."
     (case (first d)
       empty-val the-empty
       base-relation (or (u/universe-lookup-base-relation universe (second d))
-                        (throw (Exception. (str 'datum->query
-                                                ": unknown base relation "
-                                                (second d)))))
+                        (assertion-violation 'datum->query
+                                             "unknown base relation"
+                                             (second d)))
       project (make-project (into {}
                                   (map (fn [p]
                                          [(first p)
@@ -517,7 +515,7 @@ Replaced alist with hash-map."
                                    (second d)))
                         (next-step (third d)))
       top (make-top (second d) (next-step (third d)))
-      :else (throw (Exception. (str 'datum->query " invalid datum " d))))))
+      :else (assertion-violation 'datum->query "invalid datum" d))))
 
 (defn datum->expression
   "Takes a datum and returns the corresponding expression. This is the inverse
@@ -534,9 +532,9 @@ Replaced alist with hash-map."
       null-type (make-null (t/datum->type (second d) universe))
       application (apply make-application
                          (or (u/universe-lookup-rator universe (second d))
-                             (throw (Exception. (str 'datum->expression
-                                                     ": unkown rator "
-                                                     (second d)))))
+                             (assertion-violation 'datum->expression
+                                                  "unknown rator"
+                                                  (second d)))
                          (map next-step (third d)))
       tuple (make-tuple (map next-step (rest d)))
       aggregation (make-aggregation (second d)
@@ -548,7 +546,7 @@ Replaced alist with hash-map."
                                 (next-step (third d)))
       scalar-subquery (make-scalar-subquery (datum->query (second d) universe))
       set-subquery (make-set-subquery (datum->query (second d) universe))
-      (throw (Exception. (str 'datum->expression ": invalid datum " d))))))
+      (assertion-violation 'datum->expression "invalid datum" d))))
 
 (defn make-monomorphic-rator
   [name domain-types range-type proc & {:keys [universe data]}]
@@ -642,7 +640,7 @@ Replaced alist with hash-map."
                             (map first (rel-scheme-alist (query-scheme subq)))
                             (query-attribute-names subq))))
       (top? q) (query-attribute-names (top-query q))
-      :else (throw (Exception. (str 'query-attribute-names " unknown query " q))))))
+      :else (assertion-violation 'query-attribute-names "unknown query" q))))
 
 (declare query-substitute-attribute-refs)
 
@@ -704,8 +702,7 @@ Replaced alist with hash-map."
                                              (order-alist q)))
                                (next-step sub)))
       (top? q) (make-top (top-count q) (next-step (top-query q)))
-      :else (throw (Exception. (str 'query-substitute-attribute-refs
-                                    ": unknown query " q))))))
+      :else (assertion-violation 'query-substitute-attribute-refs "unknown query" q))))
 
 (defn count-aggregations
   "Count all aggregations in an expression."

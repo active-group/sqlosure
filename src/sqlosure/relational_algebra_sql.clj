@@ -79,8 +79,7 @@
   (cond
     (rel/base-relation? q)
     (if-not (sql/sql-table? (rel/base-relation-handle q))
-      (throw (Exception.
-              (str 'query->sql ": base-relation not an SQL table " q)))
+      (c/assertion-violation 'query->sql "base relation not a SQL table" q)
       (sql/make-sql-select-table (sql/sql-table-name (rel/base-relation-handle q))))
     (rel/project? q) (let [sql (x->sql-select (query->sql
                                                (rel/project-query q)))
@@ -187,4 +186,4 @@
       (sql/set-sql-select-extra sql (cons (str "LIMIT " (rel/top-count q))
                                           (sql/sql-select-extra sql))))
     (rel/empty-val? q) sql/the-sql-select-empty
-    :else (throw (Exception. (str 'query->sql ": unknown query " (pr-str q))))))
+    :else (c/assertion-violation 'query->sql "unknown query" (pr-str q))))

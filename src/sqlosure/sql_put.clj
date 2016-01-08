@@ -5,6 +5,7 @@
             [sqlosure.type :as t]
             [sqlosure.utils :refer [third]]
             [active.clojure.record :refer [define-record-type]]
+            [active.clojure.condition :refer [assertion-violation]]
             [clojure.string :as s]))
 
 (defmacro with-out-str-and-value
@@ -68,7 +69,7 @@
       (print (sql/sql-select-table-name sel))
       [])
     :else
-    (throw (Exception. (str 'put-sql-select ": unhandled query " sel)))))
+    (assertion-violation 'put-sql-select "unhandled query" sel)))
 
 (defn put-joining-infix
   "Intersperse `between` between `lis`'s elements and print via `proc`."
@@ -107,7 +108,7 @@
     (do
       (print "?")
       val)
-    (throw (Exception. (str 'default-put-literal ": unhandeled literal " val)))))
+    (assertion-violation 'default-put-literal "unhandeled literal" val)))
 
 (defn default-put-combine
   [param op left right]
@@ -206,7 +207,7 @@
                                    (sql/sql-select-combine-right sel))
     (sql/sql-select-table? sel) (print (sql/sql-select-table-name sel))
     (sql/sql-select-empty? sel) (print "")  ;; woot woot
-    :else (throw (Exception. (str 'put-sql-select-1 ": unknown select " sel)))))
+    :else (assertion-violation 'put-sql-select-1 "unknown select" sel)))
 
 (defn put-sql-expression
   [param expr]
@@ -247,9 +248,8 @@
                                          v2 (put-sql-expression param (third rands))
                                          _ (print ")")]
                                      (concat v1 v2))
-                                 :else (throw (Exception.
-                                               (str 'put-sql-expression
-                                                    ": unhandled operator arity " op)))))
+                                 :else (assertion-violation 'put-sql-expression
+                                                            "unhandled operator arity " op)))
     (sql/sql-expr-const? expr) (let [v (put-literal param (sql/sql-expr-const-val expr))]
                                  [v])
     (sql/sql-expr-tuple? expr)
@@ -276,8 +276,7 @@
           v (put-sql-select param (sql/sql-expr-subquery-query expr))
           _ (print ")")]
       v)
-    :else (throw (Exception.
-                  (str 'put-sql-expression ": unhandled expression " expr)))))
+    :else (assertion-violation 'put-sql-expression "unhandled expression" expr)))
 
 (defn sql-expression->string
   [param expr]

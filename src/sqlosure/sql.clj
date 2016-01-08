@@ -4,7 +4,8 @@
   (:require [sqlosure.relational-algebra :refer :all]
             [sqlosure.universe :refer [make-universe make-derived-universe]]
             [sqlosure.type :refer [boolean% numeric-type? type=? make-set-type]]
-            [active.clojure.record :refer [define-record-type]]))
+            [active.clojure.record :refer [define-record-type]]
+            [active.clojure.condition :refer [assertion-violation]]))
 
 (define-record-type sql-table
   (really-make-sql-table name scheme) sql-table?
@@ -124,9 +125,9 @@
   (if (= (Math/abs (sql-operator-arity rator))
          (count rands))
     (really-make-sql-expr-app rator rands)
-    (throw (Exception. (str 'make-sql-expr-app
-                            ": number or arguments does not match arity of "
-                            'rator)))))
+    (assertion-violation 'make-sql-expr-app
+                         "number of arguments does not match arity of"
+                         rator)))
 
 (def op-= (make-sql-operator "=" 2))
 (def op-< (make-sql-operator "<" 2))
