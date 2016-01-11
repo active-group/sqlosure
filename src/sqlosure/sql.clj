@@ -24,6 +24,7 @@
                    nullary?
                    tables outer-tables
                    criteria
+                   outer-criteria
                    group-by
                    having
                    order-by
@@ -35,6 +36,7 @@
    tables sql-select-tables  ;; (vec-of ["alias" sql-select-table])
    outer-tables sql-select-outer-tables
    criteria sql-select-criteria
+   outer-criteria sql-select-outer-criteria
    group-by sql-select-group-by
    having sql-select-having
    order-by sql-select-order-by
@@ -57,6 +59,9 @@
 (defn set-sql-select-criteria [sql-select criteria]
   (assoc sql-select :criteria criteria))
 
+(defn set-sql-select-outer-criteria [sql-select outer-criteria]
+  (assoc sql-select :outer-criteria outer-criteria))
+
 (defn set-sql-select-group-by [sql-select group-by*]
   (assoc sql-select :group-by group-by*))
 
@@ -72,7 +77,7 @@
 (defn ^{:test false} new-sql-select
   "Create a new, empty sql-select."
   []
-  (make-sql-select nil nil false nil nil nil nil false nil nil))
+  (make-sql-select nil nil false nil nil nil nil nil false nil nil))
 
 (def ^{:private true} sql-order #{:ascending :descending})
 

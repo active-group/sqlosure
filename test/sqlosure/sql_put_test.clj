@@ -109,9 +109,9 @@
                            (make-rel-scheme {"C" string%}))
         t2 (make-sql-table "t2"
                            (make-rel-scheme {"D" integer%}))
-        r (make-restrict (=$ (make-attribute-ref "C")
-                             (make-attribute-ref "D"))
-                           (make-left-outer-product t1 t2))
+        r (make-restrict-outer (=$ (make-attribute-ref "C")
+                                   (make-attribute-ref "D"))
+                               (make-left-outer-product t1 t2))
         sql (query->sql r)]
 
     (let [[res-str res-args]

@@ -91,6 +91,17 @@
    [old current-query]
    (set-query! (rel/make-restrict expr old))))
 
+(defn restrict-outer
+  "Restrict outer part of the current query by a condition.
+
+  expr -> query(nil)
+
+  Note this doesn't return anything."
+  [expr]
+  (monadic
+   [old current-query]
+   (set-query! (rel/make-restrict-outer expr old))))
+
 (defn restricted
   "Convenienc: Return a restricted version of a relation.
 

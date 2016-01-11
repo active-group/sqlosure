@@ -173,6 +173,15 @@ Replaced alist with hash-map."
   [exp restrict-exp
    query restrict-query])
 
+(define-record-type ^{:doc "Restrict a left outer product.
+  This will restrict all the right-hand sides of left outer products.
+  If it doesn't hold, these right-hand sides will have all-null
+  columns."}
+  restrict-outer
+  (make-restrict-outer exp query) restrict-outer?
+  [exp restrict-outer-exp
+   query restrict-outer-query])
+
 (define-record-type grouping-project
   (make-grouping-project alist query) grouping-project?
   [alist grouping-project-alist
@@ -393,6 +402,15 @@ Replaced alist with hash-map."
                                                    (restrict-exp q) fail)))
                         (fail t/boolean% (restrict-exp q)))
                       scheme)
+
+      (restrict-outer? q) (let [scheme (next-step (restrict-outer-query q))]
+                            (when (and fail
+                                       (not= t/boolean% (expression-type*
+                                                         (to-env scheme)
+                                                         (restrict-outer-exp q) fail)))
+                              (fail t/boolean% (restrict-outer-exp q)))
+                            scheme)
+      
       (combine? q) (case (combine-rel-op q)
                      :product (let [a1 (rel-scheme-alist (next-step (combine-query-1 q)))
                                     a2 (rel-scheme-alist (next-step (combine-query-2 q)))]
@@ -465,7 +483,7 @@ Replaced alist with hash-map."
 (defn query?
   "Returns true if the `obj` is a query."
   [obj]
-  (or (empty? obj) (base-relation? obj) (project? obj) (restrict? obj)
+  (or (empty? obj) (base-relation? obj) (project? obj) (restrict? obj) (restrict-outer? obj)
       (combine? obj) (grouping-project? obj) (order? obj) (top? obj)))
 
 (declare query->datum)
@@ -498,6 +516,8 @@ Replaced alist with hash-map."
                        (query->datum (project-query q)))
     (restrict? q) (list 'restrict (expression->datum (restrict-exp q))
                         (query->datum (restrict-query q)))
+    (restrict-outer? q) (list 'restrict-outer (expression->datum (restrict-outer-exp q))
+                              (query->datum (restrict-outer-query q)))
     (combine? q) (list (combine-rel-op q)
                        (query->datum (combine-query-1 q))
                        (query->datum (combine-query-2 q)))
@@ -532,6 +552,8 @@ Replaced alist with hash-map."
                             (next-step (third d)))
       restrict (make-restrict (datum->expression (second d) universe)
                               (next-step (third d)))
+      restrict-outer (make-restrict-outer (datum->expression (second d) universe)
+                                          (next-step (third d)))
       (:product :left-outer-product :union :intersection :quotient :difference)
       (make-combine (first d) (next-step (second d))
                     (next-step (third d)))
@@ -652,6 +674,15 @@ Replaced alist with hash-map."
           (expression-attribute-names (restrict-exp q))
           (map first (rel-scheme-alist (query-scheme sub)))
           (query-attribute-names sub))))
+
+      (restrict-outer? q)
+      (let [sub (restrict-outer-query q)]
+        (flat-distinct-vec
+         (concat
+          (expression-attribute-names (restrict-outer-exp q))
+          (map first (rel-scheme-alist (query-scheme sub)))
+          (query-attribute-names sub))))
+      
       (combine? q) (flat-distinct-vec
                     (concat (query-attribute-names (combine-query-1 q))
                             (query-attribute-names (combine-query-2 q))))
@@ -719,6 +750,11 @@ Replaced alist with hash-map."
                           culled (cull-substitution-alist alist sub)]
                       (make-restrict (substitute-attribute-refs culled (restrict-exp q))
                                      (next-step sub)))
+      (restrict-outer? q) (let [sub (restrict-outer-query q)
+                                culled (cull-substitution-alist alist sub)]
+                            (make-restrict-outer (substitute-attribute-refs culled (restrict-outer-exp q))
+                                                 (next-step sub)))
+      
       (combine? q) (make-combine (combine-rel-op q)
                                  (next-step (combine-query-1 q))
                                  (next-step (combine-query-2 q)))

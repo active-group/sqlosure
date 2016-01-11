@@ -205,26 +205,26 @@
                  [])
               
             v5 (put-padding-if-non-null (sql/sql-select-criteria sel)
-                                        ;; FIXME: Mike has no idea when to use ON vs. WHERE
-                                        (if (empty? outer)
-                                          #(put-where param %)
-                                          #(put-on param %)))
+                                        #(put-where param %))
+
+            v6 (put-padding-if-non-null (sql/sql-select-outer-criteria sel)
+                                        #(put-on param %))
             
-            v6 (put-padding-if-non-null (sql/sql-select-group-by sel)
+            v7 (put-padding-if-non-null (sql/sql-select-group-by sel)
                                         #(put-group-by param %))
             
-            v7 (if-let [h (sql/sql-select-having sel)]
+            v8 (if-let [h (sql/sql-select-having sel)]
                  (do
                    (put-space)
                    (put-having param h))
                  [])
-            v8 (put-padding-if-non-null (sql/sql-select-order-by sel)
+            v9 (put-padding-if-non-null (sql/sql-select-order-by sel)
                                      #(put-order-by param %))
             _ (let [extra (sql/sql-select-extra sel)]
                 (when-not (empty? extra)
                   (do (put-space)
                       (print (s/join " " extra)))))]
-        (concat v1 v2 v3 v4 v5 v6 v7 v8)))
+        (concat v1 v2 v3 v4 v5 v6 v7 v8 v9)))
       
     (sql/sql-select-combine? sel) ((sql-put-parameterization-combine-proc param)
                                    param

@@ -255,6 +255,16 @@
                            SUBA)]
       (is (= (rel-scheme-alist (query-scheme r)) {"C" string%}))
       (is (thrown? Exception (query-scheme r :typecheck? true))))
+
+
+    (let [r (make-restrict-outer (sql/=$ (make-scalar-subquery
+                                          (make-project {"C" (make-attribute-ref "C")}
+                                                        SUBB))
+                                         (make-attribute-ref "C"))
+                                 SUBA)]
+      (is (= (rel-scheme-alist (query-scheme r)) {"C" string%}))
+      (is (thrown? Exception (query-scheme r :typecheck? true))))
+    
     (testing "scheme for various combinations"
       (let [test-universe (make-universe)
             rel1 (make-base-relation 'tbl1
@@ -374,6 +384,27 @@
                                          (list 'base-relation 'SUBB)))
                              (list 'attribute-ref "C")))
                  (list 'base-relation 'SUBA))
+           (query->datum r))))
+
+
+  (let [test-universe (make-universe)
+        SUBB (make-base-relation 'SUBB
+                                 (make-rel-scheme {"B" string%})
+                                 test-universe
+                                 "SUBB")
+        SUBA (make-base-relation 'SUBA
+                                 (make-rel-scheme {"A" string%})
+                                 test-universe
+                                 "SUBA")
+        r (make-restrict-outer (sql/=$ (make-attribute-ref "A")
+                                       (make-attribute-ref "B"))
+                               (make-product SUBB SUBA))]
+    (is (= (list 'restrict-outer
+                 (list 'application
+                       '=
+                       (list (list 'attribute-ref "A")
+                             (list 'attribute-ref "B")))
+                 (list :product (list 'base-relation 'SUBB) (list 'base-relation 'SUBA)))
            (query->datum r)))))
 
 (deftest datum->query-test
@@ -417,6 +448,27 @@
       (is (thrown? Exception  ;; Should throw because of unregistered
                               ;; relations.
                    (datum->query (query->datum r) sql-universe))))
+
+    (let [sql-universe* (make-derived-universe sql-universe)
+          SUBB (make-base-relation 'SUBB
+                                   (make-rel-scheme {"B" string%})
+                                   :universe sql-universe*
+                                   :handle "SUBB")
+          SUBA (make-base-relation 'SUBA
+                                   (make-rel-scheme {"A" string%})
+                                   :universe sql-universe*
+                                   :handle "SUBA")
+          r (make-restrict-outer (sql/=$ (make-attribute-ref "A")
+                                         (make-attribute-ref "B"))
+                                 (make-left-outer-product SUBB SUBA))]
+      (is (= (make-restrict-outer
+              (make-application
+               (universe-lookup-rator sql-universe* '=)
+               (make-attribute-ref "A")
+               (make-attribute-ref "B"))
+              (make-left-outer-product SUBB SUBA))
+             (datum->query (query->datum r) sql-universe*))))
+      
     (let [rel1 (make-base-relation 'tbl1
                                    (make-rel-scheme {"one" string%
                                                      "two" integer%})
@@ -546,13 +598,17 @@
                                  (make-rel-scheme {"C" string%})
                                  :universe test-universe
                                  :handle "SUBA")
-        r (make-restrict (sql/=$ (make-scalar-subquery
-                                  (make-project {"C" (make-attribute-ref "C")
-                                                 "D" (make-attribute-ref "D")}
-                                                SUBB))
-                                 (make-attribute-ref "C"))
-                         SUBA)]
-    (is (= ["C" "D"] (query-attribute-names r))))
+        r1 (make-restrict (sql/=$ (make-scalar-subquery
+                                   (make-project {"C" (make-attribute-ref "C")
+                                                  "D" (make-attribute-ref "D")}
+                                                 SUBB))
+                                  (make-attribute-ref "C"))
+                          SUBA)
+        r2 (make-restrict (sql/=$ (make-attribute-ref "C")
+                                  (make-attribute-ref "C"))
+                          (make-left-outer-product SUBB SUBA))]
+    (is (= ["C" "D"] (query-attribute-names r1)))
+    (is (= ["C"] (query-attribute-names r2))))
   (let [test-universe (make-universe)
         rel1 (make-base-relation 'tbl1
                                  (make-rel-scheme {"one" string%

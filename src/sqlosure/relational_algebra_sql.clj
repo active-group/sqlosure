@@ -103,6 +103,12 @@
                             (sql/set-sql-select-criteria
                              (cons (expression->sql (rel/restrict-exp q))
                                    (sql/sql-select-criteria sql)))))
+    (rel/restrict-outer? q) (let [sql (x->sql-select (query->sql
+                                                      (rel/restrict-outer-query q)))]
+                              (-> sql
+                                  (sql/set-sql-select-outer-criteria
+                                   (cons (expression->sql (rel/restrict-outer-exp q))
+                                         (sql/sql-select-outer-criteria sql)))))
     (rel/grouping-project? q)
     (let [sql (x->sql-select (query->sql (rel/grouping-project-query q)))
           alist (rel/grouping-project-alist q)]

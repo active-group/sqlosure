@@ -70,8 +70,8 @@
         (get-query (monadic
                     [t1 (embed tbl1)]
                     [t2 (outer tbl2)]
-                    (restrict (=$ (! t1 "one")
-                                  (! t2 "four")))
+                    (restrict-outer (=$ (! t1 "one")
+                                        (! t2 "four")))
                     (project {"foo" (! t1 "two")})))))))
 
 
