@@ -196,6 +196,7 @@
 (def op-length (make-sql-operator "LENGTH" 1))
 
 (def op-count (make-sql-operator "COUNT" 1))
+(def op-count-all (make-sql-operator "COUNT" 1))
 (def op-sum (make-sql-operator "SUM" 1))
 (def op-avg (make-sql-operator "AVG" 1))
 (def op-min (make-sql-operator "MIN" 1))

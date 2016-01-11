@@ -247,16 +247,27 @@ Replaced alist with hash-map."
   (make-tuple expressions) tuple?
   [expressions tuple-expressions])
 
-(def ^{:private true} aggregations-op #{:count :sum :avg :min :max :std-dev
+(def ^{:private true} aggregations-op #{:count :count-all :sum :avg :min :max :std-dev
                                         :std-dev-p :var :var-p})
 
 (defn aggregations-op? [k]
   (contains? aggregations-op k))
 
 (define-record-type aggregation
-  (make-aggregation op expr) aggregation?
+  (really-make-aggregation op expr) aggregation?
   [op aggregation-operator
    expr aggregation-expr])
+
+(define-record-type aggregation*
+  (really-make-aggregation* op) aggregation*?
+  [op aggregation*-operator])
+
+(defn make-aggregation
+  [op & expr]
+  (cond
+    (empty? expr) (really-make-aggregation* op)
+    (= 1 (count expr)) (apply really-make-aggregation op expr)
+    :else (assertion-violation 'make-aggregation "invalid number of expressions (must be 0 or 1)" expr)))
 
 (define-record-type case-expr
   (make-case-expr alist default) case-expr?
@@ -272,10 +283,10 @@ Replaced alist with hash-map."
   [query set-subquery-query])
 
 (defn fold-expression
-  [on-attribute-ref on-const on-null on-application on-tuple on-aggregation
+  [on-attribute-ref on-const on-null on-application on-tuple on-aggregation on-aggregation*
    on-case on-scalar-subquery on-set-subquery expr]
   (let [next-step #(fold-expression on-attribute-ref on-const on-null on-application
-                               on-tuple on-aggregation on-case
+                               on-tuple on-aggregation on-aggregation* on-case
                                on-scalar-subquery on-set-subquery %)]
     (cond
       (attribute-ref? expr) (on-attribute-ref (attribute-ref-name expr))
@@ -286,6 +297,7 @@ Replaced alist with hash-map."
       (tuple? expr) (on-tuple (map next-step (tuple-expressions expr)))
       (aggregation? expr) (on-aggregation (aggregation-operator expr)
                                           (next-step (aggregation-expr expr)))
+      (aggregation*? expr) (on-aggregation* (aggregation*-operator expr))
       (case-expr? expr) (on-case (into {} (map (fn [[k v]] [(next-step k)
                                                             (next-step v)])
                                                (case-expr-alist expr)))
@@ -309,7 +321,6 @@ Replaced alist with hash-map."
                 (if (= :count op)
                   t/integer%
                   (do
-
                     (when fail
                       (cond
                         (contains? #{:sum :avg :std-dev :std-dev-p :var :var-p} op)
@@ -317,6 +328,10 @@ Replaced alist with hash-map."
                         (contains? #{:min :max} op)
                         (when-not (t/ordered-type? t) (fail 'ordered-type t))))
                     t))))
+   (fn [op] (let [op (aggregation*-operator expr)]
+              (if (= :count-all op)
+                t/integer%
+                (assertion-violation 'expression-type* "unknown aggregation" op))))
    (fn [alist t] (if fail
                    (for [[p r] alist]
                      (do
@@ -492,6 +507,7 @@ Replaced alist with hash-map."
    (fn [rator rands] (list 'application (rator-name rator) rands))
    (fn [exprs] (cons 'tuple exprs))
    (fn [op expr] (list 'aggregation op expr))
+   (fn [op] (list 'aggregation* op))
    (fn [alist default] (list 'case-expr alist default))
    (fn [subquery] (list 'scalar-subquery (query->datum subquery)))
    (fn [subquery] (list 'set-subquery-query (query->datum subquery)))
@@ -585,7 +601,8 @@ Replaced alist with hash-map."
                          (map next-step (third d)))
       tuple (make-tuple (map next-step (rest d)))
       aggregation (make-aggregation (second d)
-                                        (next-step (third d)))
+                                    (next-step (third d)))
+      aggregation* (make-aggregation (second d))
       case-expr (make-case-expr (into {}
                                           (map (fn [[k v]] [(next-step k)
                                                             (next-step v)])
@@ -640,6 +657,7 @@ Replaced alist with hash-map."
     (fn [rator rands] (flatten (map vec rands)))
     (fn [exprs] (flatten (map vec exprs))) ;; tuple
     (fn [_ expr] expr)
+    (fn [_] "*")
     (fn [alist default]
       (vec (concat default
                    (distinct (flatten (into [] alist))))))  ;; case
@@ -703,6 +721,7 @@ Replaced alist with hash-map."
    make-null
    (fn [rator rands] (apply make-application rator rands))
    make-tuple
+   make-aggregation
    make-aggregation
    make-case-expr
    (fn [subquery] (make-scalar-subquery (query-substitute-attribute-refs alist subquery)))
@@ -769,6 +788,7 @@ Replaced alist with hash-map."
    (fn [_ rands] (apply + rands))
    (fn [exprs] (apply + exprs))
    (fn [_ expr] (inc expr))
+   (fn [_] 1)
    (fn [alist default] (apply + default (map (fn [[k v]]
                                                (+ k v))
                                              alist)))

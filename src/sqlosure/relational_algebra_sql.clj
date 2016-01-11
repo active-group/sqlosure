@@ -19,6 +19,7 @@
   [op]
   (case op
     :count sql/op-count
+    :count-all sql/op-count-all
     :sum sql/op-sum
     :avg sql/op-avg
     :min sql/op-min
@@ -49,6 +50,10 @@
                              (aggregation-op->sql
                               (rel/aggregation-operator expr))
                              (expression->sql (rel/aggregation-expr expr)))
+    (rel/aggregation*? expr) (sql/make-sql-expr-app
+                              (aggregation-op->sql
+                               (rel/aggregation*-operator expr))
+                              (sql/make-sql-expr-column "*"))
     (rel/case-expr? expr) (sql/make-sql-expr-case
                            (into {} (map (fn [[k v]]
                                            [(expression->sql k)
@@ -59,7 +64,7 @@
                                  (query->sql (rel/scalar-subquery-query expr)))
     (rel/set-subquery? expr) (sql/make-sql-expr-subquery
                               (query->sql (rel/set-subquery-query expr)))
-    :else (c/assertion-violation (str 'expression->subquery ": unknown expression " expr))))
+    :else (c/assertion-violation 'expression->sql": unknown expression " expr)))
 
 (defn ^{:test true} alist->sql
   "Takes a map and returns a corresponding sql statement."
