@@ -104,6 +104,22 @@
                         res-str))
         (is (= res-args '(10 5 100)))))))
 
+(deftest put-sql-outer-join-test
+  (let [t1 (make-sql-table "t1"
+                           (make-rel-scheme {"C" string%}))
+        t2 (make-sql-table "t2"
+                           (make-rel-scheme {"D" integer%}))
+        r (make-restrict (=$ (make-attribute-ref "C")
+                             (make-attribute-ref "D"))
+                           (make-left-outer-product t1 t2))
+        sql (query->sql r)]
+
+    (let [[res-str res-args]
+          (with-out-str-and-value (put-sql-select default-sql-put-parameterization sql))]
+      (is (= "SELECT * FROM t1 LEFT JOIN t2 ON (C = D)"
+             res-str)))))
+
+
 (deftest put-joining-infix-test
   (is (= "foo bar baz"
          (with-out-str (put-joining-infix ["foo" "bar" "baz"] " " print))))
@@ -111,10 +127,10 @@
          (with-out-str (put-joining-infix ["foo" "bar" "baz"] "-" print)))))
 
 (deftest put-tables-test
-  (is (= "FROM foo"
+  (is (= "foo"
          (with-out-str (put-tables default-sql-put-parameterization
                                    [[nil (make-sql-select-table "foo")]]))))
-  (is (= "FROM foo, bar AS b"
+  (is (= "foo, bar AS b"
          (with-out-str (put-tables default-sql-put-parameterization
                                    [[nil (make-sql-select-table "foo")]
                                     ["b" (make-sql-select-table "bar")]])))))

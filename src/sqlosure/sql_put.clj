@@ -87,7 +87,6 @@
   "Takes a sql-put-parameterization and the sql-select-tables field of a
   sql-select and prints them as a sql statement."
   [param tables]
-  (print "FROM ")
   (put-joining-infix tables ", "
                      (fn [[alias select]]
                        (if (sql/sql-select-table? select)
@@ -192,7 +191,9 @@
             _ (put-space)
             v2 (put-attributes param (sql/sql-select-attributes sel))
             v3 (put-padding-if-non-null (sql/sql-select-tables sel)
-                                        #(put-tables param %))
+                                        (fn [tables]
+                                          (print "FROM ")
+                                          (put-tables param tables)))
 
             outer (sql/sql-select-outer-tables sel)
 
