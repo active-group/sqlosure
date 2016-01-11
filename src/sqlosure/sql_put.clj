@@ -206,12 +206,12 @@
                    (put-tables param outer))
                  [])
               
-            v5 (put-padding-if-non-null (sql/sql-select-criteria sel)
+            v5 (put-padding-if-non-null (sql/sql-select-outer-criteria sel)
+                                        #(put-on param %))
+
+            v6 (put-padding-if-non-null (sql/sql-select-criteria sel)
                                         #(put-where param %))
 
-            v6 (put-padding-if-non-null (sql/sql-select-outer-criteria sel)
-                                        #(put-on param %))
-            
             v7 (put-padding-if-non-null (sql/sql-select-group-by sel)
                                         #(put-group-by param %))
             
