@@ -19,6 +19,13 @@
                       :universe universe
                       :handle (really-make-sql-table name scheme)))
 
+;; sql-table-name = string
+;; sql-column = string
+;; sel-select is on of:
+;; * sql-select
+;; * sql-select-combine
+;; * sql-select-table
+;; * sql-select-empty
 (define-record-type sql-select
   (make-sql-select options
                    attributes
@@ -30,14 +37,34 @@
                    order-by
                    extra)
   sql-select?
-  [options sql-select-options
+  [;; [ string ]
+   ;; DISTINCT, ALL, etc.
+   options sql-select-options
+   ;; list {sql-column sql-expr}
+   ;; {} is for '*'
+   ;; result
    attributes sql-select-attributes
+   ;; true if the select represents a nullary relation. In this case,
+   ;; attributes should contain a single dummy attribute.
+   ;; TODO / FIXME: Is this comment still true?
    nullary? sql-select-nullary?
+   ;; [ [alias sql-select-talbe] ]
+   ;; FROM
    tables sql-select-tables  ;; (vec-of ["alias" sql-select-table])
+   ;; [ sql-expr ]
+   ;; WHERE
    criteria sql-select-criteria
+   ;; [ sql-expr ]
+   ;; GROUP-BY
    group-by sql-select-group-by
+   ;; one-of: (sql-expr, nil)
+   ;; HAVING
    having sql-select-having
+   ;; [ {sql-expr sql-order} ]
+   ;; ORDER BY
    order-by sql-select-order-by
+   ;; [ string ]
+   ;; TOP n, etc.
    extra sql-select-extra])
 
 ; FIXME: these should be done with lenses instead

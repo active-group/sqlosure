@@ -1,4 +1,5 @@
-(ns sqlosure.sql-put
+(ns ^{:doc "Printing SQL"}
+    sqlosure.sql-put
   (:require [sqlosure.sql :as sql]
             [sqlosure.relational-algebra :as rel]
             [sqlosure.relational-algebra-sql :refer [add-table]]
