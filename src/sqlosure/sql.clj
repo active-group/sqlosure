@@ -54,7 +54,6 @@
    tables sql-select-tables  ;; (vec-of ["alias" sql-select-table])
    ;; [ sql-expr ]
    ;; WHERE
-   criteria sql-select-criteria
    ;; [ sql-expr ]
    ;; GROUP-BY
    outer-tables sql-select-outer-tables
