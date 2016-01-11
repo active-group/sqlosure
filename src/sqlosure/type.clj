@@ -17,6 +17,7 @@
    predicate base-type-predicate
    const->datum-proc base-type-const->datum-proc
    datum->const-proc base-type-datum->const-proc
+   ;; Domain-specific date, for outside use.
    data base-type-data])
 
 (defn make-base-type

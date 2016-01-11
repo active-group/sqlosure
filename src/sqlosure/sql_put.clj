@@ -90,7 +90,6 @@
   "Takes a sql-put-parameterization and the sql-select-tables field of a
   sql-select and prints them as a sql statement."
   [param tables]
-  (print "FROM ")
   (put-joining-infix tables ", "
                      (fn [[alias select]]
                        (if (sql/sql-select-table? select)
@@ -138,11 +137,19 @@
         v2 (put-sql-expression param (second p))]
     (concat v1 v2)))
 
+(defn put-condition
+  [param exprs]
+  (put-joining-infix exprs " AND " (fn [b] (put-sql-expression param b))))
+
 (defn put-where
   [param exprs]
   (print "WHERE ")
-  (let [v (put-joining-infix exprs " AND " (fn [b] (put-sql-expression param b)))]
-    v))
+  (put-condition param exprs))
+
+(defn put-on
+  [param exprs]
+  (print "ON ")
+  (put-condition param exprs))
 
 (defn put-group-by
   [param group-by]
@@ -180,33 +187,55 @@
   [param sel]
   (cond
     (sql/sql-select? sel)
-    (let [_ (print "SELECT")
-          v1 (put-padding-if-non-null (sql/sql-select-options sel)
-                                     #(print (s/join " " %)))
-          _ (put-space)
-          v2 (put-attributes param (sql/sql-select-attributes sel))
-          v2 (put-padding-if-non-null (sql/sql-select-tables sel)
-                                     #(put-tables param %))
-          v3 (put-padding-if-non-null (sql/sql-select-criteria sel)
-                                     #(put-where param %))
-          v4 (put-padding-if-non-null (sql/sql-select-group-by sel)
-                                     #(put-group-by param %))
-          v5 (when-let [h (sql/sql-select-having sel)]
-               (put-space)
-               (put-having param h))
-          v6 (put-padding-if-non-null (sql/sql-select-order-by sel)
+    (do
+      (let [_ (print "SELECT")
+            v1 (put-padding-if-non-null (sql/sql-select-options sel)
+                                        #(print (s/join " " %)))
+            _ (put-space)
+            v2 (put-attributes param (sql/sql-select-attributes sel))
+            v3 (put-padding-if-non-null (sql/sql-select-tables sel)
+                                        (fn [tables]
+                                          (print "FROM ")
+                                          (put-tables param tables)))
+
+            outer (sql/sql-select-outer-tables sel)
+
+            v4 (if (not-empty outer)
+                 (do
+                   (print " LEFT JOIN ")
+                   (put-tables param outer))
+                 [])
+              
+            v5 (put-padding-if-non-null (sql/sql-select-criteria sel)
+                                        #(put-where param %))
+
+            v6 (put-padding-if-non-null (sql/sql-select-outer-criteria sel)
+                                        #(put-on param %))
+            
+            v7 (put-padding-if-non-null (sql/sql-select-group-by sel)
+                                        #(put-group-by param %))
+            
+            v8 (if-let [h (sql/sql-select-having sel)]
+                 (do
+                   (put-space)
+                   (put-having param h))
+                 [])
+            v9 (put-padding-if-non-null (sql/sql-select-order-by sel)
                                      #(put-order-by param %))
-          v7 (let [extra (sql/sql-select-extra sel)]
-               (when-not (empty? extra)
-                 (do (put-space)
-                     (print (s/join " " extra)))))]
-      (concat v1 v2 v3 v4 v5 v6 v7))
+            _ (let [extra (sql/sql-select-extra sel)]
+                (when-not (empty? extra)
+                  (do (put-space)
+                      (print (s/join " " extra)))))]
+        (concat v1 v2 v3 v4 v5 v6 v7 v8 v9)))
+      
     (sql/sql-select-combine? sel) ((sql-put-parameterization-combine-proc param)
                                    param
                                    (sql/sql-select-combine-op sel)
                                    (sql/sql-select-combine-left sel)
                                    (sql/sql-select-combine-right sel))
+    
     (sql/sql-select-table? sel) (print (sql/sql-select-table-name sel))
+    
     (sql/sql-select-empty? sel) (print "")  ;; woot woot
     :else (assertion-violation 'put-sql-select-1 "unknown select" sel)))
 

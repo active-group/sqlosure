@@ -5,16 +5,21 @@
   (make-db-connection type name data handle sql-put-parameterization
                       closer querier inserter deleter updater sql-runner)
   db-connection?
-  [type db-connection-type  ;; symbol
-   name db-connection-name  ;; name of actual db
-   data db-connection-data  ;; internal conenction data
-   handle db-connection-handle
+  [type db-connection-type  ;; What kind of database we're attached to.
+   name db-connection-name  ;; Name of the actual DB; for humans.
+   data db-connection-data  ;; Internal connection data; for the driver.
+   handle db-connection-handle  ;; DB-specific connection handle.
    sql-put-parameterization db-connection-sql-put-parameterization
    closer db-connection-closer
-   querier db-connection-querier
-   inserter db-connection-inserter
-   deleter db-connection-deleter
-   updater db-connection-updater
+   ;; Proc to run query.
+   querier db-connection-querier  ;; :db-connection sql-select scheme -> records
+   ;; Proc to insert.
+   inserter db-connection-inserter  ;; :db-connection string scheme (one-of (list value) & values)
+                                    ;; -> inserted-record
+   ;; Proc to delete.
+   deleter db-connection-deleter  ;; :db-connection string scheme sql-expr -> int
+   ;; Proc to update.
+   updater db-connection-updater  ;; :db-connection string scheme sql-expr (map-of field -> new-value) -> int
    sql-runner db-connection-sql-runner])
 
 (defn set-db-connection-handle

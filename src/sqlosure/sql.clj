@@ -30,8 +30,9 @@
   (make-sql-select options
                    attributes
                    nullary?
-                   tables
+                   tables outer-tables
                    criteria
+                   outer-criteria
                    group-by
                    having
                    order-by
@@ -56,6 +57,9 @@
    criteria sql-select-criteria
    ;; [ sql-expr ]
    ;; GROUP-BY
+   outer-tables sql-select-outer-tables
+   criteria sql-select-criteria
+   outer-criteria sql-select-outer-criteria
    group-by sql-select-group-by
    ;; one-of: (sql-expr, nil)
    ;; HAVING
@@ -78,8 +82,14 @@
 (defn set-sql-select-tables [sql-select tables]
   (assoc sql-select :tables tables))
 
+(defn set-sql-select-outer-tables [sql-select outer-tables]
+  (assoc sql-select :outer-tables outer-tables))
+
 (defn set-sql-select-criteria [sql-select criteria]
   (assoc sql-select :criteria criteria))
+
+(defn set-sql-select-outer-criteria [sql-select outer-criteria]
+  (assoc sql-select :outer-criteria outer-criteria))
 
 (defn set-sql-select-group-by [sql-select group-by*]
   (assoc sql-select :group-by group-by*))
@@ -96,7 +106,7 @@
 (defn ^{:test false} new-sql-select
   "Create a new, empty sql-select."
   []
-  (make-sql-select nil nil false nil nil nil false nil nil))
+  (make-sql-select nil nil false nil nil nil nil nil false nil nil))
 
 (def ^{:private true} sql-order #{:ascending :descending})
 

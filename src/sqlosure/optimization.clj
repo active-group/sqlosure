@@ -56,6 +56,21 @@
               e (worker (concat (r/expression-attribute-names e)
                                 live)
                         (r/restrict-query q))))
+
+           (r/restrict-outer? q)
+           (let [e (r/restrict-outer-exp q)]
+             (r/make-restrict-outer
+              e (worker (concat (r/expression-attribute-names e)
+                                live)
+                        (r/restrict-outer-query q))))
+           
+           (r/restrict-outer? q)
+           (let [e (r/restrict-outer-exp q)]
+             (r/make-restrict-outer
+              e (worker (concat (r/expression-attribute-names e)
+                                live)
+                        (r/restrict-outer-query q))))
+           
            (r/order? q)
            (let [alist (r/order-alist q)]
              (r/make-order
@@ -65,11 +80,12 @@
                       (r/order-query q))))
            (r/top? q) (r/make-top (r/top-count q) (worker live (r/top-query q)))
            (r/combine? q)
-           (let [q1 (r/combine-query-1 q)
+           (let [r (r/combine-rel-op q)
+                 q1 (r/combine-query-1 q)
                  q2 (r/combine-query-2 q)]
              (let [live1 (intersect-live live q1)]
-               (case (r/combine-rel-op q)
-                 :product
+               (case r
+                 (:product :left-outer-product)
                  (let [live2 (intersect-live live q2)]
                    (r/make-combine :product
                                    (worker live1 q1)
@@ -79,7 +95,8 @@
                   :quotient
                   (worker (keys (r/rel-scheme-alist (r/query-scheme q1))) q1)
                   (worker (keys (r/rel-scheme-alist (r/query-scheme q2))) q2))
-                 (r/make-combine (r/combine-rel-op q)
+                 
+                 (r/make-combine r
                                  (worker live1 q1)
                                  (worker live1 q2)))))
            (r/grouping-project? q)
@@ -111,8 +128,10 @@
                         (r/project-query pq))
         (r/combine? pq)
         (let [op (r/combine-rel-op pq)]
-          (if (= :product op)
+          (case op
+            (:product :left-outer-product)
             (r/make-project pa pq)
+
             (let [q1 (r/combine-query-1 pq)
                   q2 (r/combine-query-2 pq)
                   subst #(project-alist-substitute-attribute-refs
@@ -130,6 +149,9 @@
         :else (r/make-project pa pq)))
     (r/restrict? q) (r/make-restrict (r/restrict-exp q)
                                      (merge-project (r/restrict-query q)))
+    (r/restrict-outer? q) (r/make-restrict-outer (r/restrict-outer-exp q)
+                                                 (merge-project (r/restrict-outer-query q)))
+
     (r/order? q) (r/make-order (r/order-alist q)
                                (merge-project (r/order-query q)))
     (r/top? q) (r/make-top (r/top-count q) (merge-project (r/top-query q)))
@@ -174,22 +196,81 @@
           (cond
             (and (not (= :difference op))
                  (not (= :quotient op))
-				 (not-empty
-				  (filter (fn [[k v]]
-						   (contains? attrs k)) (query->alist q1))))
+                 (not-empty
+                  (filter (fn [[k v]]
+                            (contains? attrs k)) (query->alist q1))))
             (r/make-combine op q1 (push-restrict (r/make-restrict re q2)))
+            
             (not-empty (filter (fn [[k v]] (contains? attrs k))
                                (query->alist q2)))
             (r/make-combine op (push-restrict (r/make-restrict re q1) q2))
+            
             :else (r/make-restrict re (push-restrict rq))))
+
         (r/restrict? rq) (let [pushed (push-restrict rq)]
                            (if (r/restrict? pushed)
                              (r/make-restrict re pushed)
                              (push-restrict (r/make-restrict re pushed))))
+        
+        (r/restrict-outer? rq) (let [pushed (push-restrict rq)]
+                                 (if (r/restrict-outer? pushed)
+                                   (r/make-restrict re pushed)
+                                   (push-restrict (r/make-restrict re pushed))))
+        
         (r/order? rq) (r/make-order (r/order-alist rq)
                                     (push-restrict
                                      (r/make-restrict re (r/order-query rq))))
         :else (r/make-restrict re (push-restrict rq))))
+
+    (r/restrict-outer? q)
+    (let [rq (r/restrict-outer-query q)
+          re (r/restrict-outer-exp q)]
+      (cond
+        (and (r/project? rq)
+             (not (r/aggregate? re)))
+        (let [alist (r/project-alist rq)]
+          (r/make-project
+           alist
+           (push-restrict
+            (r/make-restrict-outer (r/substitute-attribute-refs alist re)
+                                   (r/project-query rq)))))
+        (r/combine? rq)
+        (let [op (r/combine-rel-op rq)
+              q1 (r/combine-query-1 rq)
+              q2 (r/combine-query-2 rq)
+              attrs (r/expression-attribute-names re)]
+          (cond
+            (= :left-outer-product op)
+            (r/make-restrict-outer re (push-restrict rq))
+            
+            (and (not (= :difference op))
+                 (not (= :quotient op))
+                 (not-empty
+                  (filter (fn [[k v]]
+                            (contains? attrs k)) (query->alist q1))))
+            (r/make-combine op q1 (push-restrict (r/make-restrict-outer re q2)))
+            
+            (not-empty (filter (fn [[k v]] (contains? attrs k))
+                               (query->alist q2)))
+            (r/make-combine op (push-restrict (r/make-restrict-outer re q1) q2))
+            
+            :else (r/make-restrict-outer re (push-restrict rq))))
+
+        (r/restrict? rq) (let [pushed (push-restrict rq)]
+                           (if (r/restrict? pushed)
+                             (r/make-restrict-outer re pushed)
+                             (push-restrict (r/make-restrict-outer re pushed))))
+        
+        (r/restrict-outer? rq) (let [pushed (push-restrict rq)]
+                                 (if (r/restrict-outer? pushed)
+                                   (r/make-restrict-outer re pushed)
+                                   (push-restrict (r/make-restrict-outer re pushed))))
+        
+        (r/order? rq) (r/make-order (r/order-alist rq)
+                                    (push-restrict
+                                     (r/make-restrict-outer re (r/order-query rq))))
+        :else (r/make-restrict-outer re (push-restrict rq))))
+    
     (r/order? q)
     (let [oq (r/order-query q)
           alist (r/order-alist q)]

@@ -88,6 +88,7 @@
     (is (= (list tbl2 tbl1)
            (map second (sql-select-tables q))))))
 
+;; FIXME: huh?
 (query->sql tbl1)
 
 (deftest query->sql-test
@@ -101,23 +102,46 @@
         nullary-p (make-project {} tbl1)]
     (is (sql-select-nullary? (query->sql nullary-p)))
     (is (= res (query->sql p))))
-  ;; restrict
-  (let [test-universe (make-universe)
-        t1 (make-sql-table 't1
-                           (make-rel-scheme {"C" string%})
-                           :universe test-universe
-                           :handle "t1")
-        r (make-restrict (>=$ (make-const integer% 42)
-                              (make-attribute-ref "C"))
-                         t1)]
-    (is (= [(query->sql t1)]
-           (mapv second (sql-select-tables (query->sql r)))))
-    (is (= [(expression->sql (>=$ (make-const integer% 42)
-                                   (make-attribute-ref "C")))]
-           (sql-select-criteria (query->sql r)))))
-  ;; order
-  (let [o (make-order {(make-attribute-ref "one") :ascending}
-                      (make-sql-table "tbl1"
-                                      (make-rel-scheme {"one" string%
-                                                        "two" integer%})))
-        q (query->sql o)]))
+
+  (testing "restrict"
+    (let [test-universe (make-universe)
+          t1 (make-sql-table 't1
+                             (make-rel-scheme {"C" string%})
+                             :universe test-universe
+                             :handle "t1")
+          r (make-restrict (>=$ (make-const integer% 42)
+                                (make-attribute-ref "C"))
+                           t1)]
+      (is (= (mapv second (sql-select-tables (query->sql r)))
+             [(query->sql t1)]))
+      (is (= [(expression->sql (>=$ (make-const integer% 42)
+                                    (make-attribute-ref "C")))]
+             (sql-select-criteria (query->sql r))))))
+
+  ;; FIXME: missing test for product
+  
+  (testing "outer product"
+    (let [test-universe (make-universe)
+          t1 (make-sql-table 't1
+                             (make-rel-scheme {"C" string%})
+                             :universe test-universe
+                             :handle "t1")
+          t2 (make-sql-table 't2
+                             (make-rel-scheme {"D" integer%})
+                             :universe test-universe
+                             :handle "t2")
+          r (make-restrict (=$ (make-attribute-ref "C")
+                               (make-attribute-ref "D"))
+                           (make-left-outer-product t1 t2))
+          sql (query->sql r)]
+      (is (= [[nil (make-sql-select-table 't1)]]
+             (sql-select-tables sql)))
+      (is (= [[nil (make-sql-select-table 't2)]]
+             (sql-select-outer-tables sql)))))
+    
+  (testing "order"
+    (let [o (make-order {(make-attribute-ref "one") :ascending}
+                        (make-sql-table "tbl1"
+                                        (make-rel-scheme {"one" string%
+                                                          "two" integer%})))
+          q (query->sql o)])))

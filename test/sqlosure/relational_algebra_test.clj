@@ -255,28 +255,44 @@
                            SUBA)]
       (is (= (rel-scheme-alist (query-scheme r)) {"C" string%}))
       (is (thrown? Exception (query-scheme r :typecheck? true))))
-    ;; combine
-    (let [test-universe (make-universe)
-          rel1 (make-base-relation 'tbl1
-                                   (make-rel-scheme {"one" string%
-                                                     "two" integer%})
-                                   test-universe
-                                   "tbl1")
-          rel2 (make-base-relation 'tbl2
-                                   (make-rel-scheme {"three" boolean%
-                                                     "four" double%})
-                                   test-universe
-                                   "tbl2")
-          c (make-product rel1 rel2)
-          q (make-quotient rel1 rel2)
-          u (make-union rel1 rel2)]
-      (is (= (rel-scheme-alist (query-scheme c))
-             (into (rel-scheme-alist (base-relation-scheme rel1))
-                   (rel-scheme-alist (base-relation-scheme rel2)))))
-      (is (= (rel-scheme-alist (query-scheme q))
-             (rel-scheme-alist (rel-scheme-difference
-                                (base-relation-scheme rel1)
-                                (base-relation-scheme rel2))))))
+
+
+    (let [r (make-restrict-outer (sql/=$ (make-scalar-subquery
+                                          (make-project {"C" (make-attribute-ref "C")}
+                                                        SUBB))
+                                         (make-attribute-ref "C"))
+                                 SUBA)]
+      (is (= (rel-scheme-alist (query-scheme r)) {"C" string%}))
+      (is (thrown? Exception (query-scheme r :typecheck? true))))
+    
+    (testing "scheme for various combinations"
+      (let [test-universe (make-universe)
+            rel1 (make-base-relation 'tbl1
+                                     (make-rel-scheme {"one" string%
+                                                       "two" integer%})
+                                     test-universe
+                                     "tbl1")
+            rel2 (make-base-relation 'tbl2
+                                     (make-rel-scheme {"three" boolean%
+                                                       "four" double%})
+                                     test-universe
+                                     "tbl2")
+            c (make-product rel1 rel2)
+            q (make-quotient rel1 rel2)
+            l (make-left-outer-product rel1 rel2)]
+        (testing "product"
+          (is (= (rel-scheme-concat (base-relation-scheme rel1)
+                                    (base-relation-scheme rel2))
+                 (query-scheme c))))
+        (testing "quotient"
+          (is (= (rel-scheme-difference (base-relation-scheme rel1)
+                                        (base-relation-scheme rel2))
+                 (query-scheme q))))
+        (testing "left outer product"
+          (is (= (rel-scheme-concat (base-relation-scheme rel1)
+                                    (rel-scheme-nullable (base-relation-scheme rel2)))
+                 (query-scheme l))))))
+      
     ;; grouping project
     (let [gp (make-grouping-project
               {"one" (make-attribute-ref "one")
@@ -368,6 +384,27 @@
                                          (list 'base-relation 'SUBB)))
                              (list 'attribute-ref "C")))
                  (list 'base-relation 'SUBA))
+           (query->datum r))))
+
+
+  (let [test-universe (make-universe)
+        SUBB (make-base-relation 'SUBB
+                                 (make-rel-scheme {"B" string%})
+                                 test-universe
+                                 "SUBB")
+        SUBA (make-base-relation 'SUBA
+                                 (make-rel-scheme {"A" string%})
+                                 test-universe
+                                 "SUBA")
+        r (make-restrict-outer (sql/=$ (make-attribute-ref "A")
+                                       (make-attribute-ref "B"))
+                               (make-product SUBB SUBA))]
+    (is (= (list 'restrict-outer
+                 (list 'application
+                       '=
+                       (list (list 'attribute-ref "A")
+                             (list 'attribute-ref "B")))
+                 (list :product (list 'base-relation 'SUBB) (list 'base-relation 'SUBA)))
            (query->datum r)))))
 
 (deftest datum->query-test
@@ -411,6 +448,27 @@
       (is (thrown? Exception  ;; Should throw because of unregistered
                               ;; relations.
                    (datum->query (query->datum r) sql-universe))))
+
+    (let [sql-universe* (make-derived-universe sql-universe)
+          SUBB (make-base-relation 'SUBB
+                                   (make-rel-scheme {"B" string%})
+                                   :universe sql-universe*
+                                   :handle "SUBB")
+          SUBA (make-base-relation 'SUBA
+                                   (make-rel-scheme {"A" string%})
+                                   :universe sql-universe*
+                                   :handle "SUBA")
+          r (make-restrict-outer (sql/=$ (make-attribute-ref "A")
+                                         (make-attribute-ref "B"))
+                                 (make-left-outer-product SUBB SUBA))]
+      (is (= (make-restrict-outer
+              (make-application
+               (universe-lookup-rator sql-universe* '=)
+               (make-attribute-ref "A")
+               (make-attribute-ref "B"))
+              (make-left-outer-product SUBB SUBA))
+             (datum->query (query->datum r) sql-universe*))))
+      
     (let [rel1 (make-base-relation 'tbl1
                                    (make-rel-scheme {"one" string%
                                                      "two" integer%})
@@ -423,10 +481,12 @@
                                    :handle "tbl2")
           p (make-product rel1 rel2)
           q (make-quotient rel1 rel2)
-          u (make-union rel1 rel2)]
+          u (make-union rel1 rel2)
+          l (make-left-outer-product rel1 rel2)]
       (is (= p (query->datum->query p)))
       (is (= q (query->datum->query q)))
-      (is (= u (query->datum->query u))))
+      (is (= u (query->datum->query u)))
+      (is (= l (query->datum->query l))))
     (let [gp (make-grouping-project
               {"one" (make-attribute-ref "one")
                "foo" (make-aggregation :avg
@@ -538,13 +598,17 @@
                                  (make-rel-scheme {"C" string%})
                                  :universe test-universe
                                  :handle "SUBA")
-        r (make-restrict (sql/=$ (make-scalar-subquery
-                                  (make-project {"C" (make-attribute-ref "C")
-                                                 "D" (make-attribute-ref "D")}
-                                                SUBB))
-                                 (make-attribute-ref "C"))
-                         SUBA)]
-    (is (= #{"C" "D"} (query-attribute-names r))))
+        r1 (make-restrict (sql/=$ (make-scalar-subquery
+                                   (make-project {"C" (make-attribute-ref "C")
+                                                  "D" (make-attribute-ref "D")}
+                                                 SUBB))
+                                  (make-attribute-ref "C"))
+                          SUBA)
+        r2 (make-restrict (sql/=$ (make-attribute-ref "C")
+                                  (make-attribute-ref "C"))
+                          (make-left-outer-product SUBB SUBA))]
+    (is (= #{"C" "D"} (query-attribute-names r1)))
+    (is (= #{"C"} (query-attribute-names r2))))
   (let [test-universe (make-universe)
         rel1 (make-base-relation 'tbl1
                                  (make-rel-scheme {"one" string%
@@ -561,13 +625,15 @@
                          tbl1)
         p2 (make-project {"three" (make-attribute-ref "three")
                           "four" (make-attribute-ref "four")}
-                         tbl1)
+                         tbl1) ; FIXME: doesn't typecheck
         c (make-product rel1 p1)
         q (make-quotient p1 rel1)
-        u (make-union p1 p2)]
+        u (make-union p1 p2)
+        l (make-left-outer-product rel1 p1)]
     (is (= #{"two" "one"} (query-attribute-names c)))
     (is (= #{"two" "one"} (query-attribute-names q)))
-    (is (= #{"two" "one" "three" "four"} (query-attribute-names u))))
+    (is (= #{"two" "one" "three" "four"} (query-attribute-names u)))
+    (is (= #{"two" "one"} (query-attribute-names l))))
   (is (= #{"one" "two"} (query-attribute-names
                           (make-grouping-project
                            {"one" (make-attribute-ref "one")

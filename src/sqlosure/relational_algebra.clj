@@ -24,6 +24,12 @@ Replaced alist with hash-map."
   ;; TODO: Couldn't this just be (= t1 t2)?
   (= (rel-scheme-alist t1) (rel-scheme-alist t2)))
 
+(defn rel-scheme-concat
+  [s1 s2]
+  (make-rel-scheme (into {} ; FIXME
+                         (concat (rel-scheme-alist s1)
+                                 (rel-scheme-alist s2)))))
+
 (defn rel-scheme-difference
   "Return a new rel-scheme resulting of the (set-)difference of s1's and s2's
   alist."
@@ -42,6 +48,15 @@ Replaced alist with hash-map."
   "Returns true if the rel-scheme's alist consist of only one pair."
   [scheme]
   (= 1 (count (rel-scheme-alist scheme))))
+
+(defn rel-scheme-nullable
+  "Makes all columns in a scheme nullable."
+  [scheme]
+  (make-rel-scheme
+   (into {}
+         (map (fn [[name type]]
+                [name (t/make-nullable-type type)])
+              (rel-scheme-alist scheme)))))
 
 (defn rel-scheme->environment
   "Returns the relation table of a rel-scheme."
@@ -158,6 +173,15 @@ Replaced alist with hash-map."
   [exp restrict-exp
    query restrict-query])
 
+(define-record-type ^{:doc "Restrict a left outer product.
+  This will restrict all the right-hand sides of left outer products.
+  If it doesn't hold, these right-hand sides will have all-null
+  columns."}
+  restrict-outer
+  (make-restrict-outer exp query) restrict-outer?
+  [exp restrict-outer-exp
+   query restrict-outer-query])
+
 (define-record-type grouping-project
   (make-grouping-project alist query) grouping-project?
   [alist grouping-project-alist
@@ -169,37 +193,36 @@ Replaced alist with hash-map."
    query-1 combine-query-1
    query-2 combine-query-2])
 
-(def ^{:private true} relational-ops #{:product :union :intersection :quotient :difference})
+(def ^{:private true} relational-ops #{:product :left-outer-product :union
+:intersection :quotient :difference})
 
-(defn relational-op? [k]
-  (contains? relational-ops k))
+(defn relational-op? [k] (contains? relational-ops k))
 
-(defn make-combine [rel-op query-1 query-2]
-  (if-not (relational-op? rel-op)
-    (assertion-violation 'make-combine "not a relational operator" rel-op)
-    (cond
-      (not= rel-op :product) (really-make-combine rel-op query-1 query-2)
-      (empty? query-1) query-2
-      (empty? query-2) query-1
-      :else (really-make-combine rel-op query-1 query-2))))
+(defn make-combine [rel-op query-1 query-2] (if-not (relational-op? rel-op)
+  (assertion-violation 'make-combine "not a relational operator" rel-op)
+  (when-not (relational-op? rel-op) (throw (Exception. (str 'make-combine " not
+  a relational operator " rel-op)))) (case rel-op :product (cond (empty?
+  query-1) query-2 (empty? query-2) query-1 :else (really-make-combine rel-op
+  query-1 query-2))
 
-(defn make-product [query-1 query-2]
-  (make-combine :product query-1 query-2))
+    (really-make-combine rel-op query-1 query-2)))
 
-(defn make-union [query-1 query-2]
-  (make-combine :union query-1 query-2))
+(defn make-left-outer-product [query-1 query-2] (make-combine
+  :left-outer-product query-1 query-2))
 
-(defn make-intersection [query-1 query-2]
-  (make-combine :intersection query-1 query-2))
+(defn make-product [query-1 query-2] (make-combine :product query-1 query-2))
 
-(defn make-quotient [query-1 query-2]
-  (make-combine :quotient query-1 query-2))
+(defn make-union [query-1 query-2] (make-combine :union query-1 query-2))
 
-(defn make-difference [query-1 query-2]
-  (make-combine :difference query-1 query-2))
+(defn make-intersection [query-1 query-2] (make-combine :intersection query-1
+  query-2))
 
-(define-record-type empty-val
-  (make-empty-val) empty-val? [])
+(defn make-quotient [query-1 query-2] (make-combine :quotient query-1 query-2))
+
+(defn make-difference [query-1 query-2] (make-combine :difference query-1
+  query-2))
+
+(define-record-type empty-val (make-empty-val) empty-val? [])
 
 (def the-empty (make-empty-val))
 
@@ -371,6 +394,15 @@ Replaced alist with hash-map."
                                                    (restrict-exp q) fail)))
                         (fail t/boolean% (restrict-exp q)))
                       scheme)
+
+      (restrict-outer? q) (let [scheme (next-step (restrict-outer-query q))]
+                            (when (and fail
+                                       (not= t/boolean% (expression-type*
+                                                         (to-env scheme)
+                                                         (restrict-outer-exp q) fail)))
+                              (fail t/boolean% (restrict-outer-exp q)))
+                            scheme)
+      
       (combine? q) (case (combine-rel-op q)
                      :product (let [a1 (rel-scheme-alist (next-step (combine-query-1 q)))
                                     a2 (rel-scheme-alist (next-step (combine-query-2 q)))]
@@ -379,6 +411,16 @@ Replaced alist with hash-map."
                                     (when (assoc k a2)
                                       (fail (list 'not a1) a2))))
                                 (make-rel-scheme (merge a1 a2)))
+
+                     :left-outer-product
+                     (let [a1 (rel-scheme-alist (next-step (combine-query-1 q)))
+                           a2 (rel-scheme-alist (rel-scheme-nullable (next-step (combine-query-2 q))))]
+                       (when fail
+                         (for [[k _] a1]
+                           (when (assoc k a2)
+                             (fail (list 'not a1) a2))))
+                       (make-rel-scheme (merge a1 a2)))
+
                      :quotient (let [s1 (next-step (combine-query-1 q))
                                      s2 (next-step (combine-query-2 q))]
                                  (when fail
@@ -432,7 +474,7 @@ Replaced alist with hash-map."
 (defn query?
   "Returns true if the `obj` is a query."
   [obj]
-  (or (empty? obj) (base-relation? obj) (project? obj) (restrict? obj)
+  (or (empty? obj) (base-relation? obj) (project? obj) (restrict? obj) (restrict-outer? obj)
       (combine? obj) (grouping-project? obj) (order? obj) (top? obj)))
 
 (declare query->datum)
@@ -465,6 +507,8 @@ Replaced alist with hash-map."
                        (query->datum (project-query q)))
     (restrict? q) (list 'restrict (expression->datum (restrict-exp q))
                         (query->datum (restrict-query q)))
+    (restrict-outer? q) (list 'restrict-outer (expression->datum (restrict-outer-exp q))
+                              (query->datum (restrict-outer-query q)))
     (combine? q) (list (combine-rel-op q)
                        (query->datum (combine-query-1 q))
                        (query->datum (combine-query-2 q)))
@@ -499,7 +543,9 @@ Replaced alist with hash-map."
                             (next-step (third d)))
       restrict (make-restrict (datum->expression (second d) universe)
                               (next-step (third d)))
-      (:product :union :intersection :quotient :difference)
+      restrict-outer (make-restrict-outer (datum->expression (second d) universe)
+                                          (next-step (third d)))
+      (:product :left-outer-product :union :intersection :quotient :difference)
       (make-combine (first d) (next-step (second d))
                     (next-step (third d)))
       grouping-project (make-grouping-project
@@ -604,42 +650,52 @@ Replaced alist with hash-map."
 (defn query-attribute-names
   "Takes a query and returns a set of all attribute-ref's names."
   [q]
-  (letfn [(wrap-set [& xs] (-> (apply concat xs) flatten set))]
-    (cond
-      (empty-val? q) nil
-      (base-relation? q) nil
-      (project? q)
-      (let [subq (project-query q)
-            alist (project-alist q)]
-        (apply union
-               (set (keys (rel-scheme-alist (query-scheme subq))))
-               (query-attribute-names subq)
-               (map expression-attribute-names (vals alist))))
-      (restrict? q)
-      (let [sub (restrict-query q)]
-        (apply union
-               (set (keys (rel-scheme-alist (query-scheme sub))))
-               (query-attribute-names sub)
-               (expression-attribute-names (restrict-exp q))))
-      (combine? q) (union
-                    (query-attribute-names (combine-query-1 q))
-                    (query-attribute-names (combine-query-2 q)))
-      (grouping-project? q)
-      (let [subq (grouping-project-query q)
-            alist (grouping-project-alist q)]
-        (apply union
-               (set (map first (rel-scheme-alist (query-scheme subq))))
-               (query-attribute-names subq)
-               (map expression-attribute-names (vals alist))))
-      (order? q)
-      (let [subq (order-query q)
-            alist (order-alist q)]
-        (apply union
-               (set (map first (rel-scheme-alist (query-scheme subq))))
-               (query-attribute-names subq)
-               (map expression-attribute-names (keys alist))))
-      (top? q) (query-attribute-names (top-query q))
-      :else (assertion-violation 'query-attribute-names "unknown query" q))))
+  (cond
+    (empty-val? q) nil
+    (base-relation? q) nil
+    (project? q)
+    (let [subq (project-query q)
+          alist (project-alist q)]
+      (apply union
+             (set (keys (rel-scheme-alist (query-scheme subq))))
+             (query-attribute-names subq)
+             (map expression-attribute-names (vals alist))))
+    (restrict? q)
+    (let [sub (restrict-query q)]
+      (apply union
+             (set (keys (rel-scheme-alist (query-scheme sub))))
+             (query-attribute-names sub)
+             (expression-attribute-names (restrict-exp q))))
+    (combine? q) (union
+                  (query-attribute-names (combine-query-1 q))
+                  (query-attribute-names (combine-query-2 q)))
+    (flat-distinct-vec
+     (concat
+      (expression-attribute-names (restrict-exp q))
+      (map first (rel-scheme-alist (query-scheme sub)))
+      (query-attribute-names sub))))
+  (restrict-outer? q)
+  (let [sub (restrict-outer-query q)]
+    (apply union
+           (set (keys (rel-scheme-alist (query-scheme sub))))
+           (query-attribute-names sub)
+           (expression-attribute-names (restrict-outer-exp q))))
+  (grouping-project? q)
+  (let [subq (grouping-project-query q)
+        alist (grouping-project-alist q)]
+    (apply union
+           (set (map first (rel-scheme-alist (query-scheme subq))))
+           (query-attribute-names subq)
+           (map expression-attribute-names (vals alist))))
+  (order? q)
+  (let [subq (order-query q)
+        alist (order-alist q)]
+    (apply union
+           (set (map first (rel-scheme-alist (query-scheme subq))))
+           (query-attribute-names subq)
+           (map expression-attribute-names (keys alist))))
+  (top? q) (query-attribute-names (top-query q))
+  :else (assertion-violation 'query-attribute-names "unknown query" q)))
 
 (declare query-substitute-attribute-refs)
 
@@ -685,6 +741,11 @@ Replaced alist with hash-map."
                           culled (cull-substitution-alist alist sub)]
                       (make-restrict (substitute-attribute-refs culled (restrict-exp q))
                                      (next-step sub)))
+      (restrict-outer? q) (let [sub (restrict-outer-query q)
+                                culled (cull-substitution-alist alist sub)]
+                            (make-restrict-outer (substitute-attribute-refs culled (restrict-outer-exp q))
+                                                 (next-step sub)))
+      
       (combine? q) (make-combine (combine-rel-op q)
                                  (next-step (combine-query-1 q))
                                  (next-step (combine-query-2 q)))
