@@ -84,8 +84,8 @@
     (let [rator
           (make-rator '+ (fn [fail t1 t2]
                            (when fail
-                             (do (check-numerical t1 fail)
-                                 (check-numerical t2 fail)))
+                             (do (sql/check-numerical t1 fail)
+                                 (sql/check-numerical t2 fail)))
                            t1)
                       +
                       :universe test-universe)]
@@ -513,8 +513,8 @@
                                           (fn [fail t1 t2]
                                             (when fail
                                               (do
-                                                (check-numerical t1 fail)
-                                                (check-numerical t2 fail)))
+                                                (sql/check-numerical t1 fail)
+                                                (sql/check-numerical t2 fail)))
                                             t1)
                                           +
                                           :universe sql-universe
@@ -659,8 +659,8 @@
                                         (fn [fail t1 t2]
                                           (when fail
                                             (do
-                                              (check-numerical t1 fail)
-                                              (check-numerical t2 fail)))
+                                              (sql/check-numerical t1 fail)
+                                              (sql/check-numerical t2 fail)))
                                           t1)
                                         +
                                         :universe sql-universe

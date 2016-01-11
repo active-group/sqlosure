@@ -198,14 +198,15 @@ Replaced alist with hash-map."
 
 (defn relational-op? [k] (contains? relational-ops k))
 
-(defn make-combine [rel-op query-1 query-2] (if-not (relational-op? rel-op)
-  (assertion-violation 'make-combine "not a relational operator" rel-op)
-  (when-not (relational-op? rel-op) (throw (Exception. (str 'make-combine " not
-  a relational operator " rel-op)))) (case rel-op :product (cond (empty?
-  query-1) query-2 (empty? query-2) query-1 :else (really-make-combine rel-op
-  query-1 query-2))
-
-    (really-make-combine rel-op query-1 query-2)))
+(defn make-combine [rel-op query-1 query-2]
+  (if-not (relational-op? rel-op)
+    (assertion-violation 'make-combine "not a relational operator" rel-op)
+    (case rel-op
+      :product (cond
+                 (empty? query-1) query-2
+                 (empty? query-2) query-1
+                 :else (really-make-combine rel-op query-1 query-2))
+          (really-make-combine rel-op query-1 query-2))))
 
 (defn make-left-outer-product [query-1 query-2] (make-combine
   :left-outer-product query-1 query-2))
@@ -636,16 +637,15 @@ Replaced alist with hash-map."
     list
     (constantly nil)
     (constantly nil)
-    (fn [rator rands] (vec (distinct rands)))
-    (fn [exprs] (vec (flatten (distinct exprs)))) ;; tuple
+    (fn [rator rands] (flatten (map vec rands)))
+    (fn [exprs] (flatten (map vec exprs))) ;; tuple
     (fn [_ expr] expr)
     (fn [alist default]
       (vec (concat default
-                   (distinct (flatten (into [] alist))))))
+                   (distinct (flatten (into [] alist))))))  ;; case
     query-attribute-names
     query-attribute-names
     expr)))
-
 
 (defn query-attribute-names
   "Takes a query and returns a set of all attribute-ref's names."
@@ -662,40 +662,35 @@ Replaced alist with hash-map."
              (map expression-attribute-names (vals alist))))
     (restrict? q)
     (let [sub (restrict-query q)]
-      (apply union
-             (set (keys (rel-scheme-alist (query-scheme sub))))
-             (query-attribute-names sub)
-             (expression-attribute-names (restrict-exp q))))
+      (union
+       (set (keys (rel-scheme-alist (query-scheme sub))))
+       (query-attribute-names sub)
+       (expression-attribute-names (restrict-exp q))))
     (combine? q) (union
                   (query-attribute-names (combine-query-1 q))
                   (query-attribute-names (combine-query-2 q)))
-    (flat-distinct-vec
-     (concat
-      (expression-attribute-names (restrict-exp q))
-      (map first (rel-scheme-alist (query-scheme sub)))
-      (query-attribute-names sub))))
-  (restrict-outer? q)
-  (let [sub (restrict-outer-query q)]
-    (apply union
-           (set (keys (rel-scheme-alist (query-scheme sub))))
-           (query-attribute-names sub)
-           (expression-attribute-names (restrict-outer-exp q))))
-  (grouping-project? q)
-  (let [subq (grouping-project-query q)
-        alist (grouping-project-alist q)]
-    (apply union
-           (set (map first (rel-scheme-alist (query-scheme subq))))
-           (query-attribute-names subq)
-           (map expression-attribute-names (vals alist))))
-  (order? q)
-  (let [subq (order-query q)
-        alist (order-alist q)]
-    (apply union
-           (set (map first (rel-scheme-alist (query-scheme subq))))
-           (query-attribute-names subq)
-           (map expression-attribute-names (keys alist))))
-  (top? q) (query-attribute-names (top-query q))
-  :else (assertion-violation 'query-attribute-names "unknown query" q)))
+    (restrict-outer? q)
+    (let [sub (restrict-outer-query q)]
+      (apply union
+             (set (keys (rel-scheme-alist (query-scheme sub))))
+             (query-attribute-names sub)
+             (expression-attribute-names (restrict-outer-exp q))))
+    (grouping-project? q)
+    (let [subq (grouping-project-query q)
+          alist (grouping-project-alist q)]
+      (apply union
+             (set (map first (rel-scheme-alist (query-scheme subq))))
+             (query-attribute-names subq)
+             (map expression-attribute-names (vals alist))))
+    (order? q)
+    (let [subq (order-query q)
+          alist (order-alist q)]
+      (apply union
+             (set (map first (rel-scheme-alist (query-scheme subq))))
+             (query-attribute-names subq)
+             (map expression-attribute-names (keys alist))))
+    (top? q) (query-attribute-names (top-query q))
+    :else (assertion-violation 'query-attribute-names "unknown query" q)))
 
 (declare query-substitute-attribute-refs)
 
