@@ -487,36 +487,36 @@
                            (make-const boolean% false))))))
 
 (deftest expression-attribute-names-test
-  (is (= '("two") (expression-attribute-names (make-attribute-ref "two"))))
+  (is (= #{"two"} (expression-attribute-names (make-attribute-ref "two"))))
   (is (= nil (expression-attribute-names (make-const string% "foobar"))))
   (is (= nil (expression-attribute-names (make-null string%))))
-  (is (= [nil]
+  (is (= nil
          (expression-attribute-names (sql/plus$ (make-const integer% 40)
                                                 (make-const integer% 2)))))
-  (is (= [nil]
+  (is (= nil
          (expression-attribute-names (sql/plus$ (make-const integer% 21)
                                                 (make-const integer% 21)))))
   ;; I'm not sure this is right...
-  (is (= [nil]
+  (is (= nil
          (expression-attribute-names (make-tuple [(make-const integer% 40)
                                                   (make-const integer% 2)]))))
-  (is (= [nil "two"]
+  (is (= #{"two"}
          (expression-attribute-names (make-tuple [(make-const integer% 40)
                                                   (make-attribute-ref "two")]))))
-  (is (= [nil]
+  (is (= nil
          (expression-attribute-names (make-aggregation
                                       :count (make-tuple [(make-const integer% 40)
                                                           (make-const integer% 2)])))))
-  (is (= [nil "two"]
+  (is (= #{"two"}
          (expression-attribute-names (make-aggregation
                                       :count (make-tuple [(make-const integer% 40)
                                                           (make-attribute-ref "two")])))))
-  (is (= [nil]
+  (is (= nil
          (expression-attribute-names (make-case-expr {(sql/=$ (make-const integer% 42)
                                                               (make-const integer% 42))
                                                       (make-const boolean% true)}
                                                      (make-const boolean% false)))))
-  (is (= ["three" "two" nil]
+  (is (= #{"three" "two"}
          (expression-attribute-names (make-case-expr {(sql/=$ (make-attribute-ref "two")
                                                               (make-const integer% 42))
                                                       (make-const boolean% true)}
@@ -525,10 +525,10 @@
 (deftest query-attribute-names-test
   (is (nil? (query-attribute-names the-empty)))
   (is (nil? (query-attribute-names tbl1)))
-  (is (= ["two" "one"] (query-attribute-names
-                        (make-project {"two" (make-attribute-ref "two")
-                                       "one" (make-attribute-ref "one")}
-                                      tbl1))))
+  (is (= #{"two" "one"} (query-attribute-names
+                            (make-project {"two" (make-attribute-ref "two")
+                                           "one" (make-attribute-ref "one")}
+                                          tbl1))))
   (let [test-universe (make-universe)
         SUBB (make-base-relation 'SUBB
                                  (make-rel-scheme {"C" string%})
@@ -544,7 +544,7 @@
                                                 SUBB))
                                  (make-attribute-ref "C"))
                          SUBA)]
-    (is (= ["C" "D"] (query-attribute-names r))))
+    (is (= #{"C" "D"} (query-attribute-names r))))
   (let [test-universe (make-universe)
         rel1 (make-base-relation 'tbl1
                                  (make-rel-scheme {"one" string%
@@ -565,18 +565,18 @@
         c (make-product rel1 p1)
         q (make-quotient p1 rel1)
         u (make-union p1 p2)]
-    (is (= ["two" "one"] (query-attribute-names c)))
-    (is (= ["two" "one"] (query-attribute-names q)))
-    (is (= ["two" "one" "three" "four"] (query-attribute-names u))))
-  (is (= ["one" "two"] (query-attribute-names
-                        (make-grouping-project
-                         {"one" (make-attribute-ref "one")
-                          "foo" (make-aggregation
-                                 :avg
-                                 (make-attribute-ref "two"))} tbl1))))
-  (is (= ["one" "two"] (query-attribute-names
-                        (make-order {(make-attribute-ref "one") :ascending}
-                                    tbl1))))
+    (is (= #{"two" "one"} (query-attribute-names c)))
+    (is (= #{"two" "one"} (query-attribute-names q)))
+    (is (= #{"two" "one" "three" "four"} (query-attribute-names u))))
+  (is (= #{"one" "two"} (query-attribute-names
+                          (make-grouping-project
+                           {"one" (make-attribute-ref "one")
+                            "foo" (make-aggregation
+                                   :avg
+                                   (make-attribute-ref "two"))} tbl1))))
+  (is (= #{"one" "two"} (query-attribute-names
+                          (make-order {(make-attribute-ref "one") :ascending}
+                                      tbl1))))
   (is (nil? (query-attribute-names (make-top 10 tbl1)))))
 
 (deftest substitute-attribute-refs-test

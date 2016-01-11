@@ -19,7 +19,7 @@
 (deftest order-alist-attribute-names-test
   (let [alist {(make-attribute-ref "one") :ascending
                (make-attribute-ref "two") :descending}]
-    (is (= '("one" "two")
+    (is (= #{"one" "two"}
            (order-alist-attribute-names alist)))
     (is (empty?
            (order-alist-attribute-names nil)))))

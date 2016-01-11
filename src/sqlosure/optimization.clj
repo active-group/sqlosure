@@ -14,7 +14,7 @@
 (defn order-alist-attribute-names
   "Takes an order query's alist and returns it's referenced attributes."
   [alist]
-  (flatten (distinct (map r/expression-attribute-names (keys alist)))))
+  (apply set/union (map r/expression-attribute-names (keys alist))))
 
 (defn query->alist
   "Return the rel-scheme-alist of a query's query-scheme."

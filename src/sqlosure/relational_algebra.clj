@@ -578,67 +578,66 @@ Replaced alist with hash-map."
 
 (declare query-attribute-names)
 
+(defn- filter-and-non-nil [s]
+  (let [non-nils (filter some? s)]
+    (when-not (empty? non-nils) (set non-nils))))
+
 (defn expression-attribute-names
   "Takes an expression and returns a seq all attribute-ref's names."
   [expr]
-  (fold-expression
-   list
-   (constantly nil)
-   (constantly nil)
-   (fn [rator rands] (vec (distinct rands)))
-   (fn [exprs] (vec (flatten (distinct exprs)))) ;; tuple
-   (fn [_ expr] expr)
-   (fn [alist default]
-     (vec (concat default
-                  (distinct (flatten (into [] alist))))))
-   query-attribute-names
-   query-attribute-names
-   expr))
+  (filter-and-non-nil
+   (fold-expression
+    list
+    (constantly nil)
+    (constantly nil)
+    (fn [rator rands] (vec (distinct rands)))
+    (fn [exprs] (vec (flatten (distinct exprs)))) ;; tuple
+    (fn [_ expr] expr)
+    (fn [alist default]
+      (vec (concat default
+                   (distinct (flatten (into [] alist))))))
+    query-attribute-names
+    query-attribute-names
+    expr)))
+
 
 (defn query-attribute-names
-  "Takes a query and returns a seq of all attribute-ref's names."
+  "Takes a query and returns a set of all attribute-ref's names."
   [q]
-  (letfn [(flat-distinct-vec [xs]
-            (-> xs flatten distinct vec))]
+  (letfn [(wrap-set [& xs] (-> (apply concat xs) flatten set))]
     (cond
       (empty-val? q) nil
       (base-relation? q) nil
       (project? q)
       (let [subq (project-query q)
             alist (project-alist q)]
-        (flat-distinct-vec
-         (concat
-          (distinct (map (fn [[k v]]
-                           (expression-attribute-names v)) alist))
-          (map first (rel-scheme-alist (query-scheme subq)))
-          (query-attribute-names subq))))
+        (apply union
+               (set (keys (rel-scheme-alist (query-scheme subq))))
+               (query-attribute-names subq)
+               (map expression-attribute-names (vals alist))))
       (restrict? q)
       (let [sub (restrict-query q)]
-        (flat-distinct-vec
-         (concat
-          (expression-attribute-names (restrict-exp q))
-          (map first (rel-scheme-alist (query-scheme sub)))
-          (query-attribute-names sub))))
-      (combine? q) (flat-distinct-vec
-                    (concat (query-attribute-names (combine-query-1 q))
-                            (query-attribute-names (combine-query-2 q))))
+        (apply union
+               (set (keys (rel-scheme-alist (query-scheme sub))))
+               (query-attribute-names sub)
+               (expression-attribute-names (restrict-exp q))))
+      (combine? q) (union
+                    (query-attribute-names (combine-query-1 q))
+                    (query-attribute-names (combine-query-2 q)))
       (grouping-project? q)
       (let [subq (grouping-project-query q)
             alist (grouping-project-alist q)]
-        (flat-distinct-vec
-         (concat
-          (distinct (map (fn [[k v]]
-                           (expression-attribute-names v)) alist))
-          (map first (rel-scheme-alist (query-scheme subq)))
-          (query-attribute-names subq))))
+        (apply union
+               (set (map first (rel-scheme-alist (query-scheme subq))))
+               (query-attribute-names subq)
+               (map expression-attribute-names (vals alist))))
       (order? q)
       (let [subq (order-query q)
             alist (order-alist q)]
-        (flat-distinct-vec (concat
-                            (map (fn [[k _]] (expression-attribute-names k))
-                                 alist)
-                            (map first (rel-scheme-alist (query-scheme subq)))
-                            (query-attribute-names subq))))
+        (apply union
+               (set (map first (rel-scheme-alist (query-scheme subq))))
+               (query-attribute-names subq)
+               (map expression-attribute-names (keys alist))))
       (top? q) (query-attribute-names (top-query q))
       :else (assertion-violation 'query-attribute-names "unknown query" q))))
 
