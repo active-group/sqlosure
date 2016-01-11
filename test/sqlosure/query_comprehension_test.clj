@@ -63,6 +63,17 @@
                                   (! t2 "four")))
                     (project {"foo" (! t1 "two")})))))))
 
+(deftest trivial-outer
+  (is (rel-scheme=?
+       (make-rel-scheme {"foo" integer%})
+       (query-scheme
+        (get-query (monadic
+                    [t1 (embed tbl1)]
+                    [t2 (outer tbl2)]
+                    (restrict (=$ (! t1 "one")
+                                  (! t2 "four")))
+                    (project {"foo" (! t1 "two")})))))))
+
 
 (deftest combine
   (is (rel-scheme=?
@@ -121,3 +132,4 @@
                                    [t2 (embed tbl2)]
                                    (restrict (=$ (! t2 "four") (! t1 "one")))
                                    (project {"res" (! t2 "three")})))))))))
+
