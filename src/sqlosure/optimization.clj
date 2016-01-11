@@ -198,7 +198,8 @@
                  (not (= :quotient op))
                  (not-empty
                   (filter (fn [[k v]]
-                            (contains? attrs k)) (query->alist q1))))
+                            (contains? attrs k))
+                          (query->alist q1))))
             (r/make-combine op q1 (push-restrict (r/make-restrict re q2)))
             
             (not-empty (filter (fn [[k v]] (contains? attrs k))
