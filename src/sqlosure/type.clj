@@ -2,6 +2,7 @@
       :author "Marco Schneider, based on Mike Sperbers schemeql2"}
     sqlosure.type
   (:require [sqlosure.universe :refer [register-type! universe-lookup-type]]
+            [sqlosure.utils :refer [zip]]
             [active.clojure.record :refer [define-record-type]])
   (:import [java.time LocalDate LocalDateTime]))
 
@@ -62,10 +63,6 @@
   (if (seq? v)
     (empty? v)
     (nil? v)))
-
-(defn zip
-  [xs ys]
-  (mapv (fn [k v] [k v]) xs ys))
 
 (defn all?
   [bs]

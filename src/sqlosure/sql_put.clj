@@ -3,6 +3,7 @@
             [sqlosure.relational-algebra :as rel]
             [sqlosure.relational-algebra-sql :refer [add-table]]
             [sqlosure.type :as t]
+            [sqlosure.utils :refer [third]]
             [active.clojure.record :refer [define-record-type]]
             [clojure.string :as s]))
 
@@ -262,6 +263,18 @@
                                          _ (print name)
                                          _ (put-space)
                                          v2 (put-sql-expression param (second rands))
+                                         _ (print ")")]
+                                     (concat v1 v2))
+                                 3 (let [_ (print "(")
+                                         _ (put-sql-expression param (first rands))
+                                         _ (put-space)
+                                         _ (print name)
+                                         _ (put-space)
+                                         v1 (put-sql-expression param (second rands))
+                                         _ (put-space)
+                                         _ (print "AND")
+                                         _ (put-space)
+                                         v2 (put-sql-expression param (third rands))
                                          _ (print ")")]
                                      (concat v1 v2))
                                  :else (throw (Exception.

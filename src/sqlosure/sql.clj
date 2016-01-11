@@ -142,6 +142,7 @@
 (def op-or (make-sql-operator "OR" 2))
 (def op-like (make-sql-operator "LIKE" 2))
 (def op-in (make-sql-operator "IN" 2))
+(def op-between (make-sql-operator "BETWEEN" 3))
 (def op-cat (make-sql-operator "CAT" 2))
 (def op-+ (make-sql-operator "+" 2))
 (def op-- (make-sql-operator "-" 2))
@@ -221,11 +222,13 @@
                                       :universe sql-universe
                                       :data op-or))
 
-(def and$ (make-monomorphic-combinator 'and [boolean% boolean%] boolean%
+(def and$ (make-monomorphic-combinator 'and
+                                       [boolean% boolean%]
+                                       boolean%
                                        (fn [a b]
-                                         (and (not-empty a) (not-empty b) a b)
-                                         :universe sql-universe
-                                         :data op-and)))
+                                         (and (not-empty a) (not-empty b) a b))
+                                       :universe sql-universe
+                                       :data op-and))
 
 (defn >=$
   [expr1 expr2]
@@ -302,3 +305,16 @@
                           :universe sql-universe
                           :data op-in)]
     (make-application rator expr1 expr2)))
+
+(defn between$
+  [expr1 expr2 expr3]
+  (let [rator (make-rator 'between
+                          (fn [fail t1 t2 t3]
+                            (when (and fail (or (not= t2 t3)
+                                                (not (attribute-ref? t1))))
+                              (fail t1 t2 t3))
+                            boolean%)
+                          nil
+                          :universe sql-universe
+                          :data op-between)]
+    (make-application rator expr1 expr2 expr3)))

@@ -1,6 +1,7 @@
 (ns sqlosure.optimization
   (:require [sqlosure.relational-algebra :as r]
             [sqlosure.relational-algebra-sql :as rs]
+            [active.clojure.condition :as c]
             [clojure.set :as set]))
 
 (defn project-alist-substitute-attribute-refs
@@ -94,7 +95,7 @@
                                               (r/expression-attribute-names v))
                                             new-alist))
                                 (r/project-query q))))
-           :else (throw (Exception. (str 'remove-dead ": unknown query " q)))))]
+           :else (c/assertion-violation 'remove-dead "unknown query" q)))]
     (worker (keys (query->alist q)) q)))
 
 (defn merge-project
@@ -147,7 +148,7 @@
          (project-alist-substitute-attribute-refs (r/project-alist pq) pa)
          (r/project-query pq))
         (r/make-grouping-project pa pq)))
-    :else (throw (Exception. (str 'merge-project ": unknown query " q)))))
+    :else (c/assertion-violation 'merge-project "unknown query" q)))
 
 (defn push-restrict
   [q]
@@ -249,7 +250,7 @@
     (r/grouping-project? q)
     (r/make-grouping-project (r/grouping-project-alist q)
                              (push-restrict (r/grouping-project-query q)))
-    :else (throw (Exception. (str 'push-restrict ": unknown query " q)))))
+    :else (c/assertion-violation 'push-restrict "unknown query" q)))
 
 (defn optimize-query
   "Takes a query and performs some optimizations."

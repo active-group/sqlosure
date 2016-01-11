@@ -13,7 +13,7 @@
   (let [qq (o/optimize-query q)]
     (c/db-query conn (rsql/query->sql qq) (rel/query-scheme qq))))
 
-(defn insert
+(defn insert!
   "Takes a database connection"
   [conn sql-table & args]
   (let [[scheme vals] (if (and (t/pair? args) (rel/rel-scheme? (first args)))
@@ -23,7 +23,7 @@
                  scheme
                  vals)))
 
-(defn delete
+(defn delete!
   [conn sql-table criterion-proc]
   (let [name (sql/sql-table-name (rel/base-relation-handle sql-table))]
     (c/db-delete

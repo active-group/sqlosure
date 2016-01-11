@@ -1,6 +1,7 @@
 (ns sqlosure.query-comprehension
   (:require [sqlosure.relational-algebra :as rel]
             [sqlosure.type :as t]
+            [sqlosure.utils :refer [zip]]
             [active.clojure.monad :refer :all]
             [active.clojure.record :refer [define-record-type]]
             [active.clojure.condition :refer [assertion-violation]]
