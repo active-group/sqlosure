@@ -91,7 +91,9 @@ Replaced alist with hash-map."
   "Returns a new base relation.
   If :handle is supplied, use is as base-relation-handle, defaults to nil.
   If :universe is supplied, return a vector of [relation universe]"
-  [name scheme & {:keys [universe handle]}]
+  [name scheme & {:keys [universe handle]
+                  :or {universe nil
+                       handle nil}}]
   (let [rel (really-make-base-relation name scheme handle)]
     (when universe
       (u/register-base-relation! universe name rel))
