@@ -105,19 +105,36 @@
         (is (= res-args '(10 5 100)))))))
 
 (deftest put-sql-outer-join-test
-  (let [t1 (make-sql-table "t1"
-                           (make-rel-scheme {"C" string%}))
-        t2 (make-sql-table "t2"
-                           (make-rel-scheme {"D" integer%}))
-        r (make-restrict-outer (=$ (make-attribute-ref "C")
-                                   (make-attribute-ref "D"))
-                               (make-left-outer-product t1 t2))
-        sql (query->sql r)]
-
-    (let [[res-str res-args]
-          (with-out-str-and-value (put-sql-select default-sql-put-parameterization sql))]
-      (is (= "SELECT * FROM t1 LEFT JOIN t2 ON (C = D)"
-             res-str)))))
+  (testing "simple case"
+    (let [t1 (make-sql-table "t1"
+                             (make-rel-scheme {"C" string%}))
+          t2 (make-sql-table "t2"
+                             (make-rel-scheme {"D" integer%}))
+          r (make-restrict-outer (=$ (make-attribute-ref "C")
+                                     (make-attribute-ref "D"))
+                                 (make-left-outer-product t1 t2))
+          sql (query->sql r)]
+      
+      (let [[res-str res-args]
+            (with-out-str-and-value (put-sql-select default-sql-put-parameterization sql))]
+        (is (= "SELECT * FROM t1 LEFT JOIN t2 ON (C = D)"
+               res-str)))))
+  (testing "multiple tables on the left"
+    (let [t1 (make-sql-table "t1"
+                             (make-rel-scheme {"C" string%}))
+          t2 (make-sql-table "t2"
+                             (make-rel-scheme {"D" integer%}))
+          t3 (make-sql-table "t3"
+                             (make-rel-scheme {"E" integer%}))
+          r (make-restrict-outer (=$ (make-attribute-ref "C")
+                                     (make-attribute-ref "E"))
+                                 (make-left-outer-product (make-product t1 t2) t3))
+          sql (query->sql r)]
+      
+      (let [[res-str res-args]
+            (with-out-str-and-value (put-sql-select default-sql-put-parameterization sql))]
+        (is (= "SELECT * FROM (SELECT * FROM t1, t2) LEFT JOIN t3 ON (C = E)"
+               res-str))))))
 
 
 (deftest put-joining-infix-test

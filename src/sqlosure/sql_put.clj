@@ -183,6 +183,32 @@
                            (do (put-sql-expression param expr)
                                (default-put-alias col)))))))
 
+(defn put-sql-join
+  "Put the tables involved in the join of a SQL select."
+  [param tables outer-tables]
+  (if (or (empty? outer-tables)
+          (= (count tables) 1))
+    (let [t (put-padding-if-non-null tables
+                                     (fn [tables]
+                                       (print "FROM ")
+                                       (put-tables param tables)))
+          
+          o (if (not-empty outer-tables)
+              (do
+                (print " LEFT JOIN ")
+                (put-tables param outer-tables))
+              [])]
+      (concat t o))
+    ;; outer tables AND more than one regular tablew
+    (let [_ (print " FROM (SELECT * FROM ")
+          t  (put-tables param tables)
+          _ (do (print ")")
+                ((sql-put-parameterization-alias-proc param) nil))
+          o (do
+              (print " LEFT JOIN ")
+              (put-tables param outer-tables))]
+      (concat t o))))
+
 (defn put-sql-select-1
   [param sel]
   (cond
@@ -193,19 +219,11 @@
                                         #(print (s/join " " %)))
             _ (put-space)
             v2 (put-attributes param (sql/sql-select-attributes sel))
-            v3 (put-padding-if-non-null (sql/sql-select-tables sel)
-                                        (fn [tables]
-                                          (print "FROM ")
-                                          (put-tables param tables)))
 
-            outer (sql/sql-select-outer-tables sel)
+            v3 (put-sql-join param
+                             (sql/sql-select-tables sel)
+                             (sql/sql-select-outer-tables sel))
 
-            v4 (if (not-empty outer)
-                 (do
-                   (print " LEFT JOIN ")
-                   (put-tables param outer))
-                 [])
-              
             v5 (put-padding-if-non-null (sql/sql-select-outer-criteria sel)
                                         #(put-on param %))
 
@@ -226,7 +244,7 @@
                 (when-not (empty? extra)
                   (do (put-space)
                       (print (s/join " " extra)))))]
-        (concat v1 v2 v3 v4 v5 v6 v7 v8 v9)))
+        (concat v1 v2 v3 v5 v6 v7 v8 v9)))
       
     (sql/sql-select-combine? sel) ((sql-put-parameterization-combine-proc param)
                                    param
