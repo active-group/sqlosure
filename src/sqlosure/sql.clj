@@ -16,7 +16,6 @@
 (defn make-sql-table
   [name scheme & {:keys [universe]
                   :or {universe nil}}]
-  (println "universe" universe)
   (make-base-relation (symbol name) scheme
                       :universe universe
                       :handle (really-make-sql-table name scheme)))
