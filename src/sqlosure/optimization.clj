@@ -196,14 +196,14 @@
           (cond
             (and (not (= :difference op))
                  (not (= :quotient op))
-                 (not-empty
-                  (filter (fn [[k v]]
-                            (contains? attrs k))
-                          (query->alist q1))))
+                 (not (some (fn [[k v]]
+                              (contains? attrs k))
+                            (query->alist q1))))
             (r/make-combine op q1 (push-restrict (r/make-restrict re q2)))
             
-            (not-empty (filter (fn [[k v]] (contains? attrs k))
-                               (query->alist q2)))
+            (not (some (fn [[k v]]
+                         (contains? attrs k))
+                       (query->alist q2)))
             (r/make-combine op (push-restrict (r/make-restrict re q1) q2))
             
             :else (r/make-restrict re (push-restrict rq))))
