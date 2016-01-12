@@ -204,7 +204,7 @@
             (not (some (fn [[k v]]
                          (contains? attrs k))
                        (query->alist q2)))
-            (r/make-combine op (push-restrict (r/make-restrict re q1) q2))
+            (r/make-combine op (push-restrict (r/make-restrict re q1)) q2)
             
             :else (r/make-restrict re (push-restrict rq))))
 
