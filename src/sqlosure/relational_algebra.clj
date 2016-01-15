@@ -12,11 +12,19 @@ Replaced alist with hash-map."
             [active.clojure.condition :refer [assertion-violation]]))
 
 (define-record-type rel-scheme
-  (make-rel-scheme columns alist) rel-scheme?
+  (^:private make-rel-scheme columns alist) rel-scheme?
   [^{:doc "Vector of the columns, i.e. the keys in the map, in order."}
    columns rel-scheme-columns
    alist rel-scheme-alist]  ;; (rel-scheme -> hash-map)
   )
+
+(defn rel-scheme-types
+  "Returns the types of a rel-scheme, in the order they were created."
+  [rs]
+  (let [mp (rel-scheme-alist rs)]
+    (c/assert (map? mp))
+    (map #(get mp %)
+         (rel-scheme-columns rs))))
 
 (defn alist->rel-scheme
   "Construct a relational scheme from an alist of `[column-name type]`."

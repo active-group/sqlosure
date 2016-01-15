@@ -5,7 +5,7 @@
             [sqlosure.type :as t]
             [sqlosure.relational-algebra :as rel]
             [sqlosure.jdbc-utils :as jdbc-utils]
-            [clojure.java.jdbc :refer :all]
+            [clojure.java.jdbc :refer (execute! insert! get-connection query)]
             [clojure.string :as s]))
 
 (defn- sqlite3-db [conn]
@@ -66,10 +66,11 @@
 (defn- sqlite3-query
   "Takes a db-connection, a sql-select statement and a relational scheme and
   runs the query against the connected database."
-  [conn select scheme]
+  [conn select scheme opts]
   (jdbc-utils/query (sqlite3-db conn) select scheme
                     sqlite3-value->value
-                    (db/db-connection-sql-put-parameterization conn)))
+                    (db/db-connection-sql-put-parameterization conn)
+                    opts))
 
 (defn- sqlite3-insert
   "Takes a db-connection, a table name (string), a relational scheme and a
@@ -122,8 +123,8 @@
                          sqlite3-sql-put-parameterization
                          nil ;; As long as we're not explicitly keeping the
                          ;; connection alive, we don't have to close. Solution?
-                         (fn [conn query scheme]
-                           (sqlite3-query conn query scheme))
+                         (fn [conn query scheme opts]
+                           (sqlite3-query conn query scheme opts))
                          (fn [conn table scheme vals]
                            (sqlite3-insert conn table scheme vals))
                          (fn [conn table criterion]

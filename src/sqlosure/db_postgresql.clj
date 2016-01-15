@@ -8,7 +8,7 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
             [sqlosure.type :as t]
             [sqlosure.time :as time]
             [sqlosure.jdbc-utils :as jdbc-utils]
-            [clojure.java.jdbc :refer :all]
+            [clojure.java.jdbc :refer (execute! insert! delete! update! query)]
             [clojure.string :as s]))
 
 (defn- postgresql-db
@@ -40,10 +40,11 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
 (defn- postgresql-query
   "Takes a db-connection, a sql-select statement and a relational scheme and
   runs the query against the connected database."
-  [conn select scheme]
-  (jdbc-utils/query (postgresql-db conn) query select scheme
+  [conn select scheme opts]
+  (jdbc-utils/query (postgresql-db conn) select scheme
                     postgresql-value->value
-                    (db/db-connection-sql-put-parameterization conn)))
+                    (db/db-connection-sql-put-parameterization conn)
+                    opts))
 
 (defn- postgresql-insert
   "Takes a db-connection, a table name (string), a relational scheme and a
@@ -100,8 +101,8 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
                          db-name  ;; handle
                          postgresql-sql-put-parameterization
                          nil
-                         (fn [conn query scheme]
-                           (postgresql-query conn query scheme))
+                         (fn [conn query scheme opts]
+                           (postgresql-query conn query scheme opts))
                          (fn [conn table scheme vals]
                            (postgresql-insert conn table scheme vals))
                          (fn [conn table criterion]

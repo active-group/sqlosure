@@ -3,28 +3,50 @@
   (:require [sqlosure.relational-algebra :as rel]
             [sqlosure.db-connection :as db]
             [sqlosure.sql-put :as put]
-            [sqlosure.time :as time]))
+            [sqlosure.time :as time]
+            [active.clojure.condition :as c]
+            [clojure.java.jdbc :as jdbc]))
 
 (defn query-row-fn
-  "Takes a relational scheme and a row returned by a query, then returns a map
-  of the key-value pairs with values converted via convert-base-value."
-  [convert-base-value scheme row]
-  (let [alist (rel/rel-scheme-alist scheme)]
-    (into {} (map (fn [[k v] tt]
-                    ;; assert (base-type? tt) ?
-                    [k (convert-base-value tt v)])
-                  row
-                  (vals alist)))))
+  "Takes the types of a  relational scheme and a row returned by a query, then
+  returns a vector of values converted by convert-base-value, in the
+  order defined by the given scheme."
+  [convert-base-value types row]
+  ;; Note: not much more than 'map' currently
+  (let [;; vals are/must be in the order of the scheme
+        conv-vals (map convert-base-value ;; assert (base-type? tt) ?
+                       types
+                       row)]
+    (assert (= (count types) (count row)))
+    conv-vals))
+
+(defn result-set-fn
+  [as-arrays? row-fn result-set-fn scheme-cols results]
+  ;; Note: cols is mangeled by jdbc (lowercase symbols, made unique with a suffix)
+  (let [[cols rows] results
+        rows (if as-arrays?
+               ;; the cols are not needed, as the row always complies to
+               ;; the rel-scheme used (no 'select *')
+               rows
+               ;; Use the cols from the scheme; it cannot contain duplicates for example; but
+               ;; it will be strings (other than jdbc)
+               (map #(zipmap scheme-cols %) rows))]
+    ((or result-set-fn doall)
+     (if row-fn (map row-fn rows) rows))))
 
 (defn- put-select [parameterization select]
   (put/sql-select->string parameterization select))
 
 (defn query
   "Takes a jdbc db-spec a sql-select statement and a relational scheme
-  and runs the query against the connected database, applying
+  and runs the query against the database, applying
   `convert-base-value` to the selected values."
-  [db-spec select scheme convert-base-value parameterization]
+  [db-spec select scheme convert-base-value parameterization opts]
   (let [[select-query & select-args] (put-select parameterization select)]
-    (query db-spec
-           (cons select-query (time/coerce-time-values select-args))
-           :row-fn #(query-row-fn convert-base-value scheme %))))
+    (jdbc/query db-spec
+                (cons select-query (time/coerce-time-values select-args))
+                :result-set-fn #(result-set-fn (:as-arrays? opts) (:row-fn opts)
+                                               (:result-set-fn opts)
+                                               (rel/rel-scheme-columns scheme) %)
+                :as-arrays? true
+                :row-fn #(query-row-fn convert-base-value (rel/rel-scheme-types scheme) %))))

@@ -8,10 +8,22 @@
             [sqlosure.sql :as sql]))
 
 (defn run-query
-  "Takes a database connection and a query and runs it against the database."
-  [conn q]
+  "Takes a database connection and a query and runs it against the database.
+  The optional keyword arguments specify how to
+  construct the result set:
+    :as-arrays? - return each row as a vector of the field values, default false, in which
+      a row is represented as a hash-map of the columns of the query scheme to the corresponding
+      field values.
+    :row-fn - applied to each row (vector or map) as the result set is constructed, defaults
+      to identity.
+    :result-set-fn - applied to a lazy sequence of all rows, defaults doall. Note that the
+      function must realize the sequence, as the connection to the database may be closed after
+      run-query returns.
+    "
+  [conn q & opts]
   (let [qq (o/optimize-query q)]
-    (c/db-query conn (rsql/query->sql qq) (rel/query-scheme qq))))
+    (c/db-query conn (rsql/query->sql qq) (rel/query-scheme qq)
+                (apply hash-map opts))))
 
 (defn insert!
   "Takes a database connection"
