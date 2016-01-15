@@ -13,17 +13,17 @@
   order defined by the given scheme."
   [convert-base-value types row]
   ;; Note: not much more than 'map' currently
-  (let [;; vals are/must be in the order of the scheme
-        conv-vals (map convert-base-value ;; assert (base-type? tt) ?
-                       types
-                       row)]
+  (let [ ;; vals are/must be in the order of the scheme
+        conv-vals (mapv convert-base-value ;; assert (base-type? tt) ?
+                        types
+                        row)]
     (assert (= (count types) (count row)))
     conv-vals))
 
 (defn result-set-fn
   [as-arrays? row-fn result-set-fn scheme-cols results]
   ;; Note: cols is mangeled by jdbc (lowercase symbols, made unique with a suffix)
-  (let [[cols rows] results
+  (let [[cols & rows] results
         rows (if as-arrays?
                ;; the cols are not needed, as the row always complies to
                ;; the rel-scheme used (no 'select *')
