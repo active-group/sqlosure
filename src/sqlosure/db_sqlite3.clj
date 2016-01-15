@@ -13,9 +13,6 @@
    :subprotocol "sqlite"
    :subname (db/db-connection-handle conn)})
 
-(defn- put-select [conn select]
-  (put/sql-select->string (db/db-connection-sql-put-parameterization conn) select))
-
 (defn- put-expr [conn select]
   (put/sql-expression->string (db/db-connection-sql-put-parameterization conn) select))
 
@@ -70,9 +67,9 @@
   "Takes a db-connection, a sql-select statement and a relational scheme and
   runs the query against the connected database."
   [conn select scheme]
-  (query (sqlite3-db conn)
-         [(put-select conn select)] ;; TODOO: this has to be handled via jdbc (types?)
-         :rown-fn #(jdbc-utils/query-row-fn sqlite3-value->value scheme %)))
+  (jdbc-utils/query (sqlite3-db conn) select scheme
+                    sqlite3-value->value
+                    (db/db-connection-sql-put-parameterization conn)))
 
 (defn- sqlite3-insert
   "Takes a db-connection, a table name (string), a relational scheme and a

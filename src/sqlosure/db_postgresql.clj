@@ -37,17 +37,13 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
 (def postgresql-sql-put-parameterization
   (put/make-sql-put-parameterization put/put-dummy-alias put/default-put-combine put/default-put-literal))
 
-(defn- put-select [conn select]
-  (put/sql-select->string (db/db-connection-sql-put-parameterization conn) select))
-
 (defn- postgresql-query
   "Takes a db-connection, a sql-select statement and a relational scheme and
   runs the query against the connected database."
   [conn select scheme]
-  (let [[select-query & select-args] (put-select conn select)]
-    (query (postgresql-db conn)
-           (cons select-query (time/coerce-time-values select-args))
-           :row-fn #(jdbc-utils/query-row-fn postgresql-value->value scheme %))))
+  (jdbc-utils/query (postgresql-db conn) query select scheme
+                    postgresql-value->value
+                    (db/db-connection-sql-put-parameterization conn)))
 
 (defn- postgresql-insert
   "Takes a db-connection, a table name (string), a relational scheme and a
