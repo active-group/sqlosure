@@ -119,17 +119,3 @@
                         (! t2 "four")))
           (order {(! t1 "one") :ascending})
           (project [["foo" (! t1 "two")]])))))))
-
-(deftest xy-test-1
-  (is (= '("SELECT three_1 AS res FROM (SELECT one AS one_0, two AS two_0 FROM tbl1), (SELECT three AS three_1, four AS four_1 FROM tbl2 WHERE (four = one_0)) WHERE (? = one_0)" "foobar")
-         (sqlosure.sql-put/sql-select->string
-          sqlosure.sql-put/default-sql-put-parameterization
-          (query->sql (opt/optimize-query
-                       (get-query (monadic
-                                   [t1 (embed tbl1)]
-                                   (restrict (=$ (make-const string% "foobar")
-                                                 (! t1 "one")))
-                                   [t2 (embed tbl2)]
-                                   (restrict (=$ (! t2 "four") (! t1 "one")))
-                                   (project [["res" (! t2 "three")]])))))))))
-
