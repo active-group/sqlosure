@@ -7,6 +7,7 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
             [sqlosure.relational-algebra :as rel]
             [sqlosure.type :as t]
             [sqlosure.time :as time]
+            [sqlosure.jdbc-utils :as jdbc-utils]
             [clojure.java.jdbc :refer :all]
             [clojure.string :as s]))
 
@@ -32,15 +33,6 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
   [tt val]
   val)
 
-(defn- query-row-fn
-  "Takes a relational scheme and a row returned by a query, then returns a map
-  of the key-value pairs with values converted from sqlite3 to Clojure values."
-  [scheme row]
-  (let [alist (rel/rel-scheme-alist scheme)]
-    (into {} (map (fn [[k v] tt] [k (postgresql-value->value tt v)])
-                  row
-                  (vals alist)))))
-
 ;; Parameterization as in put/default.
 (def postgresql-sql-put-parameterization
   (put/make-sql-put-parameterization put/put-dummy-alias put/default-put-combine put/default-put-literal))
@@ -55,7 +47,7 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
   (let [[select-query & select-args] (put-select conn select)]
     (query (postgresql-db conn)
            (cons select-query (time/coerce-time-values select-args))
-           :row-fn #(query-row-fn scheme %))))
+           :row-fn #(jdbc-utils/query-row-fn postgresql-value->value scheme %))))
 
 (defn- postgresql-insert
   "Takes a db-connection, a table name (string), a relational scheme and a

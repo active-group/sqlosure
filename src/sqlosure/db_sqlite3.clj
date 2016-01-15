@@ -4,6 +4,7 @@
             [sqlosure.sql :as sql]
             [sqlosure.type :as t]
             [sqlosure.relational-algebra :as rel]
+            [sqlosure.jdbc-utils :as jdbc-utils]
             [clojure.java.jdbc :refer :all]
             [clojure.string :as s]))
 
@@ -65,22 +66,13 @@
   [handle]
   (.close (get-connection handle)))
 
-(defn- query-row-fn
-  "Takes a relational scheme and a row returned by a query, then returns a map
-  of the key-value pairs with values converted from sqlite3 to Clojure values."
-  [scheme row]
-  (let [alist (rel/rel-scheme-alist scheme)]
-    (into {} (map (fn [[k v] tt] [k (sqlite3-value->value tt v)])
-                  row
-                  (vals alist)))))
-
 (defn- sqlite3-query
   "Takes a db-connection, a sql-select statement and a relational scheme and
   runs the query against the connected database."
   [conn select scheme]
   (query (sqlite3-db conn)
-         [(put-select conn select)]  ;; TODOO: this has to be handled via jdbc (types?)
-         :row-fn #(query-row-fn scheme %)))
+         [(put-select conn select)] ;; TODOO: this has to be handled via jdbc (types?)
+         :rown-fn #(jdbc-utils/query-row-fn sqlite3-value->value scheme %)))
 
 (defn- sqlite3-insert
   "Takes a db-connection, a table name (string), a relational scheme and a
