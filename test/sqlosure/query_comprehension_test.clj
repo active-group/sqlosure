@@ -15,13 +15,13 @@
 (def test-universe (make-universe))
 
 (def tbl1 (make-sql-table "tbl1"
-                          (make-rel-scheme {"one" string%
-                                            "two" integer%})
+                          (alist->rel-scheme [["one" string%]
+                                              ["two" integer%]])
                           :universe test-universe))
 
 (def tbl2 (make-sql-table "tbl2"
-                          (make-rel-scheme {"three" blob%
-                                            "four" string%})
+                          (alist->rel-scheme [["three" blob%]
+                                              ["four" string%]])
                           :universe test-universe))
 
 (defn put-query [query]
@@ -30,10 +30,10 @@
    (query->sql query)))
 
 (let [movies-table (make-sql-table 'movies
-                                       (make-rel-scheme {"title" string%
-                                                         "director" string%
-                                                         "year" integer%
-                                                         "any_good" boolean%})
+                                       (alist->rel-scheme [["title" string%]
+                                                           ["director" string%]
+                                                           ["year" integer%]
+                                                           ["any_good" boolean%]])
                                        :universe (make-universe)
                                        :handle "movies")]
   (put-query (get-query (monadic [movies (embed movies-table)]
@@ -54,7 +54,7 @@
 
 (deftest trivial
   (is (rel-scheme=?
-       (make-rel-scheme {"foo" integer%})
+       (alist->rel-scheme [["foo" integer%]])
        (query-scheme
         (get-query (monadic
                     [t1 (embed tbl1)]
@@ -65,7 +65,7 @@
 
 (deftest trivial-outer
   (is (rel-scheme=?
-       (make-rel-scheme {"foo" integer%})
+       (alist->rel-scheme [["foo" integer%]])
        (query-scheme
         (get-query (monadic
                     [t1 (embed tbl1)]
@@ -77,7 +77,7 @@
 
 (deftest combine
   (is (rel-scheme=?
-       (make-rel-scheme {"foo" string%})
+       (alist->rel-scheme [["foo" string%]])
        (query-scheme
         (get-query
          (monadic
@@ -87,7 +87,7 @@
                  (project {"foo" (! t2 "four")})))))))
 
   (is (rel-scheme=?
-       (make-rel-scheme {"foo" string%})
+       (alist->rel-scheme [["foo" string%]])
        (query-scheme
         (get-query
          (monadic
@@ -97,7 +97,7 @@
                     (project {"foo" (! t2 "four")})))))))
 
   (is (rel-scheme=?
-       (make-rel-scheme {"bar" blob%})
+       (alist->rel-scheme [["bar" blob%]])
        (query-scheme
         (get-query
          (monadic
@@ -109,7 +109,7 @@
 
 (deftest order-t
   (is (rel-scheme=?
-       (make-rel-scheme {"foo" integer%})
+       (alist->rel-scheme [["foo" integer%]])
        (query-scheme
         (get-query
          (monadic

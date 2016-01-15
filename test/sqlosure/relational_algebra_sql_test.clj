@@ -10,15 +10,15 @@
 (def test-universe (make-sql-universe))
 
 (def tbl1 (make-sql-table "tbl1"
-                          (make-rel-scheme
-                           {"one" string%
-                            "two" integer%})
+                          (alist->rel-scheme
+                           [["one" string%]
+                            ["two" integer%]])
                           :universe test-universe))
 
 (def tbl2 (make-sql-table "tbl2"
-                          (make-rel-scheme
-                           {"three" blob%
-                            "four" double%})
+                          (alist->rel-scheme
+                           [["three" blob%]
+                            ["four" double%]])
                           :universe test-universe))
 
 (deftest x->sql-select-test
@@ -106,7 +106,7 @@
   (testing "restrict"
     (let [test-universe (make-universe)
           t1 (make-sql-table 't1
-                             (make-rel-scheme {"C" string%})
+                             (alist->rel-scheme [["C" string%]])
                              :universe test-universe
                              :handle "t1")
           r (make-restrict (>=$ (make-const integer% 42)
@@ -123,11 +123,11 @@
   (testing "outer product"
     (let [test-universe (make-universe)
           t1 (make-sql-table 't1
-                             (make-rel-scheme {"C" string%})
+                             (alist->rel-scheme [["C" string%]])
                              :universe test-universe
                              :handle "t1")
           t2 (make-sql-table 't2
-                             (make-rel-scheme {"D" integer%})
+                             (alist->rel-scheme [["D" integer%]])
                              :universe test-universe
                              :handle "t2")
           r (make-restrict (=$ (make-attribute-ref "C")
@@ -142,6 +142,6 @@
   (testing "order"
     (let [o (make-order {(make-attribute-ref "one") :ascending}
                         (make-sql-table "tbl1"
-                                        (make-rel-scheme {"one" string%
-                                                          "two" integer%})))
+                                        (alist->rel-scheme [["one" string%]
+                                                            ["two" integer%]])))
           q (query->sql o)])))

@@ -26,8 +26,8 @@
 
 (deftest intersect-live-test
   (let [tbl1 (make-base-relation "tbl1"
-                                 (make-rel-scheme {"one" string%
-                                                   "two" integer%})
+                                 (alist->rel-scheme [["one" string%]
+                                                     ["two" integer%]])
                                  :handle "tbl1")
         p (make-project {"one" (make-attribute-ref "one")
                          "two" (make-attribute-ref "two")}
@@ -39,9 +39,9 @@
 
 (deftest remove-dead-test
   (let [tbl1 (make-base-relation "tbl1"
-                                 (make-rel-scheme {"one" string%
-                                                   "two" integer%
-                                                   "three" double%})
+                                 (alist->rel-scheme [["one" string%]
+                                                     ["two" integer%]
+                                                     ["three" double%]])
                                  :handle "tbl1")
         p1 (make-project {"one" (make-attribute-ref "one")
                           "two" (make-attribute-ref "two")}
@@ -59,8 +59,8 @@
 
 (deftest merge-project-test
   (let [tbl1 (make-base-relation "tbl1"
-                                 (make-rel-scheme {"one" string%
-                                                   "two" integer%
-                                                   "three" double%})
+                                 (alist->rel-scheme [["one" string%]
+                                                     ["two" integer%]
+                                                     ["three" double%]])
                                  :handle "tbl1")]
     (is (= nil (merge-project nil)))))

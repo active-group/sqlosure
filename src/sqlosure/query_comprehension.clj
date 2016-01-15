@@ -74,11 +74,10 @@
    (return (make-relation
             alias
             (let [scheme (rel/query-scheme query)]
-              (rel/make-rel-scheme
-               (into {}
-                     (map (fn [[k v]]
-                            [k (rel/expression-type (rel/rel-scheme->environment scheme) v)])
-                          alist))))))))
+              (rel/alist->rel-scheme
+               (map (fn [[k v]]
+                      [k (rel/expression-type (rel/rel-scheme->environment scheme) v)])
+                    alist)))))))
 
 (defn restrict
   "Restrict the current query by a condition.

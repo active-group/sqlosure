@@ -62,8 +62,8 @@
              (put-sql-select* (make-sql-select-table "CUSTOMERS")))))
     (let [o (make-order {(make-attribute-ref "one") :ascending}
                         (make-sql-table "tbl1"
-                                        (make-rel-scheme {"one" string%
-                                                          "two" integer%})))
+                                        (alist->rel-scheme [["one" string%]
+                                                            ["two" integer%]])))
           q (query->sql o)
           [res-str res-args] (with-out-str-and-value
                                (put-sql-select default-sql-put-parameterization q))]
@@ -107,9 +107,9 @@
 (deftest put-sql-outer-join-test
   (testing "simple case"
     (let [t1 (make-sql-table "t1"
-                             (make-rel-scheme {"C" string%}))
+                             (alist->rel-scheme [["C" string%]]))
           t2 (make-sql-table "t2"
-                             (make-rel-scheme {"D" integer%}))
+                             (alist->rel-scheme [["D" integer%]]))
           r (make-restrict-outer (=$ (make-attribute-ref "C")
                                      (make-attribute-ref "D"))
                                  (make-left-outer-product t1 t2))
@@ -121,11 +121,11 @@
                res-str)))))
   (testing "multiple tables on the left"
     (let [t1 (make-sql-table "t1"
-                             (make-rel-scheme {"C" string%}))
+                             (alist->rel-scheme [["C" string%]]))
           t2 (make-sql-table "t2"
-                             (make-rel-scheme {"D" integer%}))
+                             (alist->rel-scheme [["D" integer%]]))
           t3 (make-sql-table "t3"
-                             (make-rel-scheme {"E" integer%}))
+                             (alist->rel-scheme [["E" integer%]]))
           r (make-restrict-outer (=$ (make-attribute-ref "C")
                                      (make-attribute-ref "E"))
                                  (make-left-outer-product (make-product t1 t2) t3))
