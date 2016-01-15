@@ -147,30 +147,34 @@ Replaced alist with hash-map."
 
 (define-record-type project
   (really-make-project alist query) project?
-  [alist project-alist  ;; (project -> hash-map)
+  [^{:doc "List of pairs."}
+   alist project-alist 
    query project-query])
 
 (defn make-project
   [alist query]
-  (if (map? alist)
+  (let [alist (if (map? alist)
+                (vec alist)
+                alist)]
     (if (empty? alist)
-      (if (project? query)
-        (make-project alist (project-query query))
-        (really-make-project alist query))
-      (really-make-project alist query))
-    (assertion-violation 'make-project "requires hash-map, got" alist)))
+      (loop [query query]
+        (if (project? query)
+          (recur (project-query query))
+          (really-make-project alist query)))
+      (really-make-project alist query))))
 
 (declare query-scheme)
 
 (defn make-extend
-  "Creates a projection of some attributes while keeping all other atrtibutes in
+  "Creates a projection of some attributes while keeping all other attributes in
   the relation visible too."
   [alist query]
   (make-project
-   (into alist (map (fn [p]
-                      [(first p)
-                       (make-attribute-ref (first p))])
-                    (rel-scheme-alist (query-scheme query))))
+   (concat alist
+           (map (fn [p]
+                  [(first p)
+                   (make-attribute-ref (first p))])
+                (rel-scheme-alist (query-scheme query))))
    query))
 
 (define-record-type restrict
@@ -558,11 +562,10 @@ Replaced alist with hash-map."
                         (assertion-violation 'datum->query
                                              "unknown base relation"
                                              (second d)))
-      project (make-project (into {}
-                                  (map (fn [p]
-                                         [(first p)
-                                          (datum->expression (rest p) universe)])
-                                       (second d)))
+      project (make-project (map (fn [p]
+                                   [(first p)
+                                    (datum->expression (rest p) universe)])
+                                 (second d))
                             (next-step (third d)))
       restrict (make-restrict (datum->expression (second d) universe)
                               (next-step (third d)))
@@ -572,16 +575,14 @@ Replaced alist with hash-map."
       (make-combine (first d) (next-step (second d))
                     (next-step (third d)))
       grouping-project (make-grouping-project
-                        (into {}
-                              (map (fn [p]
-                                     [(first p)
-                                      (datum->expression (rest p) universe)])
-                                   (second d)))
+                        (map (fn [p]
+                               [(first p)
+                                (datum->expression (rest p) universe)])
+                             (second d))
                         (next-step (third d)))
-      order (make-order (into {}
-                              (map (fn [p]
-                                     [(datum->expression (first p) universe) (second p)])
-                                   (second d)))
+      order (make-order (map (fn [p]
+                               [(datum->expression (first p) universe) (second p)])
+                             (second d))
                         (next-step (third d)))
       top (make-top (second d) (next-step (third d)))
       :else (assertion-violation 'datum->query "invalid datum" d))))
@@ -610,9 +611,9 @@ Replaced alist with hash-map."
                                     (next-step (third d)))
       aggregation* (make-aggregation (second d))
       case-expr (make-case-expr (into {}
-                                          (map (fn [[k v]] [(next-step k)
-                                                            (next-step v)])
-                                               (second d)))
+                                      (map (fn [[k v]] [(next-step k)
+                                                        (next-step v)])
+                                           (second d)))
                                 (next-step (third d)))
       scalar-subquery (make-scalar-subquery (datum->query (second d) universe))
       set-subquery (make-set-subquery (datum->query (second d) universe))
@@ -683,7 +684,7 @@ Replaced alist with hash-map."
       (apply union
              (set (keys (rel-scheme-alist (query-scheme subq))))
              (query-attribute-names subq)
-             (map expression-attribute-names (vals alist))))
+             (map expression-attribute-names (map second alist))))
     (restrict? q)
     (let [sub (restrict-query q)]
       (union
@@ -753,9 +754,8 @@ Replaced alist with hash-map."
       (project? q) (let [sub (project-query q)
                          culled (cull-substitution-alist alist sub)]
                      (make-project
-                      (into {}
-                            (map (fn [[k v]] [k (substitute-attribute-refs culled v)])
-                                 (project-alist q)))
+                      (map (fn [[k v]] [k (substitute-attribute-refs culled v)])
+                           (project-alist q))
                       (next-step sub)))
       (restrict? q) (let [sub (restrict-query q)
                           culled (cull-substitution-alist alist sub)]
@@ -772,14 +772,14 @@ Replaced alist with hash-map."
       (grouping-project? q) (let [sub (grouping-project-query q)
                                   culled (cull-substitution-alist alist sub)]
                               (make-grouping-project
-                               (into {} (map (fn [[k v]] [k (substitute-attribute-refs culled v)])
-                                             (grouping-project-alist q)))
+                               (map (fn [[k v]] [k (substitute-attribute-refs culled v)])
+                                    (grouping-project-alist q))
                                (next-step sub)))
       (order? q) (let [sub (order-query q)
                        culled (cull-substitution-alist alist sub)]
-                   (make-order (into {} (map (fn [[k v]]
-                                               [(substitute-attribute-refs culled k) v])
-                                             (order-alist q)))
+                   (make-order (map (fn [[k v]]
+                                      [(substitute-attribute-refs culled k) v])
+                                    (order-alist q))
                                (next-step sub)))
       (top? q) (make-top (top-count q) (next-step (top-query q)))
       :else (assertion-violation 'query-substitute-attribute-refs "unknown query" q))))

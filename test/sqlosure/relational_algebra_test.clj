@@ -99,13 +99,13 @@
                               :handle "tbl1"))
 
 (deftest make-project-test
-  (let [p (make-project {"two" (make-attribute-ref "two")
-                         "one" (make-attribute-ref "one")}
+  (let [p (make-project [["two" (make-attribute-ref "two")]
+                         ["one" (make-attribute-ref "one")]]
                         tbl1)]
-    (is (= (project-alist p) {"two" (make-attribute-ref "two")
-                              "one" (make-attribute-ref "one")}))
-    (is (= (project-query p) tbl1)))
-  (is (thrown? Exception (make-project [] tbl1))))
+    (is (= [["two" (make-attribute-ref "two")]
+            ["one" (make-attribute-ref "one")]]
+           (project-alist p)))
+    (is (= tbl1 (project-query p)))))
 
 ;; TODO: what should be the result?
 #_(deftest make-extend-test
@@ -234,22 +234,22 @@
                                ["two" integer%]])
            (query-scheme tbl1 :typecheck? true)))
     ;; projection
-    (let [p (make-project {"two" (make-attribute-ref "two")
-                           "one" (make-attribute-ref "one")}
+    (let [p (make-project [["two" (make-attribute-ref "two")]
+                           ["one" (make-attribute-ref "one")]]
                           tbl1)
           res (query-scheme p :typecheck? true)]
       (is (= (rel-scheme-alist res) {"two" integer% "one" string%}))
       (is (thrown? Exception  ;; should fail with typechecking because of aggregation
                    (query-scheme (make-project
-                                  {"two" (make-attribute-ref "two")
-                                   "one" (make-aggregation
-                                          :min
-                                          (make-tuple [(make-const integer% 42)
-                                                       (make-const integer% 23)]))}
-                                  tbl1)
+                                  [["two" (make-attribute-ref "two")]
+                                   ["one" (make-aggregation
+                                           :min
+                                           (make-tuple [(make-const integer% 42)
+                                                        (make-const integer% 23)]))]]
+                                   tbl1)
                                  :typecheck? true))))
     (let [r (make-restrict (sql/=$ (make-scalar-subquery
-                                    (make-project {"C" (make-attribute-ref "C")}
+                                    (make-project [["C" (make-attribute-ref "C")]]
                                                   SUBB))
                                    (make-attribute-ref "C"))
                            SUBA)]
@@ -258,7 +258,7 @@
 
 
     (let [r (make-restrict-outer (sql/=$ (make-scalar-subquery
-                                          (make-project {"C" (make-attribute-ref "C")}
+                                          (make-project [["C" (make-attribute-ref "C")]]
                                                         SUBB))
                                          (make-attribute-ref "C"))
                                  SUBA)]
@@ -321,8 +321,9 @@
   ;; everything else is basically the same...
   (is (query? the-empty))
   (is (query? tbl1))
-  (is (query? (make-project {"one" (make-attribute-ref "one")
-                             "two" (make-attribute-ref "two")} tbl1)))
+  (is (query? (make-project [["one" (make-attribute-ref "one")]
+                             ["two" (make-attribute-ref "two")]]
+                            tbl1)))
   (is (not (query? [(make-attribute-ref 42)])))
   (is (query? []))
   (is (query? nil)))
@@ -358,8 +359,8 @@
   (is (= (list 'project (list (list "two" 'attribute-ref "two")
                               (list "one" 'attribute-ref "one"))
                '(base-relation tbl1))
-         (query->datum (make-project {"two" (make-attribute-ref "two")
-                                      "one" (make-attribute-ref "one")}
+         (query->datum (make-project [["two" (make-attribute-ref "two")]
+                                      ["one" (make-attribute-ref "one")]]
                                      tbl1))))
   (let [test-universe (make-universe)
         SUBB (make-base-relation 'SUBB
@@ -371,7 +372,7 @@
                                  test-universe
                                  "SUBA")
         r (make-restrict (sql/>=$ (make-scalar-subquery
-                                   (make-project {"C" (make-attribute-ref "C")}
+                                   (make-project [["C" (make-attribute-ref "C")]]
                                                  SUBB))
                                   (make-attribute-ref "C"))
                          SUBA)]
@@ -416,8 +417,8 @@
     (is (thrown? Exception  ;; Should throw because universe does not contain
                  ;; the relation.
                  (datum->query '(base-relation tbl1) (make-universe))))
-    (let [p (make-project {"two" (make-attribute-ref "two")
-                           "one" (make-attribute-ref "one")}
+    (let [p (make-project [["two" (make-attribute-ref "two")]
+                           ["one" (make-attribute-ref "one")]]
                           tbl1)]
       (is (= p (query->datum->query p)))
       (is (thrown? Exception  ;; Should throw because tbl1 is not registered in
@@ -433,14 +434,14 @@
                                    :universe sql-universe*
                                    :handle "SUBA")
           r (make-restrict (sql/=$ (make-scalar-subquery
-                                    (make-project {"C" (make-attribute-ref "C")}
+                                    (make-project [["C" (make-attribute-ref "C")]]
                                                   SUBB))
                                    (make-attribute-ref "C"))
                            SUBA)]
       (is (= (make-restrict
               (make-application
                (universe-lookup-rator sql-universe* '=)
-               (make-scalar-subquery (make-project {"C" (make-attribute-ref "C")}
+               (make-scalar-subquery (make-project [["C" (make-attribute-ref "C")]]
                                                    SUBB))
                (make-attribute-ref "C"))
               SUBA)
@@ -488,12 +489,12 @@
       (is (= u (query->datum->query u)))
       (is (= l (query->datum->query l))))
     (let [gp (make-grouping-project
-              {"one" (make-attribute-ref "one")
-               "foo" (make-aggregation :avg
-                                       (make-attribute-ref "two"))}
+              [["one" (make-attribute-ref "one")]
+               ["foo" (make-aggregation :avg
+                                        (make-attribute-ref "two"))]]
               tbl1)]
       (is (= gp (query->datum->query gp))))
-    (let [o (make-order {(make-attribute-ref "one") :ascending} tbl1)]
+    (let [o (make-order [[(make-attribute-ref "one") :ascending]] tbl1)]
       (is (= o (query->datum->query o))))
     (let [t (make-top 10 tbl1)]
       (is (= t (query->datum->query t))))))
@@ -586,8 +587,8 @@
   (is (nil? (query-attribute-names the-empty)))
   (is (nil? (query-attribute-names tbl1)))
   (is (= #{"two" "one"} (query-attribute-names
-                            (make-project {"two" (make-attribute-ref "two")
-                                           "one" (make-attribute-ref "one")}
+                            (make-project [["two" (make-attribute-ref "two")]
+                                           ["one" (make-attribute-ref "one")]]
                                           tbl1))))
   (let [test-universe (make-universe)
         SUBB (make-base-relation 'SUBB
@@ -599,8 +600,8 @@
                                  :universe test-universe
                                  :handle "SUBA")
         r1 (make-restrict (sql/=$ (make-scalar-subquery
-                                   (make-project {"C" (make-attribute-ref "C")
-                                                  "D" (make-attribute-ref "D")}
+                                   (make-project [["C" (make-attribute-ref "C")]
+                                                  ["D" (make-attribute-ref "D")]]
                                                  SUBB))
                                   (make-attribute-ref "C"))
                           SUBA)
@@ -620,11 +621,11 @@
                                                      ["four" double%]])
                                  test-universe
                                  "tbl2")
-        p1 (make-project {"two" (make-attribute-ref "two")
-                          "one" (make-attribute-ref "one")}
+        p1 (make-project [["two" (make-attribute-ref "two")]
+                          ["one" (make-attribute-ref "one")]]
                          tbl1)
-        p2 (make-project {"three" (make-attribute-ref "three")
-                          "four" (make-attribute-ref "four")}
+        p2 (make-project [["three" (make-attribute-ref "three")]
+                          ["four" (make-attribute-ref "four")]]
                          tbl1) ; FIXME: doesn't typecheck
         c (make-product rel1 p1)
         q (make-quotient p1 rel1)

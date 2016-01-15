@@ -8,13 +8,13 @@
   "Takes an alist and a project query's alist and substitutes all of the
   latter's refs."
   [alist palist]
-  (into {} (map (fn [[k v]] [k (r/substitute-attribute-refs alist v)])
-                palist)))
+  (map (fn [[k v]] [k (r/substitute-attribute-refs alist v)])
+       palist))
 
 (defn order-alist-attribute-names
   "Takes an order query's alist and returns it's referenced attributes."
   [alist]
-  (apply set/union (map r/expression-attribute-names (keys alist))))
+  (apply set/union (map r/expression-attribute-names (map first alist))))
 
 (defn query->alist
   "Return the rel-scheme-alist of a query's query-scheme."
@@ -43,8 +43,8 @@
            (nil? q) q
            (r/base-relation? q) q
            (r/project? q)
-           (let [new-alist (into {} (filter (fn [[k _]] (elem? live k))
-                                            (r/project-alist q)))]
+           (let [new-alist (filter (fn [[k _]] (elem? live k))
+                                   (r/project-alist q))]
              (r/make-project new-alist
                              (worker (map (fn [[k v]]
                                             (r/expression-attribute-names v))
@@ -116,7 +116,7 @@
 (defn merge-project
   [q]
   (cond
-    (nil? q) q
+    (nil? q) q ;; FIXME: why is nil allowed?
     (r/base-relation? q) q
     (r/project? q)
     (let [pq (merge-project (r/project-query q))
@@ -124,7 +124,7 @@
       (cond
         (r/project? pq)
         (r/make-project (project-alist-substitute-attribute-refs
-                         (r/project-alist pq) pa)
+                         (into {} (r/project-alist pq)) pa)
                         (r/project-query pq))
         (r/combine? pq)
         (let [op (r/combine-rel-op pq)]
@@ -135,7 +135,7 @@
             (let [q1 (r/combine-query-1 pq)
                   q2 (r/combine-query-2 pq)
                   subst #(project-alist-substitute-attribute-refs
-                          (r/project-alist %1) %2)]
+                          (into {} (r/project-alist %1)) %2)]
               (if (and (r/project? q1)
                        (r/project? q2))
                 (r/make-combine op
@@ -163,7 +163,7 @@
           pa (r/grouping-project-alist q)]
       (if (r/project? pq)
         (r/make-grouping-project
-         (project-alist-substitute-attribute-refs (r/project-alist pq) pa)
+         (project-alist-substitute-attribute-refs (into {} (r/project-alist pq)) pa)
          (r/project-query pq))
         (r/make-grouping-project pa pq)))
     :else (c/assertion-violation 'merge-project "unknown query" q)))
@@ -186,7 +186,7 @@
           (r/make-project
            alist
            (push-restrict
-            (r/make-restrict (r/substitute-attribute-refs alist re)
+            (r/make-restrict (r/substitute-attribute-refs (into {} alist) re)
                              (r/project-query rq)))))
         (r/combine? rq)
         (let [op (r/combine-rel-op rq)
@@ -233,7 +233,7 @@
           (r/make-project
            alist
            (push-restrict
-            (r/make-restrict-outer (r/substitute-attribute-refs alist re)
+            (r/make-restrict-outer (r/substitute-attribute-refs (into {} alist) re)
                                    (r/project-query rq)))))
         (r/combine? rq)
         (let [op (r/combine-rel-op rq)
@@ -282,7 +282,7 @@
                                {}
                                (map
                                 (fn [[k v]]
-                                  [(r/substitute-attribute-refs palist v) v])))]
+                                  [(r/substitute-attribute-refs (into {} palist) v) v])))]
                           (if (not-empty (filter (fn [[k v]] (r/aggregate? k))
                                                  new-alist))
                             (r/make-order alist (push-restrict oq))
@@ -329,6 +329,8 @@
     (r/make-grouping-project (r/grouping-project-alist q)
                              (push-restrict (r/grouping-project-query q)))
     :else (c/assertion-violation 'push-restrict "unknown query" q)))
+
+;; FIXME: what about remove-dead?
 
 (defn optimize-query
   "Takes a query and performs some optimizations."

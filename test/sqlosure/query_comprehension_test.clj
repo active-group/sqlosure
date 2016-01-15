@@ -50,7 +50,7 @@
                                    [t1 (embed tbl1)]
                                    (restrict (=$ (! t1 "one")
                                                  (make-const string% "foobar")))
-                                   (project {"foo" (! t1 "two")})))))))))
+                                   (project [["foo" (! t1 "two")]])))))))))
 
 (deftest trivial
   (is (rel-scheme=?
@@ -61,7 +61,7 @@
                     [t2 (embed tbl2)]
                     (restrict (=$ (! t1 "one")
                                   (! t2 "four")))
-                    (project {"foo" (! t1 "two")})))))))
+                    (project [["foo" (! t1 "two")]])))))))
 
 (deftest trivial-outer
   (is (rel-scheme=?
@@ -72,7 +72,7 @@
                     [t2 (outer tbl2)]
                     (restrict-outer (=$ (! t1 "one")
                                         (! t2 "four")))
-                    (project {"foo" (! t1 "two")})))))))
+                    (project [["foo" (! t1 "two")]])))))))
 
 
 (deftest combine
@@ -83,8 +83,8 @@
          (monadic
           [t1 (embed tbl1)]
           [t2 (embed tbl2)]
-          (union (project {"foo" (! t1 "one")})
-                 (project {"foo" (! t2 "four")})))))))
+          (union (project [["foo" (! t1 "one")]])
+                 (project [["foo" (! t2 "four")]])))))))
 
   (is (rel-scheme=?
        (alist->rel-scheme [["foo" string%]])
@@ -93,8 +93,8 @@
          (monadic
           [t1 (embed tbl1)]
           [t2 (embed tbl2)]
-          (subtract (project {"foo" (! t1 "one")})
-                    (project {"foo" (! t2 "four")})))))))
+          (subtract (project [["foo" (! t1 "one")]])
+                    (project [["foo" (! t2 "four")]])))))))
 
   (is (rel-scheme=?
        (alist->rel-scheme [["bar" blob%]])
@@ -103,9 +103,9 @@
          (monadic
           [t1 (embed tbl1)
            t2 (embed tbl2)]
-          (divide (project {"foo" (! t1 "one")
-                            "bar" (! t2 "three")})
-                  (project {"foo" (! t2 "four")}))))))))
+          (divide (project [["foo" (! t1 "one")]
+                            ["bar" (! t2 "three")]])
+                  (project [["foo" (! t2 "four")]]))))))))
 
 (deftest order-t
   (is (rel-scheme=?
@@ -118,7 +118,7 @@
           (restrict (=$ (! t1 "one")
                         (! t2 "four")))
           (order {(! t1 "one") :ascending})
-          (project {"foo" (! t1 "two")})))))))
+          (project [["foo" (! t1 "two")]])))))))
 
 (deftest xy-test-1
   (is (= '("SELECT three_1 AS res FROM (SELECT one AS one_0, two AS two_0 FROM tbl1), (SELECT three AS three_1, four AS four_1 FROM tbl2 WHERE (four = one_0)) WHERE (? = one_0)" "foobar")
@@ -131,5 +131,5 @@
                                                  (! t1 "one")))
                                    [t2 (embed tbl2)]
                                    (restrict (=$ (! t2 "four") (! t1 "one")))
-                                   (project {"res" (! t2 "three")})))))))))
+                                   (project [["res" (! t2 "three")]])))))))))
 

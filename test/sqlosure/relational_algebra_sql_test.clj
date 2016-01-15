@@ -94,12 +94,12 @@
 (deftest query->sql-test
   (is (= (make-sql-select-table "tbl1")
          (query->sql tbl1)))
-  (let [p (make-project {"two" (make-attribute-ref "two")
-                         "one" (make-attribute-ref "one")}
+  (let [p (make-project [["two" (make-attribute-ref "two")]
+                         ["one" (make-attribute-ref "one")]]
                         tbl1)
         res (set-sql-select-attributes (x->sql-select (query->sql tbl1))
                                        (alist->sql (project-alist p)))
-        nullary-p (make-project {} tbl1)]
+        nullary-p (make-project [] tbl1)]
     (is (sql-select-nullary? (query->sql nullary-p)))
     (is (= res (query->sql p))))
 
