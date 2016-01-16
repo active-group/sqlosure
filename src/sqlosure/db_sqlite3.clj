@@ -30,10 +30,11 @@
 
 (defn- sqlite3-put-literal
   "sqlite3 specific printer for literals."
-  [val]
+  [type val]
   (if (or (= true val) (= false val))
-    (if val (print 1) (print 0))
-    (put/default-put-literal val)))
+    (do (if val (print 1) (print 0))
+        [])
+    (put/default-put-literal type val)))
 
 (def ^{:private true} sqlite3-sql-put-parameterization
   "Printer for sqliter3."
@@ -69,6 +70,7 @@
   [conn select scheme opts]
   (jdbc-utils/query (sqlite3-db conn) select scheme
                     sqlite3-value->value
+                    value->sqlite3-value
                     (db/db-connection-sql-put-parameterization conn)
                     opts))
 

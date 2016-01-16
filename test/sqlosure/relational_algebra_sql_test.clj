@@ -38,12 +38,12 @@
 
 (deftest expression->sql-test
   (is (= (make-sql-expr-column "two") (expression->sql (make-attribute-ref "two"))))
-  (is (= (make-sql-expr-const "foobar") (expression->sql (make-const string% "foobar"))))
-  (is (= (make-sql-expr-app op-= (make-sql-expr-const true) (make-sql-expr-const "bar"))
+  (is (= (make-sql-expr-const string% "foobar") (expression->sql (make-const string% "foobar"))))
+  (is (= (make-sql-expr-app op-= (make-sql-expr-const boolean% true) (make-sql-expr-const string% "bar"))
          (expression->sql (=$ (make-const boolean% true)
                               (make-const string% "bar")))))
-  (is (= (make-sql-expr-tuple [(make-sql-expr-const 42.0)
-                               (make-sql-expr-const "foobar")
+  (is (= (make-sql-expr-tuple [(make-sql-expr-const double% 42.0)
+                               (make-sql-expr-const string% "foobar")
                                (make-sql-expr-column "ref")])
          (expression->sql (make-tuple [(make-const double% 42.0)
                                        (make-const string% "foobar")
@@ -52,17 +52,17 @@
           op-count
           (make-sql-expr-tuple [(make-sql-expr-column "two")
                                 (make-sql-expr-app op-=
-                                                   (make-sql-expr-const 42)
-                                                   (make-sql-expr-const 23))]))
+                                                   (make-sql-expr-const integer% 42)
+                                                   (make-sql-expr-const integer% 23))]))
          (expression->sql (make-aggregation :count (make-tuple [(make-attribute-ref "two")
                                                                 (=$ (make-const integer% 42)
                                                                     (make-const integer% 23))])))))
   (is (= (make-sql-expr-case
           {(make-sql-expr-app op-=
-                              (make-sql-expr-const 42)
-                              (make-sql-expr-const 42))
-           (make-sql-expr-const true)}
-          (make-sql-expr-const false))
+                              (make-sql-expr-const integer% 42)
+                              (make-sql-expr-const integer% 42))
+           (make-sql-expr-const boolean% true)}
+          (make-sql-expr-const boolean% false))
          (expression->sql (make-case-expr {(=$ (make-const integer% 42)
                                                     (make-const integer% 42))
                                            (make-const boolean% true)}

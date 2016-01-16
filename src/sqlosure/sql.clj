@@ -210,10 +210,11 @@
 ;; is it really necessary?
 
 (define-record-type sql-expr-const
-  (make-sql-expr-const val) sql-expr-const?
-  [val sql-expr-const-val])
+  (make-sql-expr-const type val) sql-expr-const?
+  [type sql-expr-const-type
+   val sql-expr-const-val])
 
-(def the-sql-null (make-sql-expr-const nil))
+;; TODO, type? (def the-sql-null (make-sql-expr-const null% nil))
 
 (define-record-type sql-expr-tuple
   (make-sql-expr-tuple expressions) sql-expr-tuple?

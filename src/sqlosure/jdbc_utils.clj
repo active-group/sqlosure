@@ -40,13 +40,13 @@
 (defn query
   "Takes a jdbc db-spec a sql-select statement and a relational scheme
   and runs the query against the database, applying
-  `convert-base-value` to the selected values."
-  [db-spec select scheme convert-base-value parameterization opts]
-  (let [[select-query & select-args] (put-select parameterization select)]
+  `from-db-value` to the selected values, and `to-db-value` to the parameters."
+  [db-spec select scheme from-db-value to-db-value parameterization opts]
+  (let [[select-query & select-types+args] (put-select parameterization select)]
     (jdbc/query db-spec
-                (cons select-query (time/coerce-time-values select-args))
+                (cons select-query (map (fn [[t v]] (to-db-value t v)) select-types+args))
                 :result-set-fn #(result-set-fn (:as-arrays? opts) (:row-fn opts)
                                                (:result-set-fn opts)
                                                (rel/rel-scheme-columns scheme) %)
                 :as-arrays? true
-                :row-fn #(query-row-fn convert-base-value (rel/rel-scheme-types scheme) %))))
+                :row-fn #(query-row-fn from-db-value (rel/rel-scheme-types scheme) %))))

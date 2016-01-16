@@ -39,7 +39,7 @@
   (cond
     (rel/attribute-ref? expr) (sql/make-sql-expr-column
                                (rel/attribute-ref-name expr))
-    (rel/const? expr) (sql/make-sql-expr-const (rel/const-val expr))
+    (rel/const? expr) (sql/make-sql-expr-const (rel/const-type expr) (rel/const-val expr))
     (rel/application? expr) (apply sql/make-sql-expr-app
                                    (rel/rator-data (rel/application-rator expr))
                                    (map expression->sql
@@ -98,7 +98,8 @@
                        (if (empty? alist)
                          (-> sql
                              (sql/set-sql-select-attributes
-                              {"dummy" (sql/make-sql-expr-const "dummy")})
+                              ;; FIXME: what type is this dummy?
+                              {"dummy" (sql/make-sql-expr-const nil "dummy")})
                              (sql/set-sql-select-nullary? true))
                          (sql/set-sql-select-attributes sql (alist->sql alist))))
     (rel/restrict? q) (let [sql (x->sql-select (query->sql

@@ -29,6 +29,7 @@
    put/default-sql-put-parameterization
    (query->sql query)))
 
+;; TODO: is this supposed to be test? zap or use deftest
 (let [movies-table (make-sql-table 'movies
                                        (alist->rel-scheme [["title" string%]
                                                            ["director" string%]
@@ -42,7 +43,7 @@
                                  (project {"title" (! movies "title")})))))
 
 (deftest const-restrict-test
-  (is (= '("SELECT two AS foo FROM tbl1 WHERE (one = ?)" "foobar")
+  (is (= ["SELECT two AS foo FROM tbl1 WHERE (one = ?)" [string% "foobar"]]
          (sqlosure.sql-put/sql-select->string
           sqlosure.sql-put/default-sql-put-parameterization
           (query->sql (opt/optimize-query

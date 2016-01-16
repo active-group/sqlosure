@@ -21,7 +21,6 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
   (put/sql-expression->string (db/db-connection-sql-put-parameterization conn) select))
 
 (defn- postgresql-value->value
-  "No conversion necessary."
   [tt val]
   (cond
     (= tt t/date%) (time/from-sql-date val)
@@ -29,9 +28,11 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
     :else val))
 
 (defn- value->postgresql-value
-  "No conversion necessary."
   [tt val]
-  val)
+  (cond
+    (= tt t/date%) (time/to-sql-date val)
+    (= tt t/timestamp%) (time/to-sql-timestamp val)
+    :else val))
 
 ;; Parameterization as in put/default.
 (def postgresql-sql-put-parameterization
@@ -43,6 +44,7 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
   [conn select scheme opts]
   (jdbc-utils/query (postgresql-db conn) select scheme
                     postgresql-value->value
+                    value->postgresql-value
                     (db/db-connection-sql-put-parameterization conn)
                     opts))
 
