@@ -10,15 +10,15 @@
 (def test-universe (make-sql-universe))
 
 (def tbl1 (make-sql-table "tbl1"
-                          (make-rel-scheme
-                           {"one" string%
-                            "two" integer%})
+                          (alist->rel-scheme
+                           [["one" string%]
+                            ["two" integer%]])
                           :universe test-universe))
 
 (def tbl2 (make-sql-table "tbl2"
-                          (make-rel-scheme
-                           {"three" blob%
-                            "four" double%})
+                          (alist->rel-scheme
+                           [["three" blob%]
+                            ["four" double%]])
                           :universe test-universe))
 
 (deftest x->sql-select-test
@@ -38,12 +38,12 @@
 
 (deftest expression->sql-test
   (is (= (make-sql-expr-column "two") (expression->sql (make-attribute-ref "two"))))
-  (is (= (make-sql-expr-const "foobar") (expression->sql (make-const string% "foobar"))))
-  (is (= (make-sql-expr-app op-= (make-sql-expr-const true) (make-sql-expr-const "bar"))
+  (is (= (make-sql-expr-const string% "foobar") (expression->sql (make-const string% "foobar"))))
+  (is (= (make-sql-expr-app op-= (make-sql-expr-const boolean% true) (make-sql-expr-const string% "bar"))
          (expression->sql (=$ (make-const boolean% true)
                               (make-const string% "bar")))))
-  (is (= (make-sql-expr-tuple [(make-sql-expr-const 42.0)
-                               (make-sql-expr-const "foobar")
+  (is (= (make-sql-expr-tuple [(make-sql-expr-const double% 42.0)
+                               (make-sql-expr-const string% "foobar")
                                (make-sql-expr-column "ref")])
          (expression->sql (make-tuple [(make-const double% 42.0)
                                        (make-const string% "foobar")
@@ -52,17 +52,17 @@
           op-count
           (make-sql-expr-tuple [(make-sql-expr-column "two")
                                 (make-sql-expr-app op-=
-                                                   (make-sql-expr-const 42)
-                                                   (make-sql-expr-const 23))]))
+                                                   (make-sql-expr-const integer% 42)
+                                                   (make-sql-expr-const integer% 23))]))
          (expression->sql (make-aggregation :count (make-tuple [(make-attribute-ref "two")
                                                                 (=$ (make-const integer% 42)
                                                                     (make-const integer% 23))])))))
   (is (= (make-sql-expr-case
           {(make-sql-expr-app op-=
-                              (make-sql-expr-const 42)
-                              (make-sql-expr-const 42))
-           (make-sql-expr-const true)}
-          (make-sql-expr-const false))
+                              (make-sql-expr-const integer% 42)
+                              (make-sql-expr-const integer% 42))
+           (make-sql-expr-const boolean% true)}
+          (make-sql-expr-const boolean% false))
          (expression->sql (make-case-expr {(=$ (make-const integer% 42)
                                                     (make-const integer% 42))
                                            (make-const boolean% true)}
@@ -94,19 +94,19 @@
 (deftest query->sql-test
   (is (= (make-sql-select-table "tbl1")
          (query->sql tbl1)))
-  (let [p (make-project {"two" (make-attribute-ref "two")
-                         "one" (make-attribute-ref "one")}
+  (let [p (make-project [["two" (make-attribute-ref "two")]
+                         ["one" (make-attribute-ref "one")]]
                         tbl1)
         res (set-sql-select-attributes (x->sql-select (query->sql tbl1))
                                        (alist->sql (project-alist p)))
-        nullary-p (make-project {} tbl1)]
+        nullary-p (make-project [] tbl1)]
     (is (sql-select-nullary? (query->sql nullary-p)))
     (is (= res (query->sql p))))
 
   (testing "restrict"
     (let [test-universe (make-universe)
           t1 (make-sql-table 't1
-                             (make-rel-scheme {"C" string%})
+                             (alist->rel-scheme [["C" string%]])
                              :universe test-universe
                              :handle "t1")
           r (make-restrict (>=$ (make-const integer% 42)
@@ -123,11 +123,11 @@
   (testing "outer product"
     (let [test-universe (make-universe)
           t1 (make-sql-table 't1
-                             (make-rel-scheme {"C" string%})
+                             (alist->rel-scheme [["C" string%]])
                              :universe test-universe
                              :handle "t1")
           t2 (make-sql-table 't2
-                             (make-rel-scheme {"D" integer%})
+                             (alist->rel-scheme [["D" integer%]])
                              :universe test-universe
                              :handle "t2")
           r (make-restrict (=$ (make-attribute-ref "C")
@@ -142,6 +142,6 @@
   (testing "order"
     (let [o (make-order {(make-attribute-ref "one") :ascending}
                         (make-sql-table "tbl1"
-                                        (make-rel-scheme {"one" string%
-                                                          "two" integer%})))
+                                        (alist->rel-scheme [["one" string%]
+                                                            ["two" integer%]])))
           q (query->sql o)])))

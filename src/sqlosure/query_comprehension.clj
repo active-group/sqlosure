@@ -44,9 +44,9 @@
    (let [scheme (transform-scheme (rel/query-scheme q))
          alist (rel/rel-scheme-alist scheme)
          fresh (map (fn [[k _]] (fresh-name k alias)) alist)
-         project-alist (into {} (map (fn [[k _] fresh]
-                                       [fresh (rel/make-attribute-ref k)])
-                                     alist fresh))
+         project-alist (map (fn [[k _] fresh]
+                              [fresh (rel/make-attribute-ref k)])
+                            alist fresh)
          qq (rel/make-project project-alist q)])
    (set-query! (make-product query qq))
    (return (make-relation alias scheme))))
@@ -67,18 +67,16 @@
    [alias new-alias]
    [query current-query]
    (set-query! (rel/make-extend
-                (into {}
-                      (map (fn [[k v]] [(fresh-name k alias) v])
-                           alist))
+                (map (fn [[k v]] [(fresh-name k alias) v])
+                     alist)
                 query))
    (return (make-relation
             alias
             (let [scheme (rel/query-scheme query)]
-              (rel/make-rel-scheme
-               (into {}
-                     (map (fn [[k v]]
-                            [k (rel/expression-type (rel/rel-scheme->environment scheme) v)])
-                          alist))))))))
+              (rel/alist->rel-scheme
+               (map (fn [[k v]]
+                      [k (rel/expression-type (rel/rel-scheme->environment scheme) v)])
+                    alist)))))))
 
 (defn restrict
   "Restrict the current query by a condition.
@@ -147,10 +145,9 @@
                      the-empty-state)
         alias (relation-alias rel)
         scheme (relation-scheme rel)
-        alist (into {}
-                    (map (fn [[k _]]
-                           [k (rel/make-attribute-ref (fresh-name k alias))])
-                         (rel/rel-scheme-alist scheme)))
+        alist (map (fn [[k _]]
+                     [k (rel/make-attribute-ref (fresh-name k alias))])
+                   (rel/rel-scheme-alist scheme))
         query (get state ::query)]
     [(rel/make-project alist query) scheme]))
    
@@ -165,17 +162,15 @@
         a2 (relation-alias rel2)
         scheme1 (relation-scheme rel1)
         scheme2 (relation-scheme rel2)
-        p1 (rel/make-project (into {}
-                                   (map (fn [[k _]]
-                                          [(fresh-name k alias)
-                                           (rel/make-attribute-ref (fresh-name k a1))])
-                                        (rel/rel-scheme-alist scheme1)))
+        p1 (rel/make-project (map (fn [[k _]]
+                                    [(fresh-name k alias)
+                                     (rel/make-attribute-ref (fresh-name k a1))])
+                                  (rel/rel-scheme-alist scheme1))
                              q1)
-        p2 (rel/make-project (into {}
-                                   (map (fn [[k _]]
-                                          [(fresh-name k alias)
-                                           (rel/make-attribute-ref (fresh-name k a2))])
-                                        (rel/rel-scheme-alist scheme2)))
+        p2 (rel/make-project (map (fn [[k _]]
+                                    [(fresh-name k alias)
+                                     (rel/make-attribute-ref (fresh-name k a2))])
+                                  (rel/rel-scheme-alist scheme2))
                              q2)]
     (monadic
      (set-alias! (inc alias))

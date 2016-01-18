@@ -7,7 +7,8 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
             [sqlosure.relational-algebra :as rel]
             [sqlosure.type :as t]
             [sqlosure.time :as time]
-            [clojure.java.jdbc :refer :all]
+            [sqlosure.jdbc-utils :as jdbc-utils]
+            [clojure.java.jdbc :refer (execute! insert! delete! update! query)]
             [clojure.string :as s]))
 
 (defn- postgresql-db
@@ -20,7 +21,6 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
   (put/sql-expression->string (db/db-connection-sql-put-parameterization conn) select))
 
 (defn- postgresql-value->value
-  "No conversion necessary."
   [tt val]
   (cond
     (= tt t/date%) (time/from-sql-date val)
@@ -28,34 +28,25 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
     :else val))
 
 (defn- value->postgresql-value
-  "No conversion necessary."
   [tt val]
-  val)
-
-(defn- query-row-fn
-  "Takes a relational scheme and a row returned by a query, then returns a map
-  of the key-value pairs with values converted from sqlite3 to Clojure values."
-  [scheme row]
-  (let [alist (rel/rel-scheme-alist scheme)]
-    (into {} (map (fn [[k v] tt] [k (postgresql-value->value tt v)])
-                  row
-                  (vals alist)))))
+  (cond
+    (= tt t/date%) (time/to-sql-date val)
+    (= tt t/timestamp%) (time/to-sql-timestamp val)
+    :else val))
 
 ;; Parameterization as in put/default.
 (def postgresql-sql-put-parameterization
   (put/make-sql-put-parameterization put/put-dummy-alias put/default-put-combine put/default-put-literal))
 
-(defn- put-select [conn select]
-  (put/sql-select->string (db/db-connection-sql-put-parameterization conn) select))
-
 (defn- postgresql-query
   "Takes a db-connection, a sql-select statement and a relational scheme and
   runs the query against the connected database."
-  [conn select scheme]
-  (let [[select-query & select-args] (put-select conn select)]
-    (query (postgresql-db conn)
-           (cons select-query (time/coerce-time-values select-args))
-           :row-fn #(query-row-fn scheme %))))
+  [conn select scheme opts]
+  (jdbc-utils/query (postgresql-db conn) select scheme
+                    postgresql-value->value
+                    value->postgresql-value
+                    (db/db-connection-sql-put-parameterization conn)
+                    opts))
 
 (defn- postgresql-insert
   "Takes a db-connection, a table name (string), a relational scheme and a
@@ -112,8 +103,8 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
                          db-name  ;; handle
                          postgresql-sql-put-parameterization
                          nil
-                         (fn [conn query scheme]
-                           (postgresql-query conn query scheme))
+                         (fn [conn query scheme opts]
+                           (postgresql-query conn query scheme opts))
                          (fn [conn table scheme vals]
                            (postgresql-insert conn table scheme vals))
                          (fn [conn table criterion]

@@ -51,8 +51,13 @@
 
 (defn put-literal
   "Apply `params` literal-proc to val."
-  [param val]
-  ((sql-put-parameterization-literal-proc param) val))
+  [param type val]
+  ((sql-put-parameterization-literal-proc param) type val))
+
+(defn put-alias
+  "Apply `params` alias-proc to the alias."
+  [param alias]
+  ((sql-put-parameterization-alias-proc param) alias))
 
 (declare put-sql-select-1)
 
@@ -70,21 +75,17 @@
       (print (sql/sql-select-table-name sel))
       [])
     :else
-    (assertion-violation 'put-sql-select "unhandled query" sel)))
+    (assertion-violation 'put-sql-select (str "unhandled query " (pr-str sel)))))
 
 (defn put-joining-infix
   "Intersperse `between` between `lis`'s elements and print via `proc`."
   [lis between proc]
-  (if (empty? lis)
-    identity
-    (let [v (proc (first lis))
-          vs (loop [xs (rest lis)
-                   vs nil]
-              (if-not (empty? xs)
-              (do (print between)
-                  (recur (rest xs) (concat vs (proc (first xs)))))
-              vs))]
-      (concat v vs))))
+  (when-not (empty? lis)
+    (doall (concat (proc (first lis))
+                   (mapcat (fn [x]
+                             (print between)
+                             (proc x))
+                           (rest lis))))))
 
 (defn put-tables
   "Takes a sql-put-parameterization and the sql-select-tables field of a
@@ -95,20 +96,20 @@
                        (if (sql/sql-select-table? select)
                          (do
                            (print (sql/sql-select-table-name select))
-                           ((sql-put-parameterization-alias-proc param) alias))
+                           (put-alias param alias))
                          (let [_ (print "(")
                                v1 (put-sql-select param select)
                                _ (print ")")
-                               _ ((sql-put-parameterization-alias-proc param) alias)]
+                               _ (put-alias param alias)]
                            v1)))))
 
 (defn default-put-literal
-  [val]
-  (if (or (number? val) (string? val) (nil? val) (= true) (= false))
+  [type val]
+  (if true ;; look wrong in any case: (or (number? val) (string? val) (nil? val) (= true) (= false))
     (do
       (print "?")
-      val)
-    (assertion-violation 'default-put-literal "unhandeled literal" val)))
+      [[type val]])
+    (assertion-violation 'default-put-literal (str "unhandeled literal " (pr-str val)))))
 
 (defn default-put-combine
   [param op left right]
@@ -159,17 +160,17 @@
 (defn put-order-by
   [param order-by]
   (print "ORDER BY ")
-  (flatten (put-joining-infix order-by ", " (fn [[a b]]
-                                              (put-sql-expression param a)
-                                              (print (case b
-                                                       :ascending " ASC"
-                                                       :descending " DESC"))))))
+  (put-joining-infix order-by ", " (fn [[a b]]
+                                     (let [v (put-sql-expression param a)]
+                                       (print (case b
+                                                :ascending " ASC"
+                                                :descending " DESC"))
+                                       v))))
 
 (defn put-having
   [param expr]
   (print "HAVING ")
-  (let [v (put-sql-expression param expr)]
-    v))
+  (put-sql-expression param expr))
 
 (defn put-attributes
   [param attributes]
@@ -183,6 +184,32 @@
                            (do (put-sql-expression param expr)
                                (default-put-alias col)))))))
 
+(defn put-sql-join
+  "Put the tables involved in the join of a SQL select."
+  [param tables outer-tables]
+  (if (or (empty? outer-tables)
+          (= (count tables) 1))
+    (let [t (put-padding-if-non-null tables
+                                     (fn [tables]
+                                       (print "FROM ")
+                                       (put-tables param tables)))
+          
+          o (if (not-empty outer-tables)
+              (do
+                (print " LEFT JOIN ")
+                (put-tables param outer-tables))
+              [])]
+      (concat t o))
+    ;; outer tables AND more than one regular tablew
+    (let [_ (print " FROM (SELECT * FROM ")
+          t  (put-tables param tables)
+          _ (do (print ")")
+                (put-alias param nil))
+          o (do
+              (print " LEFT JOIN ")
+              (put-tables param outer-tables))]
+      (concat t o))))
+
 (defn put-sql-select-1
   [param sel]
   (cond
@@ -193,25 +220,17 @@
                                         #(print (s/join " " %)))
             _ (put-space)
             v2 (put-attributes param (sql/sql-select-attributes sel))
-            v3 (put-padding-if-non-null (sql/sql-select-tables sel)
-                                        (fn [tables]
-                                          (print "FROM ")
-                                          (put-tables param tables)))
 
-            outer (sql/sql-select-outer-tables sel)
+            v3 (put-sql-join param
+                             (sql/sql-select-tables sel)
+                             (sql/sql-select-outer-tables sel))
 
-            v4 (if (not-empty outer)
-                 (do
-                   (print " LEFT JOIN ")
-                   (put-tables param outer))
-                 [])
-              
-            v5 (put-padding-if-non-null (sql/sql-select-criteria sel)
+            v5 (put-padding-if-non-null (sql/sql-select-outer-criteria sel)
+                                        #(put-on param %))
+
+            v6 (put-padding-if-non-null (sql/sql-select-criteria sel)
                                         #(put-where param %))
 
-            v6 (put-padding-if-non-null (sql/sql-select-outer-criteria sel)
-                                        #(put-on param %))
-            
             v7 (put-padding-if-non-null (sql/sql-select-group-by sel)
                                         #(put-group-by param %))
             
@@ -226,7 +245,7 @@
                 (when-not (empty? extra)
                   (do (put-space)
                       (print (s/join " " extra)))))]
-        (concat v1 v2 v3 v4 v5 v6 v7 v8 v9)))
+        (concat v1 v2 v3 v5 v6 v7 v8 v9)))
       
     (sql/sql-select-combine? sel) ((sql-put-parameterization-combine-proc param)
                                    param
@@ -237,60 +256,64 @@
     (sql/sql-select-table? sel) (print (sql/sql-select-table-name sel))
     
     (sql/sql-select-empty? sel) (print "")  ;; woot woot
-    :else (assertion-violation 'put-sql-select-1 "unknown select" sel)))
+    :else (assertion-violation 'put-sql-select-1 (str "unknown select " (pr-str sel)))))
 
 (defn put-sql-expression
   [param expr]
   (cond
-    (sql/sql-expr-column? expr) (print (sql/sql-expr-column-name expr))
-    (sql/sql-expr-app? expr) (let [op (sql/sql-expr-app-rator expr)
-                                   rands (sql/sql-expr-app-rands expr)
-                                   name (sql/sql-operator-name op)]
-                               (case (sql/sql-operator-arity op)
-                                 -1 (let [_ (print "(")
-                                          v1 (put-sql-expression param (first rands))
-                                          _ (print ")")
-                                          _ (put-space)
-                                          _ (print name)]
-                                      v1)
-                                 1 (let [_ (print name)
-                                         _ (print "(")
-                                         v1 (put-sql-expression param (first rands))
-                                         _ (print ")")]
-                                     v1)
-                                 2 (let [_ (print "(")
-                                         v1 (put-sql-expression param (first rands))
-                                         _ (put-space)
-                                         _ (print name)
-                                         _ (put-space)
-                                         v2 (put-sql-expression param (second rands))
-                                         _ (print ")")]
-                                     (concat v1 v2))
-                                 3 (let [_ (print "(")
-                                         _ (put-sql-expression param (first rands))
-                                         _ (put-space)
-                                         _ (print name)
-                                         _ (put-space)
-                                         v1 (put-sql-expression param (second rands))
-                                         _ (put-space)
-                                         _ (print "AND")
-                                         _ (put-space)
-                                         v2 (put-sql-expression param (third rands))
-                                         _ (print ")")]
-                                     (concat v1 v2))
-                                 :else (assertion-violation 'put-sql-expression
-                                                            "unhandled operator arity " op)))
-    (sql/sql-expr-const? expr) (let [v (put-literal param (sql/sql-expr-const-val expr))]
-                                 [v])
+    (sql/sql-expr-column? expr)
+    (do (print (sql/sql-expr-column-name expr))
+        [])
+    (sql/sql-expr-app? expr)
+    (let [op (sql/sql-expr-app-rator expr)
+          rands (sql/sql-expr-app-rands expr)
+          name (sql/sql-operator-name op)]
+      (case (sql/sql-operator-arity op)
+        -1 (let [_ (print "(")
+                 v1 (put-sql-expression param (first rands))
+                 _ (print ")")
+                 _ (put-space)
+                 _ (print name)]
+             v1)
+        1 (let [_ (print name)
+                _ (print "(")
+                v1 (put-sql-expression param (first rands))
+                _ (print ")")]
+            v1)
+        2 (let [_ (print "(")
+                v1 (put-sql-expression param (first rands))
+                _ (put-space)
+                _ (print name)
+                _ (put-space)
+                v2 (put-sql-expression param (second rands))
+                _ (print ")")]
+            (concat v1 v2))
+        3 (let [_ (print "(")
+                _ (put-sql-expression param (first rands))
+                _ (put-space)
+                _ (print name)
+                _ (put-space)
+                v1 (put-sql-expression param (second rands))
+                _ (put-space)
+                _ (print "AND")
+                _ (put-space)
+                v2 (put-sql-expression param (third rands))
+                _ (print ")")]
+            (concat v1 v2))
+        :else (assertion-violation 'put-sql-expression
+                                   (str "unhandled operator arity " (pr-str op)))))
+    (sql/sql-expr-const? expr)
+    (put-literal param (sql/sql-expr-const-type expr)
+                 (sql/sql-expr-const-val expr))
     (sql/sql-expr-tuple? expr)
     (let [_ (print "(")
           v (put-joining-infix (sql/sql-expr-tuple-expressions expr)
-                             ", " (fn [b] (put-sql-expression param b)))
+                               ", " (fn [b] (put-sql-expression param b)))
           _ (print ")")]
       v)
     (sql/sql-expr-case? expr)
     (let [_ (print "(CASE ")
-          v1 (map #(put-when param %) (sql/sql-expr-case-branches expr))
+          v1 (mapcat #(put-when param %) (sql/sql-expr-case-branches expr))
           _ (print " ELSE ")
           v2 (put-sql-expression param (sql/sql-expr-case-default expr))
           _ (print ")")]
@@ -306,12 +329,14 @@
           v (put-sql-select param (sql/sql-expr-subquery-query expr))
           _ (print ")")]
       v)
-    :else (assertion-violation 'put-sql-expression "unhandled expression" expr)))
+    :else (assertion-violation 'put-sql-expression (str "unhandled expression" (pr-str expr)))))
 
 (defn sql-expression->string
   [param expr]
-  (flatten (with-out-str-and-value (put-sql-expression param expr))))
+  (let [[s params] (with-out-str-and-value (put-sql-expression param expr))]
+    (cons s params)))
 
 (defn sql-select->string
   [param sel]
-  (flatten (with-out-str-and-value (put-sql-select param sel))))
+  (let [[s params] (with-out-str-and-value (put-sql-select param sel))]
+    (cons s params)))

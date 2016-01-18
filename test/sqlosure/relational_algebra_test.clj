@@ -6,37 +6,37 @@
             [clojure.pprint :refer :all]
             [clojure.test :refer :all]))
 
-(def test-scheme1 (make-rel-scheme {:foo :bar
-                                    :fizz :buzz}))
-(def test-scheme2 (make-rel-scheme {:foo :bar
-                                    :some :thing}))
-(def test-scheme3 (make-rel-scheme {:foo :bar}))
-(def test-scheme4 (make-rel-scheme {:fizz :buzz}))
+(def test-scheme1 (alist->rel-scheme [[:foo :bar]
+                                      [:fizz :buzz]]))
+(def test-scheme2 (alist->rel-scheme [[:foo :bar]
+                                      [:some :thing]]))
+(def test-scheme3 (alist->rel-scheme [[:foo :bar]]))
+(def test-scheme4 (alist->rel-scheme [[:fizz :buzz]]))
 
 
 (deftest rel-scheme=?-test
-  (is (rel-scheme=? (make-rel-scheme nil) the-empty-rel-scheme))
-  (is (rel-scheme=? (make-rel-scheme {:foo "bar"
-                                      :fizz "buzz"})
-                    (make-rel-scheme {:fizz "buzz"
-                                      :foo "bar"}))))
+  (is (rel-scheme=? (alist->rel-scheme []) the-empty-rel-scheme))
+  (is (rel-scheme=? (alist->rel-scheme [[:foo "bar"]
+                                        [:fizz "buzz"]])
+                    (alist->rel-scheme [[:foo "bar"]
+                                        [:fizz "buzz"]]))))
 
 (deftest rel-scheme-difference-test
   (is (= (rel-scheme-difference test-scheme1 test-scheme3)
-         (make-rel-scheme {:fizz :buzz})))
+         (alist->rel-scheme [[:fizz :buzz]])))
   (is (= (rel-scheme-difference test-scheme2 test-scheme3)
-         (make-rel-scheme {:some :thing})))
+         (alist->rel-scheme [[:some :thing]])))
   (is (= (rel-scheme-difference test-scheme1 the-empty-rel-scheme)
          test-scheme1))
-  (is (= (rel-scheme-difference (make-rel-scheme {:k1 "k1", :k2 "k2", :k3 "k3"})
-                                (make-rel-scheme {:k2 "just", :k3 "the", :k4 "keys"}))
-         (make-rel-scheme {:k1 "k1"})))
-  (is (= (rel-scheme-difference (make-rel-scheme {:k2 "just", :k3 "the", :k4 "keys"})
-                                (make-rel-scheme {:k1 "k1", :k2 "k2", :k3 "k3"}))
-         (make-rel-scheme {:k4 "keys"})))
+  (is (= (rel-scheme-difference (alist->rel-scheme [[:k1 "k1"] [:k2 "k2"] [:k3 "k3"]])
+                                (alist->rel-scheme [[:k2 "just"] [:k3 "the"] [:k4 "keys"]]))
+         (alist->rel-scheme [[:k1 "k1"]])))
+  (is (= (rel-scheme-difference (alist->rel-scheme [[:k2 "just"] [:k3 "the"] [:k4 "keys"]])
+                                (alist->rel-scheme [[:k1 "k1"] [:k2 "k2"] [:k3 "k3"]]))
+         (alist->rel-scheme [[:k4 "keys"]])))
   (is (thrown? Exception (rel-scheme-difference
-                          (make-rel-scheme {:foo "some foo"})
-                          (make-rel-scheme {:foo :bar})))))
+                          (alist->rel-scheme [[:foo "some foo"]])
+                          (alist->rel-scheme [[:foo :bar]])))))
 
 (deftest rel-scheme-unary?-test
   (is (rel-scheme-unary? test-scheme4))
@@ -93,19 +93,19 @@
              rator)))))
 
 (def tbl1 (make-base-relation 'tbl1
-                              (make-rel-scheme {"one" string%
-                                                "two" integer%})
+                              (alist->rel-scheme [["one" string%]
+                                                  ["two" integer%]])
                               :universe (make-universe)
                               :handle "tbl1"))
 
 (deftest make-project-test
-  (let [p (make-project {"two" (make-attribute-ref "two")
-                         "one" (make-attribute-ref "one")}
+  (let [p (make-project [["two" (make-attribute-ref "two")]
+                         ["one" (make-attribute-ref "one")]]
                         tbl1)]
-    (is (= (project-alist p) {"two" (make-attribute-ref "two")
-                              "one" (make-attribute-ref "one")}))
-    (is (= (project-query p) tbl1)))
-  (is (thrown? Exception (make-project [] tbl1))))
+    (is (= [["two" (make-attribute-ref "two")]
+            ["one" (make-attribute-ref "one")]]
+           (project-alist p)))
+    (is (= tbl1 (project-query p)))))
 
 ;; TODO: what should be the result?
 #_(deftest make-extend-test
@@ -220,36 +220,36 @@
 (deftest query-scheme-test
   (let [test-universe (make-universe)
         SUBB (make-base-relation 'SUBB
-                                 (make-rel-scheme {"C" string%})
+                                 (alist->rel-scheme [["C" string%]])
                                  :universe test-universe
                                  :handle "SUBB")
         SUBA (make-base-relation 'SUBA
-                                 (make-rel-scheme {"C" string%})
+                                 (alist->rel-scheme [["C" string%]])
                                  :universe test-universe
                                  :handle "SUBA")]
     ;; empty val
     (is (= the-empty-rel-scheme (query-scheme (make-empty-val))))
     ;; base relation
-    (is (= (make-rel-scheme {"one" string%
-                             "two" integer%})
+    (is (= (alist->rel-scheme [["one" string%]
+                               ["two" integer%]])
            (query-scheme tbl1 :typecheck? true)))
     ;; projection
-    (let [p (make-project {"two" (make-attribute-ref "two")
-                           "one" (make-attribute-ref "one")}
+    (let [p (make-project [["two" (make-attribute-ref "two")]
+                           ["one" (make-attribute-ref "one")]]
                           tbl1)
           res (query-scheme p :typecheck? true)]
       (is (= (rel-scheme-alist res) {"two" integer% "one" string%}))
       (is (thrown? Exception  ;; should fail with typechecking because of aggregation
                    (query-scheme (make-project
-                                  {"two" (make-attribute-ref "two")
-                                   "one" (make-aggregation
-                                          :min
-                                          (make-tuple [(make-const integer% 42)
-                                                       (make-const integer% 23)]))}
-                                  tbl1)
+                                  [["two" (make-attribute-ref "two")]
+                                   ["one" (make-aggregation
+                                           :min
+                                           (make-tuple [(make-const integer% 42)
+                                                        (make-const integer% 23)]))]]
+                                   tbl1)
                                  :typecheck? true))))
     (let [r (make-restrict (sql/=$ (make-scalar-subquery
-                                    (make-project {"C" (make-attribute-ref "C")}
+                                    (make-project [["C" (make-attribute-ref "C")]]
                                                   SUBB))
                                    (make-attribute-ref "C"))
                            SUBA)]
@@ -258,7 +258,7 @@
 
 
     (let [r (make-restrict-outer (sql/=$ (make-scalar-subquery
-                                          (make-project {"C" (make-attribute-ref "C")}
+                                          (make-project [["C" (make-attribute-ref "C")]]
                                                         SUBB))
                                          (make-attribute-ref "C"))
                                  SUBA)]
@@ -268,13 +268,13 @@
     (testing "scheme for various combinations"
       (let [test-universe (make-universe)
             rel1 (make-base-relation 'tbl1
-                                     (make-rel-scheme {"one" string%
-                                                       "two" integer%})
+                                     (alist->rel-scheme [["one" string%]
+                                                         ["two" integer%]])
                                      test-universe
                                      "tbl1")
             rel2 (make-base-relation 'tbl2
-                                     (make-rel-scheme {"three" boolean%
-                                                       "four" double%})
+                                     (alist->rel-scheme [["three" boolean%]
+                                                         ["four" double%]])
                                      test-universe
                                      "tbl2")
             c (make-product rel1 rel2)
@@ -303,8 +303,8 @@
                "foo" (make-aggregation :avg
                                        (make-attribute-ref "two"))}
               (make-base-relation 'tbl1
-                                  (make-rel-scheme {"two" string%
-                                                    "one" integer%})
+                                  (alist->rel-scheme [["two" string%]
+                                                      ["one" integer%]])
                                   (make-universe)
                                   "tbl1"))]
       (is (= (rel-scheme-alist (query-scheme gp))
@@ -321,8 +321,9 @@
   ;; everything else is basically the same...
   (is (query? the-empty))
   (is (query? tbl1))
-  (is (query? (make-project {"one" (make-attribute-ref "one")
-                             "two" (make-attribute-ref "two")} tbl1)))
+  (is (query? (make-project [["one" (make-attribute-ref "one")]
+                             ["two" (make-attribute-ref "two")]]
+                            tbl1)))
   (is (not (query? [(make-attribute-ref 42)])))
   (is (query? []))
   (is (query? nil)))
@@ -358,20 +359,20 @@
   (is (= (list 'project (list (list "two" 'attribute-ref "two")
                               (list "one" 'attribute-ref "one"))
                '(base-relation tbl1))
-         (query->datum (make-project {"two" (make-attribute-ref "two")
-                                      "one" (make-attribute-ref "one")}
+         (query->datum (make-project [["two" (make-attribute-ref "two")]
+                                      ["one" (make-attribute-ref "one")]]
                                      tbl1))))
   (let [test-universe (make-universe)
         SUBB (make-base-relation 'SUBB
-                                 (make-rel-scheme {"C" string%})
+                                 (alist->rel-scheme [["C" string%]])
                                  test-universe
                                  "SUBB")
         SUBA (make-base-relation 'SUBA
-                                 (make-rel-scheme {"C" string%})
+                                 (alist->rel-scheme [["C" string%]])
                                  test-universe
                                  "SUBA")
         r (make-restrict (sql/>=$ (make-scalar-subquery
-                                   (make-project {"C" (make-attribute-ref "C")}
+                                   (make-project [["C" (make-attribute-ref "C")]]
                                                  SUBB))
                                   (make-attribute-ref "C"))
                          SUBA)]
@@ -389,11 +390,11 @@
 
   (let [test-universe (make-universe)
         SUBB (make-base-relation 'SUBB
-                                 (make-rel-scheme {"B" string%})
+                                 (alist->rel-scheme [["B" string%]])
                                  test-universe
                                  "SUBB")
         SUBA (make-base-relation 'SUBA
-                                 (make-rel-scheme {"A" string%})
+                                 (alist->rel-scheme [["A" string%]])
                                  test-universe
                                  "SUBA")
         r (make-restrict-outer (sql/=$ (make-attribute-ref "A")
@@ -416,8 +417,8 @@
     (is (thrown? Exception  ;; Should throw because universe does not contain
                  ;; the relation.
                  (datum->query '(base-relation tbl1) (make-universe))))
-    (let [p (make-project {"two" (make-attribute-ref "two")
-                           "one" (make-attribute-ref "one")}
+    (let [p (make-project [["two" (make-attribute-ref "two")]
+                           ["one" (make-attribute-ref "one")]]
                           tbl1)]
       (is (= p (query->datum->query p)))
       (is (thrown? Exception  ;; Should throw because tbl1 is not registered in
@@ -425,22 +426,22 @@
                    (datum->query (query->datum p) (make-universe)))))
     (let [sql-universe* (make-derived-universe sql-universe)
           SUBB (make-base-relation 'SUBB
-                                   (make-rel-scheme {"C" string%})
+                                   (alist->rel-scheme [["C" string%]])
                                    :universe sql-universe*
                                    :handle "SUBB")
           SUBA (make-base-relation 'SUBA
-                                   (make-rel-scheme {"C" string%})
+                                   (alist->rel-scheme [["C" string%]])
                                    :universe sql-universe*
                                    :handle "SUBA")
           r (make-restrict (sql/=$ (make-scalar-subquery
-                                    (make-project {"C" (make-attribute-ref "C")}
+                                    (make-project [["C" (make-attribute-ref "C")]]
                                                   SUBB))
                                    (make-attribute-ref "C"))
                            SUBA)]
       (is (= (make-restrict
               (make-application
                (universe-lookup-rator sql-universe* '=)
-               (make-scalar-subquery (make-project {"C" (make-attribute-ref "C")}
+               (make-scalar-subquery (make-project [["C" (make-attribute-ref "C")]]
                                                    SUBB))
                (make-attribute-ref "C"))
               SUBA)
@@ -451,11 +452,11 @@
 
     (let [sql-universe* (make-derived-universe sql-universe)
           SUBB (make-base-relation 'SUBB
-                                   (make-rel-scheme {"B" string%})
+                                   (alist->rel-scheme [["B" string%]])
                                    :universe sql-universe*
                                    :handle "SUBB")
           SUBA (make-base-relation 'SUBA
-                                   (make-rel-scheme {"A" string%})
+                                   (alist->rel-scheme [["A" string%]])
                                    :universe sql-universe*
                                    :handle "SUBA")
           r (make-restrict-outer (sql/=$ (make-attribute-ref "A")
@@ -470,13 +471,13 @@
              (datum->query (query->datum r) sql-universe*))))
       
     (let [rel1 (make-base-relation 'tbl1
-                                   (make-rel-scheme {"one" string%
-                                                     "two" integer%})
+                                   (alist->rel-scheme [["one" string%]
+                                                       ["two" integer%]])
                                    :universe test-universe
                                    :handle "tbl1")
           rel2 (make-base-relation 'tbl2
-                                   (make-rel-scheme {"three" boolean%
-                                                     "four" double%})
+                                   (alist->rel-scheme [["three" boolean%]
+                                                       ["four" double%]])
                                    :universe test-universe
                                    :handle "tbl2")
           p (make-product rel1 rel2)
@@ -488,12 +489,12 @@
       (is (= u (query->datum->query u)))
       (is (= l (query->datum->query l))))
     (let [gp (make-grouping-project
-              {"one" (make-attribute-ref "one")
-               "foo" (make-aggregation :avg
-                                       (make-attribute-ref "two"))}
+              [["one" (make-attribute-ref "one")]
+               ["foo" (make-aggregation :avg
+                                        (make-attribute-ref "two"))]]
               tbl1)]
       (is (= gp (query->datum->query gp))))
-    (let [o (make-order {(make-attribute-ref "one") :ascending} tbl1)]
+    (let [o (make-order [[(make-attribute-ref "one") :ascending]] tbl1)]
       (is (= o (query->datum->query o))))
     (let [t (make-top 10 tbl1)]
       (is (= t (query->datum->query t))))))
@@ -586,21 +587,21 @@
   (is (nil? (query-attribute-names the-empty)))
   (is (nil? (query-attribute-names tbl1)))
   (is (= #{"two" "one"} (query-attribute-names
-                            (make-project {"two" (make-attribute-ref "two")
-                                           "one" (make-attribute-ref "one")}
+                            (make-project [["two" (make-attribute-ref "two")]
+                                           ["one" (make-attribute-ref "one")]]
                                           tbl1))))
   (let [test-universe (make-universe)
         SUBB (make-base-relation 'SUBB
-                                 (make-rel-scheme {"C" string%})
+                                 (alist->rel-scheme [["C" string%]])
                                  :universe test-universe
                                  :handle "SUBB")
         SUBA (make-base-relation 'SUBA
-                                 (make-rel-scheme {"C" string%})
+                                 (alist->rel-scheme [["C" string%]])
                                  :universe test-universe
                                  :handle "SUBA")
         r1 (make-restrict (sql/=$ (make-scalar-subquery
-                                   (make-project {"C" (make-attribute-ref "C")
-                                                  "D" (make-attribute-ref "D")}
+                                   (make-project [["C" (make-attribute-ref "C")]
+                                                  ["D" (make-attribute-ref "D")]]
                                                  SUBB))
                                   (make-attribute-ref "C"))
                           SUBA)
@@ -611,20 +612,20 @@
     (is (= #{"C"} (query-attribute-names r2))))
   (let [test-universe (make-universe)
         rel1 (make-base-relation 'tbl1
-                                 (make-rel-scheme {"one" string%
-                                                   "two" integer%})
+                                 (alist->rel-scheme [["one" string%]
+                                                     ["two" integer%]])
                                  test-universe
                                  "tbl1")
         rel2 (make-base-relation 'tbl2
-                                 (make-rel-scheme {"three" boolean%
-                                                   "four" double%})
+                                 (alist->rel-scheme [["three" boolean%]
+                                                     ["four" double%]])
                                  test-universe
                                  "tbl2")
-        p1 (make-project {"two" (make-attribute-ref "two")
-                          "one" (make-attribute-ref "one")}
+        p1 (make-project [["two" (make-attribute-ref "two")]
+                          ["one" (make-attribute-ref "one")]]
                          tbl1)
-        p2 (make-project {"three" (make-attribute-ref "three")
-                          "four" (make-attribute-ref "four")}
+        p2 (make-project [["three" (make-attribute-ref "three")]
+                          ["four" (make-attribute-ref "four")]]
                          tbl1) ; FIXME: doesn't typecheck
         c (make-product rel1 p1)
         q (make-quotient p1 rel1)

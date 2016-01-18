@@ -14,7 +14,8 @@
    ])
 
 (defn make-sql-table
-  [name scheme & {:keys [universe]}]
+  [name scheme & {:keys [universe]
+                  :or {universe nil}}]
   (make-base-relation (symbol name) scheme
                       :universe universe
                       :handle (really-make-sql-table name scheme)))
@@ -209,10 +210,11 @@
 ;; is it really necessary?
 
 (define-record-type sql-expr-const
-  (make-sql-expr-const val) sql-expr-const?
-  [val sql-expr-const-val])
+  (make-sql-expr-const type val) sql-expr-const?
+  [type sql-expr-const-type
+   val sql-expr-const-val])
 
-(def the-sql-null (make-sql-expr-const nil))
+;; TODO, type? (def the-sql-null (make-sql-expr-const null% nil))
 
 (define-record-type sql-expr-tuple
   (make-sql-expr-tuple expressions) sql-expr-tuple?
@@ -264,8 +266,7 @@
                                        :universe sql-universe
                                        :data op-and))
 
-(defn >=$
-  [expr1 expr2]
+(def >=$
   (let [rator (make-rator '>=
                           (fn [fail t1 t2]
                             (when fail
@@ -277,10 +278,10 @@
                           (null-lift-binary-predicate >=)
                           :universe sql-universe
                           :data op->=)]
-    (make-application rator expr1 expr2)))
+    (fn [expr1 expr2]
+      (make-application rator expr1 expr2))))
 
-(defn plus$
-  [expr1 expr2]
+(def plus$
   (let [rator (make-rator '+
                           (fn [fail t1 t2]
                             (when fail
@@ -291,24 +292,24 @@
                           +
                           :universe sql-universe
                           :data op-+)]
-    (make-application rator expr1 expr2)))
+    (fn [expr1 expr2]
+      (make-application rator expr1 expr2))))
 
-(defn minus$
-  [expr1 expr2]
+(def minus$
   (let [rator (make-rator '-
                           (fn [fail t1 t2]
                             (when fail
                               (do
                                 (check-numerical t1 fail)
                                 (check-numerical t2 fail)
-                                t1)
-                              -
-                              :universe sql-universe
-                              :data op--)))]
-    (make-application rator expr1 expr2)))
+                                t1)))
+                          -
+                          :universe sql-universe
+                          :data op--)]
+    (fn [expr1 expr2]
+      (make-application rator expr1 expr2))))
 
-(defn =$
-  [expr1 expr2]
+(def =$
   (let [rator (make-rator '=
                           (fn [fail t1 t2]
                             (when (and fail (not (type=? t1 t2)))
@@ -317,7 +318,8 @@
                           =
                           :universe sql-universe
                           :data op-=)]
-    (make-application rator expr1 expr2)))
+    (fn [expr1 expr2]
+      (make-application rator expr1 expr2))))
 
 (defn member
   "Locates the first element of xs that is equal to x. If such an element
@@ -328,8 +330,7 @@
     res
     false))
 
-(defn in$
-  [expr1 expr2]
+(def in$
   (let [rator (make-rator 'in
                           (fn [fail t1 t2]
                             (when (and fail (not (type=? (make-set-type t1) t2)))
@@ -338,10 +339,10 @@
                           contains?
                           :universe sql-universe
                           :data op-in)]
-    (make-application rator expr1 expr2)))
+    (fn [expr1 expr2]
+      (make-application rator expr1 expr2))))
 
-(defn between$
-  [expr1 expr2 expr3]
+(def between$
   (let [rator (make-rator 'between
                           (fn [fail t1 t2 t3]
                             (when (and fail (or (not= t2 t3)
@@ -351,4 +352,5 @@
                           nil
                           :universe sql-universe
                           :data op-between)]
-    (make-application rator expr1 expr2 expr3)))
+    (fn [expr1 expr2 expr3]
+      (make-application rator expr1 expr2 expr3))))

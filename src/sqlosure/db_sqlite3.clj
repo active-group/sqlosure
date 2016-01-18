@@ -4,16 +4,14 @@
             [sqlosure.sql :as sql]
             [sqlosure.type :as t]
             [sqlosure.relational-algebra :as rel]
-            [clojure.java.jdbc :refer :all]
+            [sqlosure.jdbc-utils :as jdbc-utils]
+            [clojure.java.jdbc :refer (execute! insert! get-connection query)]
             [clojure.string :as s]))
 
 (defn- sqlite3-db [conn]
   {:classname "org.sqlite.JDBC"
    :subprotocol "sqlite"
    :subname (db/db-connection-handle conn)})
-
-(defn- put-select [conn select]
-  (put/sql-select->string (db/db-connection-sql-put-parameterization conn) select))
 
 (defn- put-expr [conn select]
   (put/sql-expression->string (db/db-connection-sql-put-parameterization conn) select))
@@ -32,10 +30,11 @@
 
 (defn- sqlite3-put-literal
   "sqlite3 specific printer for literals."
-  [val]
+  [type val]
   (if (or (= true val) (= false val))
-    (if val (print 1) (print 0))
-    (put/default-put-literal val)))
+    (do (if val (print 1) (print 0))
+        [])
+    (put/default-put-literal type val)))
 
 (def ^{:private true} sqlite3-sql-put-parameterization
   "Printer for sqliter3."
@@ -65,22 +64,15 @@
   [handle]
   (.close (get-connection handle)))
 
-(defn- query-row-fn
-  "Takes a relational scheme and a row returned by a query, then returns a map
-  of the key-value pairs with values converted from sqlite3 to Clojure values."
-  [scheme row]
-  (let [alist (rel/rel-scheme-alist scheme)]
-    (into {} (map (fn [[k v] tt] [k (sqlite3-value->value tt v)])
-                  row
-                  (vals alist)))))
-
 (defn- sqlite3-query
   "Takes a db-connection, a sql-select statement and a relational scheme and
   runs the query against the connected database."
-  [conn select scheme]
-  (query (sqlite3-db conn)
-         [(put-select conn select)]  ;; TODOO: this has to be handled via jdbc (types?)
-         :row-fn #(query-row-fn scheme %)))
+  [conn select scheme opts]
+  (jdbc-utils/query (sqlite3-db conn) select scheme
+                    sqlite3-value->value
+                    value->sqlite3-value
+                    (db/db-connection-sql-put-parameterization conn)
+                    opts))
 
 (defn- sqlite3-insert
   "Takes a db-connection, a table name (string), a relational scheme and a
@@ -133,8 +125,8 @@
                          sqlite3-sql-put-parameterization
                          nil ;; As long as we're not explicitly keeping the
                          ;; connection alive, we don't have to close. Solution?
-                         (fn [conn query scheme]
-                           (sqlite3-query conn query scheme))
+                         (fn [conn query scheme opts]
+                           (sqlite3-query conn query scheme opts))
                          (fn [conn table scheme vals]
                            (sqlite3-insert conn table scheme vals))
                          (fn [conn table criterion]

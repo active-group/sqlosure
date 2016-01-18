@@ -11,8 +11,8 @@
    handle db-connection-handle  ;; DB-specific connection handle.
    sql-put-parameterization db-connection-sql-put-parameterization
    closer db-connection-closer
-   ;; Proc to run query.
-   querier db-connection-querier  ;; :db-connection sql-select scheme -> records
+   ;; Proc to run query. (opts see sqlosure.database/run-query)
+   querier db-connection-querier  ;; :db-connection sql-select scheme opts -> records
    ;; Proc to insert.
    inserter db-connection-inserter  ;; :db-connection string scheme (one-of (list value) & values)
                                     ;; -> inserted-record
@@ -35,8 +35,8 @@
 (defn db-query
   "Takes a db-connection, a sql-select and a relational scheme and runs the
   select query against the connected database."
-  [conn select scheme]
-  ((db-connection-querier conn) conn select scheme))
+  [conn select scheme opts]
+  ((db-connection-querier conn) conn select scheme opts))
 
 (defn db-insert
   "Takes a db-connection, a table name (string), a relational scheme and a

@@ -6,57 +6,71 @@ Replaced alist with hash-map."
   (:require [sqlosure.universe :as u]
             [sqlosure.type :as t]
             [sqlosure.utils :refer [third]]
-            [clojure.set :refer [difference union]]
+            [clojure.set :refer [difference union intersection]]
             [active.clojure.record :refer [define-record-type]]
+            [active.clojure.condition :as c]
             [active.clojure.condition :refer [assertion-violation]]))
 
 (define-record-type rel-scheme
-  (make-rel-scheme alist) rel-scheme?
-  [alist rel-scheme-alist]  ;; (rel-scheme -> hash-map)
+  (^:private make-rel-scheme columns alist) rel-scheme?
+  [^{:doc "Vector of the columns, i.e. the keys in the map, in order."}
+   columns rel-scheme-columns
+   alist rel-scheme-alist]  ;; (rel-scheme -> hash-map)
   )
 
-(def the-empty-rel-scheme (make-rel-scheme nil))
-(def the-empty-environment nil)
+(defn rel-scheme-types
+  "Returns the types of a rel-scheme, in the order they were created."
+  [rs]
+  (let [mp (rel-scheme-alist rs)]
+    (c/assert (map? mp))
+    (map #(get mp %)
+         (rel-scheme-columns rs))))
+
+(defn alist->rel-scheme
+  "Construct a relational scheme from an alist of `[column-name type]`."
+  [alist]
+  (let [cols (map first alist)]
+    (c/assert (count (set cols)) (count cols))
+    (make-rel-scheme cols (into {} alist))))
+
+(def the-empty-rel-scheme (alist->rel-scheme []))
+(def the-empty-environment {})
 
 (defn rel-scheme=?
   "Returns true if t1 and t2 are the same."
   [t1 t2]
-  ;; TODO: Couldn't this just be (= t1 t2)?
-  (= (rel-scheme-alist t1) (rel-scheme-alist t2)))
+  (= t1 t2))
 
 (defn rel-scheme-concat
   [s1 s2]
-  (make-rel-scheme (into {} ; FIXME
-                         (concat (rel-scheme-alist s1)
-                                 (rel-scheme-alist s2)))))
+  (make-rel-scheme (concat (rel-scheme-columns s1)
+                           (rel-scheme-columns s2))
+                   (merge (rel-scheme-alist s1)
+                          (rel-scheme-alist s2))))
 
 (defn rel-scheme-difference
   "Return a new rel-scheme resulting of the (set-)difference of s1's and s2's
   alist."
   [s1 s2]
-  (let [res (reduce (fn [m [k2 _]]
-                      (if (get m k2)
-                        (dissoc m k2)
-                        m))
-                    (rel-scheme-alist s1)
-                    (rel-scheme-alist s2))]
-    (if-not (empty? res)
-      (make-rel-scheme res)
-      (assertion-violation 'rel-scheme-difference "difference must not be empty"))))
+  (let [cols2 (set (rel-scheme-columns s2))
+        cols (filter (complement cols2) (rel-scheme-columns s1))]
+    (c/assert (not-empty cols))
+    (make-rel-scheme cols
+                     (select-keys (rel-scheme-alist s1) cols))))
 
 (defn rel-scheme-unary?
   "Returns true if the rel-scheme's alist consist of only one pair."
   [scheme]
-  (= 1 (count (rel-scheme-alist scheme))))
+  (= 1 (count (rel-scheme-columns scheme))))
 
 (defn rel-scheme-nullable
   "Makes all columns in a scheme nullable."
   [scheme]
-  (make-rel-scheme
-   (into {}
-         (map (fn [[name type]]
-                [name (t/make-nullable-type type)])
-              (rel-scheme-alist scheme)))))
+  (make-rel-scheme (rel-scheme-columns scheme)
+                   (into {}
+                         (map (fn [[name type]]
+                                [name (t/make-nullable-type type)])
+                              (rel-scheme-alist scheme)))))
 
 (defn rel-scheme->environment
   "Returns the relation table of a rel-scheme."
@@ -66,10 +80,7 @@ Replaced alist with hash-map."
 (defn compose-environments
   "Combine two environments. e1 takes precedence over e2."
   [e1 e2]
-  (cond
-    (empty? e1) e2
-    (empty? e2) e1
-    :else (merge e2 e1)))
+  (merge e2 e1))
 
 (defn lookup-env
   "Lookup a name in an environment.
@@ -91,7 +102,9 @@ Replaced alist with hash-map."
   "Returns a new base relation.
   If :handle is supplied, use is as base-relation-handle, defaults to nil.
   If :universe is supplied, return a vector of [relation universe]"
-  [name scheme & {:keys [universe handle]}]
+  [name scheme & {:keys [universe handle]
+                  :or {universe nil
+                       handle nil}}]
   (let [rel (really-make-base-relation name scheme handle)]
     (when universe
       (u/register-base-relation! universe name rel))
@@ -142,30 +155,34 @@ Replaced alist with hash-map."
 
 (define-record-type project
   (really-make-project alist query) project?
-  [alist project-alist  ;; (project -> hash-map)
+  [^{:doc "List of pairs."}
+   alist project-alist 
    query project-query])
 
 (defn make-project
   [alist query]
-  (if (map? alist)
+  (let [alist (if (map? alist)
+                (vec alist)
+                alist)]
     (if (empty? alist)
-      (if (project? query)
-        (make-project alist (project-query query))
-        (really-make-project alist query))
-      (really-make-project alist query))
-    (assertion-violation 'make-project "requires hash-map, got" alist)))
+      (loop [query query]
+        (if (project? query)
+          (recur (project-query query))
+          (really-make-project alist query)))
+      (really-make-project alist query))))
 
 (declare query-scheme)
 
 (defn make-extend
-  "Creates a projection of some attributes while keeping all other atrtibutes in
+  "Creates a projection of some attributes while keeping all other attributes in
   the relation visible too."
   [alist query]
   (make-project
-   (into alist (map (fn [p]
-                      [(first p)
-                       (make-attribute-ref (first p))])
-                    (rel-scheme-alist (query-scheme query))))
+   (concat alist
+           (map (fn [p]
+                  [(first p)
+                   (make-attribute-ref (first p))])
+                (rel-scheme-alist (query-scheme query))))
    query))
 
 (define-record-type restrict
@@ -395,15 +412,13 @@ Replaced alist with hash-map."
                      (when fail
                        (for [[_ v] m]
                          (when (aggregate? v) (fail ": non-aggregate " v))))
-                     (make-rel-scheme
-                      (into {}
-                            (map (fn [[k v]]
-                                   (let [typ (expression-type* (to-env base-scheme)
-                                                               v fail)]
-                                     (when (and fail (t/product-type? typ))
-                                       (fail ": non-product type " typ))
-                                     [k typ]))
-                                 m))))
+                     (alist->rel-scheme (map (fn [[k v]]
+                                                (let [typ (expression-type* (to-env base-scheme)
+                                                                            v fail)]
+                                                  (when (and fail (t/product-type? typ))
+                                                    (fail ": non-product type " typ))
+                                                  [k typ]))
+                                              m)))
       (restrict? q) (let [scheme (next-step (restrict-query q))]
                       (when (and fail
                                  (not= t/boolean% (expression-type*
@@ -421,22 +436,26 @@ Replaced alist with hash-map."
                             scheme)
       
       (combine? q) (case (combine-rel-op q)
-                     :product (let [a1 (rel-scheme-alist (next-step (combine-query-1 q)))
-                                    a2 (rel-scheme-alist (next-step (combine-query-2 q)))]
-                                (when fail
-                                  (for [[k _] a1]
-                                    (when (assoc k a2)
-                                      (fail (list 'not a1) a2))))
-                                (make-rel-scheme (merge a1 a2)))
+                     :product (let [r1 (next-step (combine-query-1 q))
+                                    r2 (next-step (combine-query-2 q))]
+                                (let [a1 (rel-scheme-alist r1)
+                                      a2 (rel-scheme-alist r2)]
+                                  (when fail
+                                    (for [[k _] a1]
+                                      (when (contains? a2 k)
+                                        (fail (list 'not a1) a2)))))
+                                (rel-scheme-concat r1 r2))
 
                      :left-outer-product
-                     (let [a1 (rel-scheme-alist (next-step (combine-query-1 q)))
-                           a2 (rel-scheme-alist (rel-scheme-nullable (next-step (combine-query-2 q))))]
-                       (when fail
-                         (for [[k _] a1]
-                           (when (assoc k a2)
-                             (fail (list 'not a1) a2))))
-                       (make-rel-scheme (merge a1 a2)))
+                     (let [r1 (next-step (combine-query-1 q))
+                           r2 (rel-scheme-nullable (next-step (combine-query-2 q)))]
+                       (let [a1 (rel-scheme-alist r1)
+                             a2 (rel-scheme-alist r2)]
+                         (when fail
+                           (for [[k _] a1]
+                             (when (assoc k a2)
+                               (fail (list 'not a1) a2)))))
+                       (rel-scheme-concat r1 r2))
 
                      :quotient (let [s1 (next-step (combine-query-1 q))
                                      s2 (next-step (combine-query-2 q))]
@@ -458,14 +477,13 @@ Replaced alist with hash-map."
                          (fail s1 q))
                        s1))
       (grouping-project? q) (let [base-scheme (next-step (grouping-project-query q))]
-                              (make-rel-scheme
-                               (into {}
-                                     (map (fn [[k v]]
-                                            (let [typ (expression-type* (to-env base-scheme) v fail)]
-                                              (when (and fail (t/product-type? typ))
-                                                (fail ": non-product type " typ))
-                                              [k typ]))
-                                          (grouping-project-alist q)))))
+                              (alist->rel-scheme
+                               (map (fn [[k v]]
+                                      (let [typ (expression-type* (to-env base-scheme) v fail)]
+                                        (when (and fail (t/product-type? typ))
+                                          (fail ": non-product type " typ))
+                                        [k typ]))
+                                    (grouping-project-alist q))))
       (order? q) (let [scheme (next-step (order-query q))
                        env (to-env scheme)]
                    (when fail
@@ -553,11 +571,10 @@ Replaced alist with hash-map."
                         (assertion-violation 'datum->query
                                              "unknown base relation"
                                              (second d)))
-      project (make-project (into {}
-                                  (map (fn [p]
-                                         [(first p)
-                                          (datum->expression (rest p) universe)])
-                                       (second d)))
+      project (make-project (map (fn [p]
+                                   [(first p)
+                                    (datum->expression (rest p) universe)])
+                                 (second d))
                             (next-step (third d)))
       restrict (make-restrict (datum->expression (second d) universe)
                               (next-step (third d)))
@@ -567,16 +584,14 @@ Replaced alist with hash-map."
       (make-combine (first d) (next-step (second d))
                     (next-step (third d)))
       grouping-project (make-grouping-project
-                        (into {}
-                              (map (fn [p]
-                                     [(first p)
-                                      (datum->expression (rest p) universe)])
-                                   (second d)))
+                        (map (fn [p]
+                               [(first p)
+                                (datum->expression (rest p) universe)])
+                             (second d))
                         (next-step (third d)))
-      order (make-order (into {}
-                              (map (fn [p]
-                                     [(datum->expression (first p) universe) (second p)])
-                                   (second d)))
+      order (make-order (map (fn [p]
+                               [(datum->expression (first p) universe) (second p)])
+                             (second d))
                         (next-step (third d)))
       top (make-top (second d) (next-step (third d)))
       :else (assertion-violation 'datum->query "invalid datum" d))))
@@ -605,9 +620,9 @@ Replaced alist with hash-map."
                                     (next-step (third d)))
       aggregation* (make-aggregation (second d))
       case-expr (make-case-expr (into {}
-                                          (map (fn [[k v]] [(next-step k)
-                                                            (next-step v)])
-                                               (second d)))
+                                      (map (fn [[k v]] [(next-step k)
+                                                        (next-step v)])
+                                           (second d)))
                                 (next-step (third d)))
       scalar-subquery (make-scalar-subquery (datum->query (second d) universe))
       set-subquery (make-set-subquery (datum->query (second d) universe))
@@ -678,7 +693,7 @@ Replaced alist with hash-map."
       (apply union
              (set (keys (rel-scheme-alist (query-scheme subq))))
              (query-attribute-names subq)
-             (map expression-attribute-names (vals alist))))
+             (map expression-attribute-names (map second alist))))
     (restrict? q)
     (let [sub (restrict-query q)]
       (union
@@ -748,9 +763,8 @@ Replaced alist with hash-map."
       (project? q) (let [sub (project-query q)
                          culled (cull-substitution-alist alist sub)]
                      (make-project
-                      (into {}
-                            (map (fn [[k v]] [k (substitute-attribute-refs culled v)])
-                                 (project-alist q)))
+                      (map (fn [[k v]] [k (substitute-attribute-refs culled v)])
+                           (project-alist q))
                       (next-step sub)))
       (restrict? q) (let [sub (restrict-query q)
                           culled (cull-substitution-alist alist sub)]
@@ -767,14 +781,14 @@ Replaced alist with hash-map."
       (grouping-project? q) (let [sub (grouping-project-query q)
                                   culled (cull-substitution-alist alist sub)]
                               (make-grouping-project
-                               (into {} (map (fn [[k v]] [k (substitute-attribute-refs culled v)])
-                                             (grouping-project-alist q)))
+                               (map (fn [[k v]] [k (substitute-attribute-refs culled v)])
+                                    (grouping-project-alist q))
                                (next-step sub)))
       (order? q) (let [sub (order-query q)
                        culled (cull-substitution-alist alist sub)]
-                   (make-order (into {} (map (fn [[k v]]
-                                               [(substitute-attribute-refs culled k) v])
-                                             (order-alist q)))
+                   (make-order (map (fn [[k v]]
+                                      [(substitute-attribute-refs culled k) v])
+                                    (order-alist q))
                                (next-step sub)))
       (top? q) (make-top (top-count q) (next-step (top-query q)))
       :else (assertion-violation 'query-substitute-attribute-refs "unknown query" q))))

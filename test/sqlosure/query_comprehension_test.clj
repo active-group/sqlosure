@@ -15,13 +15,13 @@
 (def test-universe (make-universe))
 
 (def tbl1 (make-sql-table "tbl1"
-                          (make-rel-scheme {"one" string%
-                                            "two" integer%})
+                          (alist->rel-scheme [["one" string%]
+                                              ["two" integer%]])
                           :universe test-universe))
 
 (def tbl2 (make-sql-table "tbl2"
-                          (make-rel-scheme {"three" blob%
-                                            "four" string%})
+                          (alist->rel-scheme [["three" blob%]
+                                              ["four" string%]])
                           :universe test-universe))
 
 (defn put-query [query]
@@ -29,11 +29,12 @@
    put/default-sql-put-parameterization
    (query->sql query)))
 
+;; TODO: is this supposed to be test? zap or use deftest
 (let [movies-table (make-sql-table 'movies
-                                       (make-rel-scheme {"title" string%
-                                                         "director" string%
-                                                         "year" integer%
-                                                         "any_good" boolean%})
+                                       (alist->rel-scheme [["title" string%]
+                                                           ["director" string%]
+                                                           ["year" integer%]
+                                                           ["any_good" boolean%]])
                                        :universe (make-universe)
                                        :handle "movies")]
   (put-query (get-query (monadic [movies (embed movies-table)]
@@ -42,7 +43,7 @@
                                  (project {"title" (! movies "title")})))))
 
 (deftest const-restrict-test
-  (is (= '("SELECT two AS foo FROM tbl1 WHERE (one = ?)" "foobar")
+  (is (= ["SELECT two AS foo FROM tbl1 WHERE (one = ?)" [string% "foobar"]]
          (sqlosure.sql-put/sql-select->string
           sqlosure.sql-put/default-sql-put-parameterization
           (query->sql (opt/optimize-query
@@ -50,66 +51,66 @@
                                    [t1 (embed tbl1)]
                                    (restrict (=$ (! t1 "one")
                                                  (make-const string% "foobar")))
-                                   (project {"foo" (! t1 "two")})))))))))
+                                   (project [["foo" (! t1 "two")]])))))))))
 
 (deftest trivial
   (is (rel-scheme=?
-       (make-rel-scheme {"foo" integer%})
+       (alist->rel-scheme [["foo" integer%]])
        (query-scheme
         (get-query (monadic
                     [t1 (embed tbl1)]
                     [t2 (embed tbl2)]
                     (restrict (=$ (! t1 "one")
                                   (! t2 "four")))
-                    (project {"foo" (! t1 "two")})))))))
+                    (project [["foo" (! t1 "two")]])))))))
 
 (deftest trivial-outer
   (is (rel-scheme=?
-       (make-rel-scheme {"foo" integer%})
+       (alist->rel-scheme [["foo" integer%]])
        (query-scheme
         (get-query (monadic
                     [t1 (embed tbl1)]
                     [t2 (outer tbl2)]
                     (restrict-outer (=$ (! t1 "one")
                                         (! t2 "four")))
-                    (project {"foo" (! t1 "two")})))))))
+                    (project [["foo" (! t1 "two")]])))))))
 
 
 (deftest combine
   (is (rel-scheme=?
-       (make-rel-scheme {"foo" string%})
+       (alist->rel-scheme [["foo" string%]])
        (query-scheme
         (get-query
          (monadic
           [t1 (embed tbl1)]
           [t2 (embed tbl2)]
-          (union (project {"foo" (! t1 "one")})
-                 (project {"foo" (! t2 "four")})))))))
+          (union (project [["foo" (! t1 "one")]])
+                 (project [["foo" (! t2 "four")]])))))))
 
   (is (rel-scheme=?
-       (make-rel-scheme {"foo" string%})
+       (alist->rel-scheme [["foo" string%]])
        (query-scheme
         (get-query
          (monadic
           [t1 (embed tbl1)]
           [t2 (embed tbl2)]
-          (subtract (project {"foo" (! t1 "one")})
-                    (project {"foo" (! t2 "four")})))))))
+          (subtract (project [["foo" (! t1 "one")]])
+                    (project [["foo" (! t2 "four")]])))))))
 
   (is (rel-scheme=?
-       (make-rel-scheme {"bar" blob%})
+       (alist->rel-scheme [["bar" blob%]])
        (query-scheme
         (get-query
          (monadic
           [t1 (embed tbl1)
            t2 (embed tbl2)]
-          (divide (project {"foo" (! t1 "one")
-                            "bar" (! t2 "three")})
-                  (project {"foo" (! t2 "four")}))))))))
+          (divide (project [["foo" (! t1 "one")]
+                            ["bar" (! t2 "three")]])
+                  (project [["foo" (! t2 "four")]]))))))))
 
 (deftest order-t
   (is (rel-scheme=?
-       (make-rel-scheme {"foo" integer%})
+       (alist->rel-scheme [["foo" integer%]])
        (query-scheme
         (get-query
          (monadic
@@ -118,18 +119,4 @@
           (restrict (=$ (! t1 "one")
                         (! t2 "four")))
           (order {(! t1 "one") :ascending})
-          (project {"foo" (! t1 "two")})))))))
-
-(deftest xy-test-1
-  (is (= '("SELECT three_1 AS res FROM (SELECT one AS one_0, two AS two_0 FROM tbl1), (SELECT three AS three_1, four AS four_1 FROM tbl2 WHERE (four = one_0)) WHERE (? = one_0)" "foobar")
-         (sqlosure.sql-put/sql-select->string
-          sqlosure.sql-put/default-sql-put-parameterization
-          (query->sql (opt/optimize-query
-                       (get-query (monadic
-                                   [t1 (embed tbl1)]
-                                   (restrict (=$ (make-const string% "foobar")
-                                                 (! t1 "one")))
-                                   [t2 (embed tbl2)]
-                                   (restrict (=$ (! t2 "four") (! t1 "one")))
-                                   (project {"res" (! t2 "three")})))))))))
-
+          (project [["foo" (! t1 "two")]])))))))
