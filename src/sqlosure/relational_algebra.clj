@@ -365,8 +365,7 @@ Replaced alist with hash-map."
                         alist (rel-scheme-alist scheme)]
                     (when (and fail (or (empty? alist) (t/pair? (rest alist))))
                       (fail 'unary-relation subquery))
-                    (key (first alist)) ; FIXME: this looks super wonky and i have no idea what this should do anyway
-                    ))
+                    (key (first alist))))
    (fn [subquery] (let [scheme (query-scheme* subquery env fail)
                         alist (rel-scheme-alist scheme)]
                     (when (and fail (or (empty? alist) (t/pair? (rest alist))))
