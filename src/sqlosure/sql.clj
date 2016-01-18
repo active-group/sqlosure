@@ -3,7 +3,7 @@
     sqlosure.sql
   (:require [sqlosure.relational-algebra :refer :all]
             [sqlosure.universe :refer [make-universe make-derived-universe]]
-            [sqlosure.type :refer [boolean% numeric-type? type=? make-set-type]]
+            [sqlosure.type :refer [boolean% numeric-type? type=? make-set-type null% any%]]
             [active.clojure.record :refer [define-record-type]]
             [active.clojure.condition :refer [assertion-violation]]))
 

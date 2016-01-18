@@ -173,6 +173,10 @@
 (def double% (make-base-type 'double double? identity identity))
 (def boolean% (make-base-type 'boolean boolean? identity identity))
 
+;; Used to represent the type of sql NULL. Corresponds to nil in Clojure.
+(def null% (make-base-type 'unknown nil? identity identity))
+(def any% (make-base-type 'any (constantly true) identity identity))
+
 (def date% (make-base-type 'date date? identity identity))
 (def timestamp% (make-base-type 'timestamp timestamp? identity identity))
 

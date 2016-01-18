@@ -1,6 +1,7 @@
 (ns sqlosure.relational-algebra-sql
   (:require [sqlosure.relational-algebra :as rel]
             [sqlosure.sql :as sql]
+            [sqlosure.type :as t]
             [active.clojure.condition :as c]))
 
 (defn x->sql-select
@@ -99,7 +100,7 @@
                          (-> sql
                              (sql/set-sql-select-attributes
                               ;; FIXME: what type is this dummy?
-                              {"dummy" (sql/make-sql-expr-const nil "dummy")})
+                              {"dummy" (sql/make-sql-expr-const t/any% "dummy")})
                              (sql/set-sql-select-nullary? true))
                          (sql/set-sql-select-attributes sql (alist->sql alist))))
     (rel/restrict? q) (let [sql (x->sql-select (query->sql
