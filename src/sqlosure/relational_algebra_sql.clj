@@ -13,7 +13,7 @@
     :else (let [new (sql/new-sql-select)]
             (sql/set-sql-select-tables new [[nil sql]]))))
 
-(defn ^{:test true} aggregation-op->sql
+(defn aggregation-op->sql
   "Takes an op keyword and returns the corresponding sql-op. If there is no
   sql-op, return the name of the keyword."
   [op]
@@ -66,18 +66,18 @@
                               (query->sql (rel/set-subquery-query expr)))
     :else (c/assertion-violation 'expression->sql": unknown expression " expr)))
 
-(defn ^{:test true} alist->sql
+(defn alist->sql
   "Takes a map and returns a corresponding sql statement."
   [alist]
   (into {} (map (fn [[k v]] [k (expression->sql v)])) alist))
 
-(defn ^{:test true} add-table
+(defn add-table
   "Takes an sql-select statement and adds a table to its select-tables list."
   [sql q]
   (sql/set-sql-select-tables sql
                              (conj (sql/sql-select-tables sql) [nil q])))
 
-(defn ^{:test true} add-left-outer-table
+(defn add-left-outer-table
   "Takes an sql-select statement and adds an outer (join) table to its select-tables list."
   [sql q]
   (sql/set-sql-select-outer-tables sql

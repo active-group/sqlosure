@@ -10,7 +10,9 @@
             [clojure.string :as s]))
 
 (defmacro with-out-str-and-value
-  "See http://stackoverflow.com/a/7151125"
+  "See http://stackoverflow.com/a/7151125.
+  Runs the body and collects the prints as a string and the value returned.
+  Returns [prints-string value]."
   [& body]
   `(let [s# (new java.io.StringWriter)]
      (binding [*out* s#]
@@ -153,11 +155,13 @@
   (put-condition param exprs))
 
 (defn put-group-by
+  "Takes a seq of sql-expr."
   [param group-by]
   (print "GROUP BY ")
   (put-joining-infix group-by ", " (fn [b] (put-sql-expression param b))))
 
 (defn put-order-by
+  "Takes a seq of [sql-expr, sql-order]."
   [param order-by]
   (print "ORDER BY ")
   (put-joining-infix order-by ", " (fn [[a b]]
@@ -269,12 +273,14 @@
           rands (sql/sql-expr-app-rands expr)
           name (sql/sql-operator-name op)]
       (case (sql/sql-operator-arity op)
+        ;; postfix
         -1 (let [_ (print "(")
                  v1 (put-sql-expression param (first rands))
                  _ (print ")")
                  _ (put-space)
                  _ (print name)]
              v1)
+        ;; prefix
         1 (let [_ (print name)
                 _ (print "(")
                 v1 (put-sql-expression param (first rands))

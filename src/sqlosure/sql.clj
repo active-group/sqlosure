@@ -122,6 +122,7 @@
    right sql-select-combine-right])
 
 (define-record-type sql-select-table
+  ^{:doc "The whole SQL table."}
   (make-sql-select-table name) sql-select-table?
   [name sql-select-table-name])
 
@@ -138,24 +139,24 @@
 (def the-sql-select-empty (make-sql-select-empty))
 
 ;; sql-expr is one of:
-;;  :sql-expr-column
-;;  :sql-expr-app
-;;  :sql-expr-case
-;;  :sql-expr-exists
+;;   * sql-expr-column
+;;   * sql-expr-app
+;;   * sql-expr-case
+;;   * sql-expr-exists
 (define-record-type sql-expr-column
   (make-sql-expr-column name) sql-expr-column?
   [name sql-expr-column-name])
 
 (define-record-type sql-expr-app
   (really-make-sql-expr-app rator rands) sql-expr-app?
-  [rator sql-expr-app-rator
+  [rator sql-expr-app-rator  ;; Is one of the symbols below or a string.
    rands sql-expr-app-rands])
 
 (define-record-type sql-operator
   (make-sql-operator name arity) sql-operator?
   [name sql-operator-name
-   ;; -1 means postfix
-   arity sql-operator-arity])
+   arity sql-operator-arity  ;; -1 means postfix
+   ])
 
 (defn make-sql-expr-app
   [rator & rands]
@@ -206,15 +207,12 @@
 (def op-var (make-sql-operator "Var" 1))
 (def op-var-p (make-sql-operator "VarP" 1))
 
-;; What to do about the (define-syntax ...) part? Is this just convinience or
-;; is it really necessary?
-
 (define-record-type sql-expr-const
   (make-sql-expr-const type val) sql-expr-const?
   [type sql-expr-const-type
    val sql-expr-const-val])
 
-;; TODO, type? (def the-sql-null (make-sql-expr-const null% nil))
+(def the-sql-null (make-sql-expr-const null% nil))
 
 (define-record-type sql-expr-tuple
   (make-sql-expr-tuple expressions) sql-expr-tuple?
@@ -222,12 +220,13 @@
 
 (define-record-type sql-expr-case
   (make-sql-expr-case branches default) sql-expr-case?
-  [branches sql-expr-case-branches
+  [branches sql-expr-case-branches  ;; list(pair(sql-expr, sql-expr))
    default sql-expr-case-default])
 
 (define-record-type sql-expr-exists
   (make-sql-expr-exists select) sql-expr-exists?
-  [select sql-expr-exists-select])
+  [select sql-expr-exists-select  ;; sql-select
+   ])
 
 (define-record-type sql-expr-subquery
   (make-sql-expr-subquery query) sql-expr-subquery?

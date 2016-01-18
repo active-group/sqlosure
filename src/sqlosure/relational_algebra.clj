@@ -15,7 +15,7 @@ Replaced alist with hash-map."
   (^:private make-rel-scheme columns alist) rel-scheme?
   [^{:doc "Vector of the columns, i.e. the keys in the map, in order."}
    columns rel-scheme-columns
-   alist rel-scheme-alist]  ;; (rel-scheme -> hash-map)
+   alist rel-scheme-alist]  ;; maps labels to types
   )
 
 (defn rel-scheme-types
@@ -93,10 +93,12 @@ Replaced alist with hash-map."
 ;;; ----------------------------------------------------------------------------
 
 (define-record-type base-relation
+  ^{:doc "Primitive relations, dpeending on the domain universe."}
   (really-make-base-relation name scheme handle) base-relation?
   [name base-relation-name
    scheme base-relation-scheme
-   handle base-relation-handle])
+   handle base-relation-handle  ;; Domain specific handle.
+   ])
 
 (defn make-base-relation
   "Returns a new base relation.
@@ -138,9 +140,10 @@ Replaced alist with hash-map."
 (define-record-type rator
   (really-make-rator name range-type-proc proc data) rator?
   [name rator-name
-   range-type-proc rator-range-type-proc
-   proc rator-proc
-   data rator-data])
+   range-type-proc rator-range-type-proc  ;; Gets applied to fail, arg types, yields range type.
+   proc rator-proc  ;; Procedure with a Clojure implementation of the operator.
+   data rator-data  ;; Domain-specific data, for outside use.
+   ])
 
 (defn make-rator
   [name range-type-proc proc & {:keys [universe data]}]
@@ -154,9 +157,9 @@ Replaced alist with hash-map."
 ;;; ----------------------------------------------------------------------------
 
 (define-record-type project
+  ^{:doc "List of pairs."}
   (really-make-project alist query) project?
-  [^{:doc "List of pairs."}
-   alist project-alist 
+  [alist project-alist  ;; Maps newly bound attribute names to expressions.
    query project-query])
 
 (defn make-project
@@ -187,7 +190,7 @@ Replaced alist with hash-map."
 
 (define-record-type restrict
   (make-restrict exp query) restrict?
-  [exp restrict-exp
+  [exp restrict-exp  ;; :expression[boolean%]
    query restrict-query])
 
 (define-record-type ^{:doc "Restrict a left outer product.
@@ -200,13 +203,15 @@ Replaced alist with hash-map."
    query restrict-outer-query])
 
 (define-record-type grouping-project
+  ^{:doc "The underlying query is grouped by the non-aggregate expressions in
+          the alist"}
   (make-grouping-project alist query) grouping-project?
   [alist grouping-project-alist
    query grouping-project-query])
 
 (define-record-type combine
   (really-make-combine rel-op query-1 query-2) combine?
-  [rel-op combine-rel-op
+  [rel-op combine-rel-op  ;; Relational algebra. See below.
    query-1 combine-query-1
    query-2 combine-query-2])
 
@@ -256,6 +261,7 @@ Replaced alist with hash-map."
 
 ;; Top n entries.
 (define-record-type top
+  ^{:doc "The top n entries."}
   (make-top count query) top?
   [count top-count
    query top-query])
@@ -272,7 +278,7 @@ Replaced alist with hash-map."
 
 (define-record-type aggregation
   (really-make-aggregation op expr) aggregation?
-  [op aggregation-operator
+  [op aggregation-operator  ;; Aggregation-op or string.
    expr aggregation-expr])
 
 (define-record-type aggregation*
@@ -288,7 +294,7 @@ Replaced alist with hash-map."
 
 (define-record-type case-expr
   (make-case-expr alist default) case-expr?
-  [alist case-expr-alist
+  [alist case-expr-alist  ;; (list (pair expression[boolean] expression)).
    default case-expr-default])
 
 (define-record-type scalar-subquery
@@ -644,7 +650,11 @@ Replaced alist with hash-map."
               :universe universe
               :data data))
 
-(defn null-lift-binary-predicate [pred]
+(defn null-lift-binary-predicate
+  "Helper for defining rators.
+  Takes a predicate and returns a function that takes two values to apply this
+  predicate to."
+  [pred]
   (fn [v1 v2]
     (when-not (or (empty? v1) (empty? v2))
       (pred v1 v2))))

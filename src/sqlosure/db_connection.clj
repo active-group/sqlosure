@@ -20,6 +20,7 @@
    deleter db-connection-deleter  ;; :db-connection string scheme sql-expr -> int
    ;; Proc to update.
    updater db-connection-updater  ;; :db-connection string scheme sql-expr (map-of field -> new-value) -> int
+   ;; proc to run SQL query (for emergencies only)
    sql-runner db-connection-sql-runner])
 
 (defn set-db-connection-handle

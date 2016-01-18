@@ -17,8 +17,8 @@
    predicate base-type-predicate
    const->datum-proc base-type-const->datum-proc
    datum->const-proc base-type-datum->const-proc
-   ;; Domain-specific date, for outside use.
-   data base-type-data])
+   data base-type-data  ;; Domain-specific date, for outside use.
+   ])
 
 (defn make-base-type
   "Returns a new base type as specified.
@@ -116,6 +116,7 @@
 (defn type=?
   "Checks if two types are the same."
   [t1 t2]
+  ;; FIXME: Couldn't this just be (def type=? =)?
   (cond
     (base-type? t1) (= t1 t2)
     (base-type? t2) false
