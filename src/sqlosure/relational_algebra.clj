@@ -373,6 +373,7 @@ Replaced alist with hash-map."
     (application? expr) (some aggregate? (application-rands expr))
     (tuple? expr) (some aggregate? (tuple-expressions expr))
     (aggregation? expr) true
+    (aggregation*? expr) true
     (case-expr? expr) (or (some (fn [[k v]] (or (aggregate? k)
                                                 (aggregate? v)))
                                 (case-expr-alist expr))
