@@ -77,13 +77,20 @@ Replaced alist with hash-map."
   [s]
   (rel-scheme-alist s))
 
+(defn contains-key?
+  [alist k]
+  (not (empty? (filter #(= (first %) k) alist))))
+
 (defn compose-environments
   "Combine two environments. e1 takes precedence over e2."
   [e1 e2]
   (cond
     (empty? e1) e2
     (empty? e2) e1
-    :else (concat e1 e2)))
+    :else (reduce (fn [acc [e2-k e2-v]]
+                    (if-not (contains-key? acc e2-k)
+                      (concat acc [[e2-k e2-v]])
+                      acc)) e1 e2)))
 
 (defn lookup-env
   "Lookup a name in an environment.
