@@ -78,8 +78,10 @@ Replaced alist with hash-map."
   (rel-scheme-alist s))
 
 (defn contains-key?
+  "Checks wheter alist contains the key k."
   [alist k]
-  (not (empty? (filter #(= (first %) k) alist))))
+  (not (empty? (filter (fn [[alist-k _]]
+                         (= alist-k k)) alist))))
 
 (defn compose-environments
   "Combine two environments. e1 takes precedence over e2."
@@ -93,8 +95,7 @@ Replaced alist with hash-map."
                       acc)) e1 e2)))
 
 (defn lookup-env
-  "Lookup a name in an environment.
-  TODO: Should this return `false` as in the original?"
+  "Lookup a name in an environment."
   [name env]
   (first (filter #(= name (first %)) env)))
 
