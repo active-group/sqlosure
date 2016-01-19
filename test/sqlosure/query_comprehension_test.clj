@@ -29,19 +29,6 @@
    put/default-sql-put-parameterization
    (query->sql query)))
 
-;; TODO: is this supposed to be test? zap or use deftest
-(let [movies-table (make-sql-table 'movies
-                                       (alist->rel-scheme [["title" string%]
-                                                           ["director" string%]
-                                                           ["year" integer%]
-                                                           ["any_good" boolean%]])
-                                       :universe (make-universe)
-                                       :handle "movies")]
-  (put-query (get-query (monadic [movies (embed movies-table)]
-                                 (project {"title" (! movies "title")
-                                           "year" (! movies "year")})
-                                 (project {"title" (! movies "title")})))))
-
 (deftest const-restrict-test
   (is (= ["SELECT two AS foo FROM tbl1 WHERE (one = ?)" [string% "foobar"]]
          (sqlosure.sql-put/sql-select->string
