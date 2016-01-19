@@ -97,7 +97,7 @@ Replaced alist with hash-map."
 (defn lookup-env
   "Lookup a name in an environment."
   [name env]
-  (first (filter #(= name (first %)) env)))
+  (second (first (filter #(= name (first %)) env))))
 
 ;;; ----------------------------------------------------------------------------
 ;;; --- Primitive relations, depending on the domain universe

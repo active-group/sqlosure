@@ -54,7 +54,7 @@
                                                            [[:foo :something-else] [:fizz :buzz]]))))
 
 (deftest lookup-env-test
-  (is (= :bar (lookup-env :foo {:foo :bar}))))
+  (is (= :bar (lookup-env :foo [[:foo :bar]]))))
 
 (deftest make-base-relation-test
   (let [test-universe (make-universe)]
