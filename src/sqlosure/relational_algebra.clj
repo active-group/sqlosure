@@ -541,7 +541,7 @@ Replaced alist with hash-map."
   [q]
   (cond
     (empty? q) (list 'empty-val)
-    (base-relation? q) (list 'base-relation (base-relation-name q))
+    (base-relation? q) (list 'base-relation (symbol (base-relation-name q)))
     (project? q) (list 'project (map (fn [[k v]]
                                        (cons k (expression->datum v)))
                                      (project-alist q))
