@@ -246,7 +246,8 @@
 
 (def not$ (make-monomorphic-combinator 'not [boolean%] boolean%
                                        not
-                                       :universe sql-universe))
+                                       :universe sql-universe
+                                       :data op-not))
 
 (def is-null?$ (make-monomorphic-combinator "IS NULL" [any%] boolean%
                                             nil?
