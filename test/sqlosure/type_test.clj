@@ -6,22 +6,15 @@
 
 (deftest make-base-type-test
   (let [test-universe (u/make-universe)
-        string-type (make-base-type 'string string? values values
+        string-type (make-base-type 'string string? identity identity
                                     :universe test-universe)]
     (is (and (= (base-type-name string-type) 'string)
-             ;; I was not aware one could test fns on equality. Why does this work?
-             ;; Of even more important, why is this still wrong?
              (= (base-type-predicate string-type) string?)
-             (= (base-type-const->datum-proc string-type) values)
-             (= (base-type-datum->const-proc string-type) values)
+             (= (base-type-const->datum-proc string-type) identity)
+             (= (base-type-datum->const-proc string-type) identity)
              (nil? (base-type-data string-type))
              (u/universe-lookup-type test-universe 'string)))))
 
-
-(deftest values-test
-  (is (= [1 2 3] (values 1 2 3)))
-  (is (not= [1 2 3] (values 1 2)))
-  (is (= [1] (values 1))))
 
 (deftest double?-test
   (is (double? 0.3))
