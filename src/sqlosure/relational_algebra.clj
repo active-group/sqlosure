@@ -5,7 +5,7 @@ Replaced alist with hash-map."
     sqlosure.relational-algebra
   (:require [sqlosure.universe :as u]
             [sqlosure.type :as t]
-            [sqlosure.utils :refer [third]]
+            [sqlosure.utils :refer [third fourth]]
             [clojure.set :refer [difference union intersection]]
             [active.clojure.record :refer [define-record-type]]
             [active.clojure.condition :as c]
@@ -271,9 +271,10 @@ Replaced alist with hash-map."
 
 ;; Top n entries.
 (define-record-type top
-  ^{:doc "The top n entries."}
-  (make-top count query) top?
-  [count top-count
+  ^{:doc "The top `count` entries, optionally starting at `offset`, defaulting to 0."}
+  (make-top offset count query) top?
+  [offset top-offset
+   count top-count
    query top-query])
 
 (define-record-type tuple
@@ -558,7 +559,7 @@ Replaced alist with hash-map."
   [q]
   (cond
     (empty? q) (list 'empty-val)
-    (base-relation? q) (list 'base-relation (base-relation-name q))
+    (base-relation? q) (list 'base-relation (symbol (base-relation-name q)))
     (project? q) (list 'project (map (fn [[k v]]
                                        (cons k (expression->datum v)))
                                      (project-alist q))
@@ -579,7 +580,7 @@ Replaced alist with hash-map."
                                    (list (expression->datum k) v))
                                     (order-alist q))
                      (query->datum (order-query q)))
-    (top? q) (list 'top (top-count q) (query->datum (top-query q)))
+    (top? q) (list 'top (top-offset q) (top-count q) (query->datum (top-query q)))
     :else (assertion-violation 'query->datum "unknown query" q)))
 
 (declare datum->expression)
@@ -615,7 +616,7 @@ Replaced alist with hash-map."
                                [(datum->expression (first p) universe) (second p)])
                              (second d))
                         (next-step (third d)))
-      top (make-top (second d) (next-step (third d)))
+      top (make-top (second d) (third d) (next-step (fourth d)))
       :else (assertion-violation 'datum->query "invalid datum" d))))
 
 (defn datum->expression
@@ -814,7 +815,7 @@ Replaced alist with hash-map."
                                       [(substitute-attribute-refs culled k) v])
                                     (order-alist q))
                                (next-step sub)))
-      (top? q) (make-top (top-count q) (next-step (top-query q)))
+      (top? q) (make-top (top-offset q) (top-count q) (next-step (top-query q)))
       :else (assertion-violation 'query-substitute-attribute-refs "unknown query" q))))
 
 (defn count-aggregations

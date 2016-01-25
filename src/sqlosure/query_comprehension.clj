@@ -217,7 +217,9 @@
    (set-query! (rel/make-order alist old))))
 
 (defn top
-  [n]
-  (monadic
-   [old current-query]
-   (set-query! (rel/make-top n old))))
+  ([n]
+   (top nil n))
+  ([offset n]
+   (monadic
+    [old current-query]
+    (set-query! (rel/make-top offset n old)))))

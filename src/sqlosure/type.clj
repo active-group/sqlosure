@@ -31,13 +31,6 @@
       (register-type! universe name t))
     t))
 
-;; TODO: We don't need this at all, do we?
-(defn values
-  "kind of resembles schemes `values` function but instead returns a vector of
-  all its arguments. i don't know if this is really necessary or the way to go."
-  [& values]
-  (vec values))
-
 (define-record-type bounded-string-type
   (make-bounded-string-type max-size) bounded-string-type?
   [max-size bounded-string-type-max-size])

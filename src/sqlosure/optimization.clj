@@ -76,7 +76,7 @@
               (worker (concat (order-alist-attribute-names alist)
                               live)
                       (r/order-query q))))
-           (r/top? q) (r/make-top (r/top-count q) (worker live (r/top-query q)))
+           (r/top? q) (r/make-top (r/top-offset q) (r/top-count q) (worker live (r/top-query q)))
            (r/combine? q)
            (let [r (r/combine-rel-op q)
                  q1 (r/combine-query-1 q)
@@ -152,7 +152,7 @@
 
     (r/order? q) (r/make-order (r/order-alist q)
                                (merge-project (r/order-query q)))
-    (r/top? q) (r/make-top (r/top-count q) (merge-project (r/top-query q)))
+    (r/top? q) (r/make-top (r/top-offset q) (r/top-count q) (merge-project (r/top-query q)))
     (r/combine? q) (r/make-combine (r/combine-rel-op q)
                                    (merge-project (r/combine-query-1 q))
                                    (merge-project (r/combine-query-2 q)))
@@ -300,6 +300,7 @@
         :else (r/make-order alist (push-restrict oq))))
     (r/top? q)
     (let [tq (r/top-query q)
+          offset (r/top-offset q)
           count (r/top-count q)]
       (cond
         (r/project? tq)
@@ -308,18 +309,18 @@
             (r/make-top count (push-restrict tq))
             (r/make-project
              passoc
-             (push-restrict (r/make-top count (r/project-query tq))))))
+             (push-restrict (r/make-top offset count (r/project-query tq))))))
         (r/order? tq) (let [pushed (push-restrict tq)
-                            new (r/make-top count pushed)]
+                            new (r/make-top offset count pushed)]
                         (if (r/order? pushed)
                           new
                           (push-restrict new)))
         (r/top? tq) (let [pushed (push-restrict tq)
-                          new (r/make-top count pushed)]
+                          new (r/make-top offset count pushed)]
                       (if (r/top? pushed)
                         new
                         (push-restrict new)))
-        :else (r/make-top count (push-restrict tq))))
+        :else (r/make-top offset count (push-restrict tq))))
     (r/combine? q) (r/make-combine (r/combine-rel-op q)
                                    (push-restrict (r/combine-query-1 q))
                                    (push-restrict (r/combine-query-2 q)))

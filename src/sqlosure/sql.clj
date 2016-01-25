@@ -13,10 +13,11 @@
    scheme sql-table-scheme  ;; (sql-table -> rel-scheme)
    ])
 
+;; FIXME: clean up public api: (sql-table-name (make-sql-table "abc" ...)) would break, e.g. 
 (defn make-sql-table
   [name scheme & {:keys [universe]
                   :or {universe nil}}]
-  (make-base-relation (symbol name) scheme
+  (make-base-relation name scheme
                       :universe universe
                       :handle (really-make-sql-table name scheme)))
 
@@ -245,7 +246,8 @@
 
 (def not$ (make-monomorphic-combinator 'not [boolean%] boolean%
                                        not
-                                       :universe sql-universe))
+                                       :universe sql-universe
+                                       :data op-not))
 
 (def is-null?$ (make-monomorphic-combinator "IS NULL" [any%] boolean%
                                             nil?

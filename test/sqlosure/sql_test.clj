@@ -16,12 +16,12 @@
                      (alist->rel-scheme [["one" string%]
                                          ["two" integer%]])
                      :universe test-universe)]
-    (is (= (base-relation-name test-table) 'tbl1))
+    (is (= (base-relation-name test-table) "tbl1"))
     (is (= (sql-table-scheme (base-relation-handle test-table))
            (alist->rel-scheme [["one" string%] ["two" integer%]])))
     (is (and (= (sql-table-scheme (base-relation-handle test-table2))
                 (alist->rel-scheme [["one" string%] ["two" integer%]]))
-             (= ((u/universe-get-base-relation-table test-universe) 'tbl2)
+             (= ((u/universe-get-base-relation-table test-universe) "tbl2")
                 test-table2)))))
 
 (deftest sql-order?-test
