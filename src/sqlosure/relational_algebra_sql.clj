@@ -123,7 +123,7 @@
            (concat
             (map expression->sql
                  (filter (fn [e] (not (rel/aggregate? e)))
-                         (vals (rel/grouping-project-alist q))))
+                         (map second (rel/grouping-project-alist q))))
             (sql/sql-select-group-by sql)))))
     (rel/combine? q)
     (let [q1 (rel/combine-query-1 q)

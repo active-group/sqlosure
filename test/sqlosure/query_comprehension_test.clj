@@ -10,7 +10,8 @@
             [sqlosure.sql-put :as put]
             [active.clojure.monad :refer :all]
             [clojure.test :refer :all]
-            [sqlosure.optimization :as opt]))
+            [sqlosure.optimization :as opt]
+            [sqlosure.relational-algebra :as rel]))
 
 (def test-universe (make-universe))
 

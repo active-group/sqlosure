@@ -21,19 +21,17 @@
   [q]
   (-> q r/query-scheme r/rel-scheme-alist))
 
-(defn intersect-live
-  "Takes a sequence of 'live' values and a query and returns the intersection of
-  all refs in both the live-list and the rel-scheme-alist of the query."
-  [live q]
-  (into []
-        (set/intersection
-         (into #{} live)
-         (into #{} (keys (query->alist q))))))
-
 (defn elem?
   "Does a collection contain e?"
   [coll e]
   (some #(= % e) coll))
+
+(defn intersect-live
+  "Takes a sequence of 'live' values and a query and returns the intersection of
+  all refs in both the live-list and the rel-scheme-alist of the query."
+  [live q]
+  (let [cols (r/rel-scheme-columns (r/query-scheme q))]
+    (filter (fn [k] (elem? cols k)) live)))
 
 (defn remove-dead
   [q]
@@ -93,8 +91,8 @@
                  :quotient
                  (r/make-combine
                   :quotient
-                  (worker (keys (r/rel-scheme-alist (r/query-scheme q1))) q1)
-                  (worker (keys (r/rel-scheme-alist (r/query-scheme q2))) q2))
+                  (worker (r/rel-scheme-columns (r/query-scheme q1)) q1)
+                  (worker (r/rel-scheme-columns (r/rel-scheme-alist (r/query-scheme q2))) q2))
                  
                  (r/make-combine r
                                  (worker live1 q1)
@@ -111,7 +109,7 @@
                                             new-alist))
                                 (r/project-query q))))
            :else (c/assertion-violation 'remove-dead "unknown query" q)))]
-    (worker (keys (query->alist q)) q)))
+    (worker (r/rel-scheme-columns (r/query-scheme q)) q)))
 
 (defn merge-project
   [q]
