@@ -106,28 +106,10 @@
   ;; per default, all numeric types are ordered.
   [t] (numeric-type? t))
 
-(defn type=?
-  "Checks if two types are the same."
-  [t1 t2]
-  ;; FIXME: Couldn't this just be (def type=? =)?
-  (cond
-    (base-type? t1) (= t1 t2)
-    (base-type? t2) false
-    (nullable-type? t1) (and (nullable-type? 2)
-                             (type=? (nullable-type-underlying t1)
-                                     (nullable-type-underlying t2)))
-    (bounded-string-type? t1) (and (bounded-string-type? t2)
-                                   (= (bounded-string-type-max-size t1)
-                                      (bounded-string-type-max-size t2)))
-    (product-type? t1) (and (product-type? t2)
-                            (let [c1 (product-type-components t1)
-                                  c2 (product-type-components t2)]
-                              (and (= (count c1) (count c2))
-                                   (every? (fn [[t1 t2]] (type=? t1 t2)) (zip c1 c2)))))
-    (set-type? t1) (and (set-type? t2)
-                        (type=? (set-type-member-type t1)
-                                (set-type-member-type t2)))
-    :else (assertion-violation 'type=? "unknown type" t1)))
+
+;; Checks if two types are the same.
+;; Verbose definition unnecessary because of Clojures sensible equality (?).
+(def type=? =)
 
 ;; Standard types
 
