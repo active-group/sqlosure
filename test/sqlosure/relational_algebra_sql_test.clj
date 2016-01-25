@@ -88,9 +88,6 @@
     (is (= (list tbl2 tbl1)
            (map second (sql-select-tables q))))))
 
-;; FIXME: huh?
-(query->sql tbl1)
-
 (deftest query->sql-test
   (is (= (make-sql-select-table "tbl1")
          (query->sql tbl1)))
