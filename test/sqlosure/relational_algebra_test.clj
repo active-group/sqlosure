@@ -496,7 +496,9 @@
       (is (= gp (query->datum->query gp))))
     (let [o (make-order [[(make-attribute-ref "one") :ascending]] tbl1)]
       (is (= o (query->datum->query o))))
-    (let [t (make-top 10 tbl1)]
+    (let [t (make-top nil 10 tbl1)]
+      (is (= t (query->datum->query t))))
+    (let [t (make-top 5 10 tbl1)]
       (is (= t (query->datum->query t))))))
 
 (deftest datum->expression-test
@@ -644,7 +646,7 @@
   (is (= #{"one" "two"} (query-attribute-names
                           (make-order {(make-attribute-ref "one") :ascending}
                                       tbl1))))
-  (is (nil? (query-attribute-names (make-top 10 tbl1)))))
+  (is (nil? (query-attribute-names (make-top 5 10 tbl1)))))
 
 (deftest substitute-attribute-refs-test
   (is (= (make-const string% "foobar")

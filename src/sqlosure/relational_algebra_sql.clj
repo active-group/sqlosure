@@ -216,7 +216,10 @@
       (sql/set-sql-select-order-by sql (concat new-order (sql/sql-select-order-by sql))))
     (rel/top? q)
     (let [sql (x->sql-select (query->sql (rel/top-query q)))]
-      (sql/set-sql-select-extra sql (cons (str "LIMIT " (rel/top-count q))
+      (sql/set-sql-select-extra sql (cons (if-let [off (rel/top-offset q)]
+                                            (str "LIMIT " off "," (rel/top-count q))
+                                            ;; no offset should be the same as offset 0 though:
+                                            (str "LIMIT " (rel/top-count q)))
                                           (sql/sql-select-extra sql))))
     (rel/empty-val? q) sql/the-sql-select-empty
     :else (c/assertion-violation 'query->sql "unknown query" (pr-str q))))
