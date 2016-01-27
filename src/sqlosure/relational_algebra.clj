@@ -24,6 +24,7 @@ Replaced alist with hash-map."
   (let [mp (rel-scheme-alist rs)]
     ;; FIXME: can we zap this?
     ;; (c/assert (map? mp))
+  (let [mp (into {} (rel-scheme-alist rs))]
     (map #(get mp %)
          (rel-scheme-columns rs))))
 

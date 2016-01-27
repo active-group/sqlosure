@@ -13,6 +13,13 @@
 (def test-scheme3 (alist->rel-scheme [[:foo :bar]]))
 (def test-scheme4 (alist->rel-scheme [[:fizz :buzz]]))
 
+(deftest rel-scheme-types-test
+  (is (= [:bar :buzz]
+         (rel-scheme-types test-scheme1))))
+
+(deftest rel-scheme-columns-test
+  (is (= [:foo :fizz]
+         (rel-scheme-columns test-scheme1))))
 
 (deftest rel-scheme=?-test
   (is (rel-scheme=? (alist->rel-scheme []) the-empty-rel-scheme))
