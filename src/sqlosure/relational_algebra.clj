@@ -22,7 +22,8 @@ Replaced alist with hash-map."
   "Returns the types of a rel-scheme, in the order they were created."
   [rs]
   (let [mp (rel-scheme-alist rs)]
-    (c/assert (map? mp))
+    ;; FIXME: can we zap this?
+    ;; (c/assert (map? mp))
     (map #(get mp %)
          (rel-scheme-columns rs))))
 
@@ -407,7 +408,7 @@ Replaced alist with hash-map."
                                                 expected thing)))))
 
 (defn aggregate?
-  "returns true if `expr` is or contains an aggregation."
+  "Returns true if `expr` is or contains an aggregation."
   [expr]
   (cond
     (attribute-ref? expr) false
@@ -423,7 +424,7 @@ Replaced alist with hash-map."
                           (aggregate? (case-expr-default expr)))
     (scalar-subquery? expr) false
     (set-subquery? expr) false
-    :else (assertion-violation 'aggregate? "invalid expression" expr)))
+    :else false #_(assertion-violation 'aggregate? "invalid expression" expr)))
 
 (defn- query-scheme* [q env fail]
   (letfn [(to-env [scheme]
