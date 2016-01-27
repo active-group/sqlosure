@@ -535,6 +535,21 @@ Replaced alist with hash-map."
   (or (empty? obj) (base-relation? obj) (project? obj) (restrict? obj) (restrict-outer? obj)
       (combine? obj) (grouping-project? obj) (order? obj) (top? obj)))
 
+(defn grouping?
+  [q]
+  (cond
+    (empty? q) false
+    (base-relation? q) false
+    (project? q) (grouping? (project-query q))
+    (restrict? q) (grouping? (restrict-query q))
+    (restrict-outer? q) (grouping? (restrict-outer-query q))
+    (combine? q) (or (grouping? (combine-query-1 q))
+                     (grouping? (combine-query-2 q)))
+    (grouping-project? q) true
+    (order? q) (grouping? (order-query q))
+    (top? q) (grouping? (top-query q))
+    :else (c/assertion-violation 'grouping? "invalid query" q)))
+
 (declare query->datum)
 
 (defn expression->datum
