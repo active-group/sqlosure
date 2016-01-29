@@ -21,8 +21,7 @@ Replaced alist with hash-map."
 (defn rel-scheme-types
   "Returns the types of a rel-scheme, in the order they were created."
   [rs]
-  (let [mp (rel-scheme-alist rs)]
-    (c/assert (map? mp))
+  (let [mp (into {} (rel-scheme-alist rs))]
     (map #(get mp %)
          (rel-scheme-columns rs))))
 
