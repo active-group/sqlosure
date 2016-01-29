@@ -50,18 +50,18 @@
   (is (not (rel-scheme-unary? test-scheme1))))
 
 (deftest rel-scheme->environment-test
-  (is (= [[:fizz :buzz]] (rel-scheme->environment test-scheme4)))
-  (is (= [[:foo :bar] [:some :thing]] (rel-scheme->environment test-scheme2))))
+  (is (= {:fizz :buzz} (rel-scheme->environment test-scheme4)))
+  (is (= {:foo :bar :some :thing} (rel-scheme->environment test-scheme2))))
 
 (deftest compose-environments-test
   (is (= the-empty-environment (compose-environments the-empty-environment the-empty-environment)))
-  (is (= [[:foo :bar]] (compose-environments [[:foo :bar]] the-empty-environment)))
+  (is (= {:foo :bar} (compose-environments {:foo :bar} the-empty-environment)))
   ;; e1 should take precedence over e2!
-  (is (= [[:foo :bar] [:fizz :buzz]] (compose-environments [[:foo :bar]]
-                                                           [[:foo :something-else] [:fizz :buzz]]))))
+  (is (= {:foo :bar :fizz :buzz} (compose-environments {:foo :bar}
+                                                       {:foo :something-else :fizz :buzz}))))
 
 (deftest lookup-env-test
-  (is (= :bar (lookup-env :foo [[:foo :bar]]))))
+  (is (= :bar (lookup-env :foo {:foo :bar}))))
 
 (deftest make-base-relation-test
   (let [test-universe (make-universe)]
