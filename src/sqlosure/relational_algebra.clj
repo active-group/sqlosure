@@ -345,21 +345,22 @@ Replaced alist with hash-map."
    identity
    (fn [rator rands] (apply (rator-range-type-proc rator) fail rands))
    t/make-product-type
-   (fn [op t] (let [op (aggregation-operator expr)]
-                (if (= :count op)
-                  t/integer%
-                  (do
-                    (when fail
-                      (cond
-                        (contains? #{:sum :avg :std-dev :std-dev-p :var :var-p} op)
-                        (when-not (t/numeric-type? t) (fail 'numeric-type t))
-                        (contains? #{:min :max} op)
-                        (when-not (t/ordered-type? t) (fail 'ordered-type t))))
-                    t))))
-   (fn [op] (let [op (aggregation*-operator expr)]
-              (if (= :count-all op)
+   ;; aggregation
+   (fn [op t] (if (= :count op)
                 t/integer%
-                (assertion-violation 'expression-type* "unknown aggregation" op))))
+                (do
+                  (when fail
+                    (cond
+                      (contains? #{:sum :avg :std-dev :std-dev-p :var :var-p} op)
+                      (when-not (t/numeric-type? t) (fail 'numeric-type t))
+                      (contains? #{:min :max} op)
+                      (when-not (t/ordered-type? t) (fail 'ordered-type t))))
+                  t)))
+   ;; aggregation*
+   (fn [op] (if (= :count-all op)
+              t/integer%
+              (assertion-violation 'expression-type* "unknown aggregation" op)))
+   ;; case-expr
    (fn [alist t] (if fail
                    (for [[p r] alist]
                      (do
