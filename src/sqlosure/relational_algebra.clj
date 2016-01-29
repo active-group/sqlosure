@@ -31,7 +31,7 @@ Replaced alist with hash-map."
   [alist]
   (let [cols (map first alist)]
     (c/assert (count (set cols)) (count cols))
-    (make-rel-scheme cols alist)))
+    (make-rel-scheme cols (into {} alist))))
 
 (def the-empty-rel-scheme (alist->rel-scheme []))
 (def the-empty-environment {})
@@ -86,18 +86,12 @@ Replaced alist with hash-map."
 (defn compose-environments
   "Combine two environments. e1 takes precedence over e2."
   [e1 e2]
-  (cond
-    (empty? e1) e2
-    (empty? e2) e1
-    :else (reduce (fn [acc [e2-k e2-v]]
-                    (if-not (contains-key? acc e2-k)
-                      (concat acc [[e2-k e2-v]])
-                      acc)) e1 e2)))
+  (merge e2 e1))
 
 (defn lookup-env
   "Lookup a name in an environment."
   [name env]
-  (second (first (filter #(= name (first %)) env))))
+  (get env name))
 
 ;;; ----------------------------------------------------------------------------
 ;;; --- Primitive relations, depending on the domain universe
@@ -727,13 +721,13 @@ Replaced alist with hash-map."
     (let [subq (project-query q)
           alist (project-alist q)]
       (apply union
-             (set (map first (rel-scheme-alist (query-scheme subq))))
+             (set (keys (rel-scheme-alist (query-scheme subq))))
              (query-attribute-names subq)
              (map expression-attribute-names (map second alist))))
     (restrict? q)
     (let [sub (restrict-query q)]
       (union
-       (set (map first (rel-scheme-alist (query-scheme sub))))
+       (set (keys (rel-scheme-alist (query-scheme sub))))
        (query-attribute-names sub)
        (expression-attribute-names (restrict-exp q))))
     (combine? q) (union
@@ -742,7 +736,7 @@ Replaced alist with hash-map."
     (restrict-outer? q)
     (let [sub (restrict-outer-query q)]
       (apply union
-             (set (map first (rel-scheme-alist (query-scheme sub))))
+             (set (keys (rel-scheme-alist (query-scheme sub))))
              (query-attribute-names sub)
              (expression-attribute-names (restrict-outer-exp q))))
     (grouping-project? q)
@@ -751,14 +745,14 @@ Replaced alist with hash-map."
       (apply union
              (set (map first (rel-scheme-alist (query-scheme subq))))
              (query-attribute-names subq)
-             (map expression-attribute-names (map first alist))))
+             (map expression-attribute-names (vals alist))))
     (order? q)
     (let [subq (order-query q)
           alist (order-alist q)]
       (apply union
              (set (map first (rel-scheme-alist (query-scheme subq))))
              (query-attribute-names subq)
-             (map expression-attribute-names (map first alist))))
+             (map expression-attribute-names (keys alist))))
     (top? q) (query-attribute-names (top-query q))
     :else (assertion-violation 'query-attribute-names "unknown query" q)))
 
@@ -785,9 +779,10 @@ Replaced alist with hash-map."
   substitutions not already featured in `underlying`."
   [alist underlying]
   (let [underlying-alist (rel-scheme-alist (query-scheme underlying))]
-    (filter (fn [[k v]]
-              (not (contains? underlying-alist k)))
-            alist)))
+    (into {}
+          (filter (fn [[k v]]
+                    (not (contains? underlying-alist k)))
+                  alist))))
 
 (defn query-substitute-attribute-refs
   [alist q]

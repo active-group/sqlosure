@@ -99,6 +99,7 @@
                        (if (empty? alist)
                          (-> sql
                              (sql/set-sql-select-attributes
+                              ;; FIXME: what type is this dummy?
                               {"dummy" (sql/make-sql-expr-const t/any% "dummy")})
                              (sql/set-sql-select-nullary? true))
                          (sql/set-sql-select-attributes sql (alist->sql alist))))
