@@ -34,7 +34,7 @@
                         tbl1)]
     (is (= ["one"]
            (intersect-live ["one"] p)))
-    (is (= ["one" "two"]
+    (is (= ["two" "one"]
            (intersect-live ["one" "two"] p)))))
 
 (deftest remove-dead-test

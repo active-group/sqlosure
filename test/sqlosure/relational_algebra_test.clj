@@ -29,18 +29,18 @@
                                         [:fizz "buzz"]]))))
 
 (deftest rel-scheme-difference-test
-  (is (= (alist->rel-scheme [[:fizz :buzz]])
-         (rel-scheme-difference test-scheme1 test-scheme3)))
-  (is (= (alist->rel-scheme [[:some :thing]])
-         (rel-scheme-difference test-scheme2 test-scheme3)))
-  (is (= test-scheme1
-         (rel-scheme-difference test-scheme1 the-empty-rel-scheme)))
-  (is (= (alist->rel-scheme [[:k1 "k1"]])
-         (rel-scheme-difference (alist->rel-scheme [[:k1 "k1"] [:k2 "k2"] [:k3 "k3"]])
-                                (alist->rel-scheme [[:k2 "just"] [:k3 "the"] [:k4 "keys"]]))))
-  (is (= (alist->rel-scheme [[:k4 "keys"]])
-         (rel-scheme-difference (alist->rel-scheme [[:k2 "just"] [:k3 "the"] [:k4 "keys"]])
-                                (alist->rel-scheme [[:k1 "k1"] [:k2 "k2"] [:k3 "k3"]]))))
+  (is (= (rel-scheme-difference test-scheme1 test-scheme3)
+         (alist->rel-scheme [[:fizz :buzz]])))
+  (is (= (rel-scheme-difference test-scheme2 test-scheme3)
+         (alist->rel-scheme [[:some :thing]])))
+  (is (= (rel-scheme-difference test-scheme1 the-empty-rel-scheme)
+         test-scheme1))
+  (is (= (rel-scheme-difference (alist->rel-scheme [[:k1 "k1"] [:k2 "k2"] [:k3 "k3"]])
+                                (alist->rel-scheme [[:k2 "just"] [:k3 "the"] [:k4 "keys"]]))
+         (alist->rel-scheme [[:k1 "k1"]])))
+  (is (= (rel-scheme-difference (alist->rel-scheme [[:k2 "just"] [:k3 "the"] [:k4 "keys"]])
+                                (alist->rel-scheme [[:k1 "k1"] [:k2 "k2"] [:k3 "k3"]]))
+         (alist->rel-scheme [[:k4 "keys"]])))
   (is (thrown? Exception (rel-scheme-difference
                           (alist->rel-scheme [[:foo "some foo"]])
                           (alist->rel-scheme [[:foo :bar]])))))
@@ -115,6 +115,16 @@
            (project-alist p)))
     (is (= tbl1 (project-query p)))))
 
+;; TODO: what should be the result?
+#_(deftest make-extend-test
+  (let [p (make-extend {"three" (make-attribute-ref "three")
+                        "four" (make-attribute-ref "four")} tbl1)]
+    (is (= (project-alist p) (merge {"three" (make-attribute-ref "three")
+                                     "four" (make-attribute-ref "four")}
+                                    {"one" string%
+                                     "two" integer%})))
+    (is (= (project-query p) tbl1))))
+
 (deftest expression-type-test
   (let [one-ref (make-attribute-ref "one")
         string-const (make-const string% "foobar")
@@ -175,7 +185,18 @@
                                                 (make-const integer% 23)]))
                                   :typecheck? true)))
     ;; case expression
-    (is (= boolean% (expression-type the-empty my-case)))))
+    (is (= boolean% (expression-type the-empty my-case)))
+    (is (thrown? Exception  ;; With typechecking, this should fail
+                 (expression-type
+                  the-empty-environment
+                  (make-case-expr
+                   {(sql/plus$ (make-const string% "foobar")
+                               (make-const integer% 42))
+                    (make-const boolean% true)}
+                   (make-const boolean% false))
+                  :typecheck? true)))
+    ;; scalar subquery
+    ))
 
 (deftest aggregate?-test
   (is (not (aggregate? (make-attribute-ref "one"))))
@@ -225,7 +246,7 @@
                            ["one" (make-attribute-ref "one")]]
                           tbl1)
           res (query-scheme p :typecheck? true)]
-      (is (= [["two" integer%] ["one" string%]] (rel-scheme-alist res)))
+      (is (= (rel-scheme-alist res) {"two" integer% "one" string%}))
       (is (thrown? Exception  ;; should fail with typechecking because of aggregation
                    (query-scheme (make-project
                                   [["two" (make-attribute-ref "two")]
@@ -240,7 +261,7 @@
                                                   SUBB))
                                    (make-attribute-ref "C"))
                            SUBA)]
-      (is (= [["C" string%]] (rel-scheme-alist (query-scheme r))))
+      (is (= (rel-scheme-alist (query-scheme r)) {"C" string%}))
       (is (thrown? Exception (query-scheme r :typecheck? true))))
 
 
@@ -249,7 +270,7 @@
                                                         SUBB))
                                          (make-attribute-ref "C"))
                                  SUBA)]
-      (is (= [["C" string%]] (rel-scheme-alist (query-scheme r))))
+      (is (= (rel-scheme-alist (query-scheme r)) {"C" string%}))
       (is (thrown? Exception (query-scheme r :typecheck? true))))
     
     (testing "scheme for various combinations"
@@ -282,26 +303,27 @@
       
     ;; grouping project
     (let [gp (make-grouping-project
-              [["one" (make-attribute-ref "one")]
-               ["foo" (make-aggregation :avg
-                                        (make-attribute-ref "two"))]] tbl1)
+              {"one" (make-attribute-ref "one")
+               "foo" (make-aggregation :avg
+                                       (make-attribute-ref "two"))} tbl1)
           gp2 (make-grouping-project
-               [["one" (make-attribute-ref "one")]
-                ["foo" (make-aggregation :avg
-                                         (make-attribute-ref "two"))]]
+              {"one" (make-attribute-ref "one")
+               "foo" (make-aggregation :avg
+                                       (make-attribute-ref "two"))}
               (make-base-relation 'tbl1
                                   (alist->rel-scheme [["two" string%]
                                                       ["one" integer%]])
                                   (make-universe)
                                   "tbl1"))]
-      (is (= [["one" string%] ["foo" integer%]]
-             (rel-scheme-alist (query-scheme gp))))
+      (is (= (rel-scheme-alist (query-scheme gp))
+             {"one" string%
+              "foo" integer%}))
       (is (thrown? Exception  ;; should fail (types do not match)
                    (query-scheme gp2 :typecheck? true))))
     ;; order
     (let [o (make-order {(make-attribute-ref "one") :ascending} tbl1)]
-      (is (= [["one" string%] ["two" integer%]]
-             (rel-scheme-alist (query-scheme o)))))))
+      (is (= (rel-scheme-alist (query-scheme o))
+             {"one" string% "two" integer%})))))
 
 (deftest query?-test
   ;; everything else is basically the same...
@@ -492,10 +514,10 @@
         expression->datum->expression #(-> %
                                            expression->datum
                                            (datum->expression test-universe))]
-    (is (= (make-attribute-ref "two")
-           (expression->datum->expression (make-attribute-ref "two"))))
-    (is (= (make-const string% "foobar")
-           (expression->datum->expression (make-const string% "foobar"))))
+    (is (= (expression->datum->expression (make-attribute-ref "two"))
+           (make-attribute-ref "two")))
+    (is (= (expression->datum->expression (make-const string% "foobar"))
+           (make-const string% "foobar")))
     (is (= (expression->datum->expression (make-null string%))
            (make-null string%)))
     (let [a (make-application (make-rator '+
@@ -510,29 +532,30 @@
                                           :data op-+)
                               (make-const integer% 40)
                               (make-const integer% 2))]
-      (is (= a (datum->expression (expression->datum a) sql-universe))))
+      (is (= (datum->expression (expression->datum a) sql-universe)
+             a)))
     (is (= (expression->datum->expression (make-tuple [(make-const integer% 40)
                                                        (make-const integer% 2)]))
            (make-tuple [(make-const integer% 40)
                         (make-const integer% 2)])))
-    (is (= (make-aggregation
-            :count (make-tuple [(make-const integer% 40)
-                                (make-const integer% 2)]))
-           (expression->datum->expression (make-aggregation
+    (is (= (expression->datum->expression (make-aggregation
                                            :count (make-tuple [(make-const integer% 40)
-                                                               (make-const integer% 2)])))))
-    (is (= (make-case-expr [[(make-application
-                               (universe-lookup-rator sql-universe '=)
-                               (make-const integer% 42)
-                               (make-const integer% 42))
-                             (make-const boolean% true)]]
-                           (make-const boolean% false))
-           (datum->expression (expression->datum
-                               (make-case-expr [[(sql/=$ (make-const integer% 42)
-                                                         (make-const integer% 42))
-                                                 (make-const boolean% true)]]
+                                                               (make-const integer% 2)])))
+           (make-aggregation
+            :count (make-tuple [(make-const integer% 40)
+                                (make-const integer% 2)]))))
+    (is (= (datum->expression (expression->datum
+                               (make-case-expr {(sql/=$ (make-const integer% 42)
+                                                        (make-const integer% 42))
+                                                (make-const boolean% true)}
                                                (make-const boolean% false)))
-                              sql-universe)))))
+                              sql-universe)
+           (make-case-expr {(make-application
+                             (universe-lookup-rator sql-universe '=)
+                             (make-const integer% 42)
+                             (make-const integer% 42))
+                            (make-const boolean% true)}
+                           (make-const boolean% false))))))
 
 (deftest expression-attribute-names-test
   (is (= #{"two"} (expression-attribute-names (make-attribute-ref "two"))))
@@ -624,10 +647,10 @@
     (is (= #{"two" "one"} (query-attribute-names l))))
   (is (= #{"one" "two"} (query-attribute-names
                           (make-grouping-project
-                           [["one" (make-attribute-ref "one")]
-                            ["foo" (make-aggregation
-                                    :avg
-                                    (make-attribute-ref "two"))]] tbl1))))
+                           {"one" (make-attribute-ref "one")
+                            "foo" (make-aggregation
+                                   :avg
+                                   (make-attribute-ref "two"))} tbl1))))
   (is (= #{"one" "two"} (query-attribute-names
                           (make-order {(make-attribute-ref "one") :ascending}
                                       tbl1))))
@@ -675,11 +698,11 @@
           (make-aggregation
            :count (make-tuple [(make-attribute-ref "fourty")
                                (make-const integer% 2)])))))
-  (is (= (make-case-expr [[(make-application
-                             (universe-lookup-rator sql-universe '=)
-                             (make-const integer% 42)
-                             (make-const integer% 42))
-                           (make-const boolean% true)]]
+  (is (= (make-case-expr {(make-application
+                           (universe-lookup-rator sql-universe '=)
+                           (make-const integer% 42)
+                           (make-const integer% 42))
+                          (make-const boolean% true)}
                          (make-const boolean% true))
          (substitute-attribute-refs
           {"true" (make-const boolean% true)
@@ -693,10 +716,10 @@
 
 (deftest cull-substitution-alist-test
   (is (empty? (cull-substitution-alist
-               [["one" (make-attribute-ref "one")]]
+               {"one" (make-attribute-ref "one")}
                tbl1)))
-  (is (= [["three" (make-attribute-ref "three")]]
-         (cull-substitution-alist [["three" (make-attribute-ref "three")]] tbl1))))
+  (is (= {"three" (make-attribute-ref "three")}
+         (cull-substitution-alist {"three" (make-attribute-ref "three")} tbl1))))
 
 (deftest query-substitute-attribute-refs-test
   (is (= the-empty (query-substitute-attribute-refs {} the-empty)))

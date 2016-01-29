@@ -129,14 +129,14 @@
   (monadic
    (restrict expr)
    (return rel)))
-
+  
 (defn !
   [rel name]
   ;; check user args
   (if (not (relation? rel))
     (assertion-violation '! (str "not a relation: " rel)))
   (let [alist (rel/rel-scheme-alist (relation-scheme rel))]
-    (if (rel/contains-key? alist name)
+    (if (contains? alist name)
       (rel/make-attribute-ref (fresh-name name (relation-alias rel)))
       (assertion-violation '! "unkown attribute" rel name))))
 
@@ -211,9 +211,9 @@
                   compute-scheme
                   alias0)))
 
-(defn first-scheme
-  [s1 s2]
-  s1)
+ (defn first-scheme
+   [s1 s2]
+   s1)
 
 (defn union
   [prod1 prod2]
