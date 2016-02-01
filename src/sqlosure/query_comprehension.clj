@@ -67,17 +67,10 @@
   (monadic
    [alias new-alias]
    [query current-query]
-   ;; In order to properly group all aggregations, we have to know if there are
-   ;; any grouping-projects further down the current query. If so, the v
-   (if (rel/grouping? query)
-     (set-query! (rel/make-grouping-project
-                  (map (fn [[k v]] [(fresh-name k alias) v])
-                       alist)
-                  query))
-     (set-query! (rel/make-extend
-                  (map (fn [[k v]] [(fresh-name k alias) v])
-                       alist)
-                  query)))
+   (set-query! (rel/make-extend
+                (map (fn [[k v]] [(fresh-name k alias) v])
+                     alist)
+                query))
    (return (make-relation
             alias
             (let [scheme (rel/query-scheme query)]
@@ -85,18 +78,6 @@
                (map (fn [[k v]]
                       [k (rel/expression-type (rel/rel-scheme->environment scheme) v)])
                     alist)))))))
-
-;; For comparison https://github.com/chrisdone/haskelldb-demo/blob/master/lib/haskelldb/test/TestCases.hs
-(defn unique!
-  []
-  (monadic
-   [old current-query]
-   (let [alist (map (fn [[k v]]
-                      (if (t/base-type? v)
-                        [k (rel/make-attribute-ref k)]
-                        [k v]))
-                    (rel/rel-scheme-alist (rel/query-scheme old)))])
-   (set-query! (rel/make-grouping-project alist old))))
 
 ;; FIXME: add !
 (defn restrict
