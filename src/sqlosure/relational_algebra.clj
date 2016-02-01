@@ -224,13 +224,17 @@ Replaced alist with hash-map."
 
 (defn relational-op? [k] (contains? relational-ops k))
 
+(define-record-type empty-val
+  ^{:doc "Represents an empty relational algebra value."}
+  (make-empty-val) empty-val? [])
+
 (defn make-combine [rel-op query-1 query-2]
   (if-not (relational-op? rel-op)
     (assertion-violation 'make-combine "not a relational operator" rel-op)
     (case rel-op
       :product (cond
-                 (empty? query-1) query-2
-                 (empty? query-2) query-1
+                 (empty-val? query-1) query-2
+                 (empty-val? query-2) query-1
                  :else (really-make-combine rel-op query-1 query-2))
           (really-make-combine rel-op query-1 query-2))))
 
@@ -248,8 +252,6 @@ Replaced alist with hash-map."
 
 (defn make-difference [query-1 query-2] (make-combine :difference query-1
   query-2))
-
-(define-record-type empty-val (make-empty-val) empty-val? [])
 
 (def the-empty (make-empty-val))
 
@@ -520,7 +522,7 @@ Replaced alist with hash-map."
 (defn query?
   "Returns true if the `obj` is a query."
   [obj]
-  (or (empty? obj) (base-relation? obj) (project? obj) (restrict? obj) (restrict-outer? obj)
+  (or (empty-val? obj) (base-relation? obj) (project? obj) (restrict? obj) (restrict-outer? obj)
       (combine? obj) (grouping-project? obj) (order? obj) (top? obj)))
 
 (defn grouping?
@@ -561,7 +563,7 @@ Replaced alist with hash-map."
 (defn query->datum
   [q]
   (cond
-    (empty? q) (list 'empty-val)
+    (empty-val? q) (list 'empty-val)
     (base-relation? q) (list 'base-relation (symbol (base-relation-name q)))
     (project? q) (list 'project (map (fn [[k v]]
                                        (cons k (expression->datum v)))

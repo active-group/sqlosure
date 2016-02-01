@@ -40,7 +40,7 @@
   (letfn
       [(worker [live q]
          (cond
-           (nil? q) q
+           (r/empty-val? q) q
            (r/base-relation? q) q
            (r/project? q)
            (let [new-alist (filter (fn [[k _]] (elem? live k))
@@ -116,7 +116,7 @@
 (defn merge-project
   [q]
   (cond
-    (nil? q) q ;; FIXME: why is nil allowed?
+    (r/empty-val? q) q
     (r/base-relation? q) q
     (r/project? q)
     (let [pq (merge-project (r/project-query q))
