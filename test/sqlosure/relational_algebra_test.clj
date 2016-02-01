@@ -333,8 +333,8 @@
                              ["two" (make-attribute-ref "two")]]
                             tbl1)))
   (is (not (query? [(make-attribute-ref 42)])))
-  (is (query? []))
-  (is (query? nil)))
+  (is (not (query? [])))
+  (is (not (query? nil))))
 
 (deftest expression->datum-test
   (is (= (list 'attribute-ref "two") (expression->datum

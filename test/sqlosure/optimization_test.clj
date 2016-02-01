@@ -63,4 +63,4 @@
                                                      ["two" integer%]
                                                      ["three" double%]])
                                  :handle "tbl1")]
-    (is (= nil (merge-project nil)))))
+    (is (= the-empty (merge-project the-empty)))))
