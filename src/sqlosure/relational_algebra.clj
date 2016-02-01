@@ -206,13 +206,6 @@ Replaced alist with hash-map."
   [exp restrict-outer-exp
    query restrict-outer-query])
 
-(define-record-type grouping-project
-  ^{:doc "The underlying query is grouped by the non-aggregate expressions in
-          the alist"}
-  (make-grouping-project alist query) grouping-project?
-  [alist grouping-project-alist
-   query grouping-project-query])
-
 (define-record-type combine
   (really-make-combine rel-op query-1 query-2) combine?
   [rel-op combine-rel-op  ;; Relational algebra. See below.
@@ -489,14 +482,6 @@ Replaced alist with hash-map."
                                                      (next-step (combine-query-2 q)))))
                          (fail s1 q))
                        s1))
-      (grouping-project? q) (let [base-scheme (next-step (grouping-project-query q))]
-                              (alist->rel-scheme
-                               (map (fn [[k v]]
-                                      (let [typ (expression-type* (to-env base-scheme) v fail)]
-                                        (when (and fail (t/product-type? typ))
-                                          (fail ": non-product type " typ))
-                                        [k typ]))
-                                    (grouping-project-alist q))))
       (order? q) (let [scheme (next-step (order-query q))
                        env (to-env scheme)]
                    (when fail
@@ -523,22 +508,7 @@ Replaced alist with hash-map."
   "Returns true if the `obj` is a query."
   [obj]
   (or (empty-val? obj) (base-relation? obj) (project? obj) (restrict? obj) (restrict-outer? obj)
-      (combine? obj) (grouping-project? obj) (order? obj) (top? obj)))
-
-(defn grouping?
-  [q]
-  (cond
-    (empty? q) false
-    (base-relation? q) false
-    (project? q) (grouping? (project-query q))
-    (restrict? q) (grouping? (restrict-query q))
-    (restrict-outer? q) (grouping? (restrict-outer-query q))
-    (combine? q) (or (grouping? (combine-query-1 q))
-                     (grouping? (combine-query-2 q)))
-    (grouping-project? q) true
-    (order? q) (grouping? (order-query q))
-    (top? q) (grouping? (top-query q))
-    :else (c/assertion-violation 'grouping? "invalid query" q)))
+      (combine? obj) (order? obj) (top? obj)))
 
 (declare query->datum)
 
@@ -576,11 +546,6 @@ Replaced alist with hash-map."
     (combine? q) (list (combine-rel-op q)
                        (query->datum (combine-query-1 q))
                        (query->datum (combine-query-2 q)))
-    (grouping-project? q) (list 'grouping-project
-                                (map (fn [[k v]]
-                                       (cons k (expression->datum v)))
-                                     (grouping-project-alist q))
-                                (query->datum (grouping-project-query q)))
     (order? q) (list 'order (map (fn [[k v]]
                                    (list (expression->datum k) v))
                                     (order-alist q))
@@ -611,12 +576,6 @@ Replaced alist with hash-map."
       (:product :left-outer-product :union :intersection :quotient :difference)
       (make-combine (first d) (next-step (second d))
                     (next-step (third d)))
-      grouping-project (make-grouping-project
-                        (map (fn [p]
-                               [(first p)
-                                (datum->expression (rest p) universe)])
-                             (second d))
-                        (next-step (third d)))
       order (make-order (map (fn [p]
                                [(datum->expression (first p) universe) (second p)])
                              (second d))
@@ -741,13 +700,6 @@ Replaced alist with hash-map."
              (set (keys (rel-scheme-alist (query-scheme sub))))
              (query-attribute-names sub)
              (expression-attribute-names (restrict-outer-exp q))))
-    (grouping-project? q)
-    (let [subq (grouping-project-query q)
-          alist (grouping-project-alist q)]
-      (apply union
-             (set (map first (rel-scheme-alist (query-scheme subq))))
-             (query-attribute-names subq)
-             (map expression-attribute-names (vals alist))))
     (order? q)
     (let [subq (order-query q)
           alist (order-alist q)]
@@ -810,12 +762,6 @@ Replaced alist with hash-map."
       (combine? q) (make-combine (combine-rel-op q)
                                  (next-step (combine-query-1 q))
                                  (next-step (combine-query-2 q)))
-      (grouping-project? q) (let [sub (grouping-project-query q)
-                                  culled (cull-substitution-alist alist sub)]
-                              (make-grouping-project
-                               (map (fn [[k v]] [k (substitute-attribute-refs culled v)])
-                                    (grouping-project-alist q))
-                               (next-step sub)))
       (order? q) (let [sub (order-query q)
                        culled (cull-substitution-alist alist sub)]
                    (make-order (map (fn [[k v]]

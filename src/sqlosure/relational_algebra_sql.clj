@@ -115,17 +115,6 @@
                                   (sql/set-sql-select-outer-criteria
                                    (cons (expression->sql (rel/restrict-outer-exp q))
                                          (sql/sql-select-outer-criteria sql)))))
-    (rel/grouping-project? q)
-    (let [sql (x->sql-select (query->sql (rel/grouping-project-query q)))
-          alist (rel/grouping-project-alist q)]
-      (-> sql
-          (sql/set-sql-select-attributes (alist->sql alist))
-          (sql/set-sql-select-group-by
-           (concat
-            (map expression->sql
-                 (filter (fn [e] (not (rel/aggregate? e)))
-                         (vals (rel/grouping-project-alist q))))
-            (sql/sql-select-group-by sql)))))
     (rel/combine? q)
     (let [q1 (rel/combine-query-1 q)
           q2 (rel/combine-query-2 q)

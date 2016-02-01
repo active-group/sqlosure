@@ -87,21 +87,9 @@
                   :quotient
                   (worker (keys (r/rel-scheme-alist (r/query-scheme q1))) q1)
                   (worker (keys (r/rel-scheme-alist (r/query-scheme q2))) q2))
-                 
                  (r/make-combine r
                                  (worker live1 q1)
                                  (worker live1 q2)))))
-           (r/grouping-project? q)
-           (let [new-alist (filter (fn [[k v]]
-                                     (or (not (r/aggregate? v))
-                                         (contains? live k)))
-                                   (r/project-alist q))]
-             (r/make-grouping-project
-              new-alist (worker (apply concat
-                                       (map (fn [[k v]]
-                                              (r/expression-attribute-names v))
-                                            new-alist))
-                                (r/project-query q))))
            :else (c/assertion-violation 'remove-dead "unknown query" q)))]
     (worker (keys (query->alist q)) q)))
 
@@ -150,14 +138,6 @@
     (r/combine? q) (r/make-combine (r/combine-rel-op q)
                                    (merge-project (r/combine-query-1 q))
                                    (merge-project (r/combine-query-2 q)))
-    (r/grouping-project? q)
-    (let [pq (merge-project (r/grouping-project-query q))
-          pa (r/grouping-project-alist q)]
-      (if (r/project? pq)
-        (r/make-grouping-project
-         (project-alist-substitute-attribute-refs (into {} (r/project-alist pq)) pa)
-         (r/project-query pq))
-        (r/make-grouping-project pa pq)))
     :else (c/assertion-violation 'merge-project "unknown query" q)))
 
 (defn push-restrict
@@ -318,9 +298,6 @@
     (r/combine? q) (r/make-combine (r/combine-rel-op q)
                                    (push-restrict (r/combine-query-1 q))
                                    (push-restrict (r/combine-query-2 q)))
-    (r/grouping-project? q)
-    (r/make-grouping-project (r/grouping-project-alist q)
-                             (push-restrict (r/grouping-project-query q)))
     :else (c/assertion-violation 'push-restrict "unknown query" q)))
 
 ;; FIXME: what about remove-dead?

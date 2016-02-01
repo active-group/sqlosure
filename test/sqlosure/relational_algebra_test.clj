@@ -300,26 +300,6 @@
           (is (= (rel-scheme-concat (base-relation-scheme rel1)
                                     (rel-scheme-nullable (base-relation-scheme rel2)))
                  (query-scheme l))))))
-      
-    ;; grouping project
-    (let [gp (make-grouping-project
-              {"one" (make-attribute-ref "one")
-               "foo" (make-aggregation :avg
-                                       (make-attribute-ref "two"))} tbl1)
-          gp2 (make-grouping-project
-              {"one" (make-attribute-ref "one")
-               "foo" (make-aggregation :avg
-                                       (make-attribute-ref "two"))}
-              (make-base-relation 'tbl1
-                                  (alist->rel-scheme [["two" string%]
-                                                      ["one" integer%]])
-                                  (make-universe)
-                                  "tbl1"))]
-      (is (= (rel-scheme-alist (query-scheme gp))
-             {"one" string%
-              "foo" integer%}))
-      (is (thrown? Exception  ;; should fail (types do not match)
-                   (query-scheme gp2 :typecheck? true))))
     ;; order
     (let [o (make-order {(make-attribute-ref "one") :ascending} tbl1)]
       (is (= (rel-scheme-alist (query-scheme o))
@@ -496,12 +476,6 @@
       (is (= q (query->datum->query q)))
       (is (= u (query->datum->query u)))
       (is (= l (query->datum->query l))))
-    (let [gp (make-grouping-project
-              [["one" (make-attribute-ref "one")]
-               ["foo" (make-aggregation :avg
-                                        (make-attribute-ref "two"))]]
-              tbl1)]
-      (is (= gp (query->datum->query gp))))
     (let [o (make-order [[(make-attribute-ref "one") :ascending]] tbl1)]
       (is (= o (query->datum->query o))))
     (let [t (make-top nil 10 tbl1)]
@@ -645,12 +619,6 @@
     (is (= #{"two" "one"} (query-attribute-names q)))
     (is (= #{"two" "one" "three" "four"} (query-attribute-names u)))
     (is (= #{"two" "one"} (query-attribute-names l))))
-  (is (= #{"one" "two"} (query-attribute-names
-                          (make-grouping-project
-                           {"one" (make-attribute-ref "one")
-                            "foo" (make-aggregation
-                                   :avg
-                                   (make-attribute-ref "two"))} tbl1))))
   (is (= #{"one" "two"} (query-attribute-names
                           (make-order {(make-attribute-ref "one") :ascending}
                                       tbl1))))
