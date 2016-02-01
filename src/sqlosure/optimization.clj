@@ -63,14 +63,6 @@
               e (worker (concat (r/expression-attribute-names e)
                                 live)
                         (r/restrict-outer-query q))))
-           
-           (r/restrict-outer? q)
-           (let [e (r/restrict-outer-exp q)]
-             (r/make-restrict-outer
-              e (worker (concat (r/expression-attribute-names e)
-                                live)
-                        (r/restrict-outer-query q))))
-           
            (r/order? q)
            (let [alist (r/order-alist q)]
              (r/make-order
