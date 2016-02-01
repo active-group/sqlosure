@@ -403,7 +403,7 @@ Replaced alist with hash-map."
                           (aggregate? (case-expr-default expr)))
     (scalar-subquery? expr) false
     (set-subquery? expr) false
-    :else false #_(assertion-violation 'aggregate? "invalid expression" expr)))
+    :else (assertion-violation 'aggregate? "invalid expression" expr)))
 
 (defn- query-scheme* [q env fail]
   (letfn [(to-env [scheme]
