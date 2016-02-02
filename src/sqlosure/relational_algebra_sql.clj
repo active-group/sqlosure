@@ -214,6 +214,7 @@
   abstract sql."
   [q]
   (cond
+    (rel/empty-val? q) (sql/the-sql-select-empty)
     (rel/base-relation? q)
     (if-not (sql/sql-table? (rel/base-relation-handle q))
       (c/assertion-violation 'query->sql "base relation not a SQL table" q)
