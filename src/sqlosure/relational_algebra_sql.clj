@@ -130,6 +130,43 @@
   (if (sql/sql-select? expr)
     (filter groupable? (map second (sql/sql-select-attributes expr)))
     (c/assertion-violation `groupables "invalid expr" expr)))
+
+(defn substitute-expr
+  "Taḱes a map of aliases and substitutes all column aliases with their values."
+  [aliases expr]
+  (fold-sql-expression
+   (fn [e] (sql/make-sql-expr-column (get aliases e e))) ;; column
+   sql/make-sql-expr-app ;; app
+   sql/make-sql-expr-const ;; const
+   sql/make-sql-expr-tuple ;; tuple
+   sql/make-sql-expr-case ;; case
+   sql/make-sql-expr-exists ;; exists
+   sql/make-sql-expr-subquery;; subquery
+   expr))
+
+(defn substitute-group
+  [aliases group-attrs]
+  (when group-attrs
+    (into {} (map (fn [[col expr]] [(get aliases col) expr]) group-attrs))))
+
+(defn substitute
+  "Rename projected columns in a select. Since we did not create another layer
+  of SELECT, we have to propagate the associtation list provided in the current
+  query or it will not create columns with the right names."
+  [alist select]
+  (if (sql/sql-select? select)
+    (let [attrs (sql/sql-select-attributes select)
+          criteria (sql/sql-select-criteria select)
+          groupby (sql/sql-select-group-by select)
+          orderby (sql/sql-select-order-by select)
+          aliases (into {} (map (fn [[alias col]] [(rel/attribute-ref-name col) alias]) alist))]
+      (-> select
+          (sql/set-sql-select-attributes (map (fn [[curr-col expr]] [(get aliases curr-col curr-col) expr])
+                                              attrs))
+          (sql/set-sql-select-criteria (map (fn [c] (substitute-expr aliases c)) criteria))
+          (sql/set-sql-select-group-by (substitute-group aliases groupby))
+          (sql/set-sql-select-order-by (map (fn [[expr ord]] [(substitute-expr aliases expr) ord]) attrs))))
+    (c/assertion-violation `substitute "invalid expr" select)))
 (defn query->sql
   "Takes a query in abstract relational algegbra and returns the corresponding
   abstract sql."
