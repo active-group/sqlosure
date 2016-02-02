@@ -106,6 +106,30 @@
     (sql/sql-expr-subquery? expr) (let [sub (sql/sql-expr-subquery-query expr)]
                                     (on-subquery sub))
     :else (c/assertion-violation `fold-sql-expression "invalid sql expression" expr)))
+
+(defn groupable?
+  "Takes a Sql-expression and determines if the selection should be grouped.
+  Expressions are groupable if there are only columns, non-aggregates or
+  expressions that contain only such values. If an expression contains any
+  groupable values then the whole expression is groupable."
+  [expr]
+  (fold-sql-expression
+   (constantly true) ;; column
+   (constantly true) ;; app
+   (constantly false) ;; const
+   (fn [exprs] (reduce (fn [acc b] (and acc b)) exprs)) ;; tuple
+   (fn [branches default] (and (map (fn [[k v]] (or k v)) branches) default)) ;; case
+   (constantly false) ;; exists
+   ;; subquery
+   identity
+   expr))
+
+(defn groupables
+  "Takes a Sql-expression and returns all groupable attribues."
+  [expr]
+  (if (sql/sql-select? expr)
+    (filter groupable? (map second (sql/sql-select-attributes expr)))
+    (c/assertion-violation `groupables "invalid expr" expr)))
 (defn query->sql
   "Takes a query in abstract relational algegbra and returns the corresponding
   abstract sql."
