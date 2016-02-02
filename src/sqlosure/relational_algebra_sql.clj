@@ -167,10 +167,21 @@
           (sql/set-sql-select-group-by (substitute-group aliases groupby))
           (sql/set-sql-select-order-by (map (fn [[expr ord]] [(substitute-expr aliases expr) ord]) attrs))))
     (c/assertion-violation `substitute "invalid expr" select)))
+
 (defn has-aggregations?
   "Takes an alist and checks if there are any aggregations on the right sides."
   [alist]
   (not= 0 (count (filter rel/aggregate? (map second alist)))))
+
+(defn group-by-alist
+  [alist select]
+  (let [groupable-projections (filter (fn [[k v]] (not (or (rel/aggregate? v) (rel/constant? v))))
+                                      alist)
+        groupable-order-cols (filter (fn [[k v]] (sql/sql-expr-column? k))
+                                     (sql/sql-select-order-by select))]
+    (merge (map (fn [c] [(sql/sql-expr-column-name c) c]) groupable-order-cols)
+           groupable-projections)))
+
 (defn query->sql
   "Takes a query in abstract relational algegbra and returns the corresponding
   abstract sql."
