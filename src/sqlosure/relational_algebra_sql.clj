@@ -182,6 +182,33 @@
     (merge (map (fn [c] [(sql/sql-expr-column-name c) c]) groupable-order-cols)
            groupable-projections)))
 
+(defn project->sql
+  "Takes a projcet query and returns the abstract Sql representation.
+  "
+  [q]
+  (let [alist (rel/project-alist q)
+        query (rel/project-query q)
+        query-sql (x->sql-select (query->sql query))]
+    (-> (cond
+          (and (every? rel/attribute-ref? (map second alist))
+               (not (empty? (sql/sql-select-attributes query-sql))))
+          (let [groupables (groupables query-sql)]
+            ;; If the group-by clause is nil, we'll treat is as though it would group everything.
+            ;; FIXME: More sensible representation for different types of grouping (all, some or nothing)
+            ;;        (HaskellDB uses Nothing, (Just alist) and Just ALL)
+            ;; If so, group via the groupables just found. Otherwise, keep the old grouping.
+            (substitute alist (if (nil? (sql/sql-select-group-by query-sql))
+                                (sql/set-sql-select-group-by query-sql groupables)
+                                query-sql)))
+          (or (has-aggregations? alist) (nil? (sql/sql-select-group-by query-sql)))
+          (let [new-select (sql/set-sql-select-attributes query-sql alist)
+                g (group-by-alist alist new-select)]
+            (if (empty? g)
+              (sql/set-sql-select-group-by new-select nil)
+              (sql/set-sql-select-group-by new-select g)))
+          :else (sql/set-sql-select-attributes alist))
+        (sql/set-sql-select-nullary? (empty? alist)))))
+
 (defn query->sql
   "Takes a query in abstract relational algegbra and returns the corresponding
   abstract sql."
@@ -191,16 +218,7 @@
     (if-not (sql/sql-table? (rel/base-relation-handle q))
       (c/assertion-violation 'query->sql "base relation not a SQL table" q)
       (sql/make-sql-select-table (sql/sql-table-name (rel/base-relation-handle q))))
-    (rel/project? q) (let [sql (x->sql-select (query->sql
-                                               (rel/project-query q)))
-                           alist (rel/project-alist q)]
-                       (if (empty? alist)
-                         (-> sql
-                             (sql/set-sql-select-attributes
-                              ;; FIXME: what type is this dummy?
-                              {"dummy" (sql/make-sql-expr-const t/any% "dummy")})
-                             (sql/set-sql-select-nullary? true))
-                         (sql/set-sql-select-attributes sql (alist->sql alist))))
+    (rel/project? q) (project->sql q)
     (rel/restrict? q) (let [sql (x->sql-select (query->sql
                                                 (rel/restrict-query q)))]
                         (-> sql
