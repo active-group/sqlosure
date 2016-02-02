@@ -240,14 +240,14 @@
         :product
         (let [sql1 (query->sql q1)
               sql2 (query->sql q2)]
-          
+
           (cond
             (and (sql/sql-select? sql1) (empty? (sql/sql-select-attributes sql1)))
             (add-table sql1 sql2)
-            
+
             (and (sql/sql-select? sql2) (empty? (sql/sql-select-attributes sql2)))
             (add-table sql2 sql1)
-            
+
             :else
             (sql/set-sql-select-tables (sql/new-sql-select) [[nil sql1]
                                                              [nil sql2]])))
@@ -299,7 +299,7 @@
                             (list [nil (sql/make-sql-expr-app
                                         sql/op-count
                                         (sql/make-sql-expr-column name-2))])))))))))
-            
+
             (let [diff-project-alist (map (fn [[k _]] [k (rel/make-attribute-ref k)])
                                           (rel/rel-scheme-alist diff-scheme))
                   q1-project-alist (map (fn [[k _]] [k (rel/make-attribute-ref k)])
@@ -311,9 +311,9 @@
                                                                   (rel/make-project q1-project-alist
                                                                                     (rel/make-product q2 pruned))
                                                                   q1)))))))
-        
+
         (sql/make-sql-select-combine op (query->sql q1) (query->sql q2))))
-        
+
 
     (rel/order? q)
     (let [sql (x->sql-select (query->sql (rel/order-query q)))
