@@ -167,6 +167,10 @@
           (sql/set-sql-select-group-by (substitute-group aliases groupby))
           (sql/set-sql-select-order-by (map (fn [[expr ord]] [(substitute-expr aliases expr) ord]) attrs))))
     (c/assertion-violation `substitute "invalid expr" select)))
+(defn has-aggregations?
+  "Takes an alist and checks if there are any aggregations on the right sides."
+  [alist]
+  (not= 0 (count (filter rel/aggregate? (map second alist)))))
 (defn query->sql
   "Takes a query in abstract relational algegbra and returns the corresponding
   abstract sql."
