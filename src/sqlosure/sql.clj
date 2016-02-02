@@ -142,8 +142,11 @@
 ;; sql-expr is one of:
 ;;   * sql-expr-column
 ;;   * sql-expr-app
+;;   * sql-expr-const
 ;;   * sql-expr-case
 ;;   * sql-expr-exists
+;;   * sql-expr-tuple
+;;   * sql-expr-subquery
 (define-record-type sql-expr-column
   (make-sql-expr-column name) sql-expr-column?
   [name sql-expr-column-name])
