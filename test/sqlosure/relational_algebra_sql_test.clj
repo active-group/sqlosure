@@ -111,7 +111,8 @@
                                                 (make-sql-expr-column "two"))}
                (sql-select-attributes grouping-p)))
         (is (= [[nil (make-sql-select-table "tbl1")]] (sql-select-tables grouping-p)))
-        (is (= {"one" (make-sql-expr-column "one")} (sql-select-group-by grouping-p))))))
+
+        (is (= (list (make-sql-expr-column "one")) (sql-select-group-by grouping-p))))))
   (testing "restrict"
     (let [test-universe (make-universe)
           t1 (make-sql-table 't1

@@ -341,20 +341,20 @@
                    (map
                     (fn [[k _]] (sql/make-sql-expr-column k)) diff-alist))
                   (sql/set-sql-select-having
-                   (sql/make-sql-expr-app
-                    sql/op-=
-                    (sql/make-sql-expr-app
-                     sql/op-count
-                     (sql/make-sql-expr-column
-                      (ffirst (rel/rel-scheme-alist diff-scheme))))
-                    (sql/make-sql-expr-subquery
-                     (let [sql* (sql/new-sql-select)]
-                       (-> sql*
-                           (add-table sql2)
-                           (sql/set-sql-select-attributes
-                            (list [nil (sql/make-sql-expr-app
-                                        sql/op-count
-                                        (sql/make-sql-expr-column name-2))])))))))))
+                   [(sql/make-sql-expr-app
+                     sql/op-=
+                     (sql/make-sql-expr-app
+                      sql/op-count
+                      (sql/make-sql-expr-column
+                       (ffirst (rel/rel-scheme-alist diff-scheme))))
+                     (sql/make-sql-expr-subquery
+                      (let [sql* (sql/new-sql-select)]
+                        (-> sql*
+                            (add-table sql2)
+                            (sql/set-sql-select-attributes
+                             (list [nil (sql/make-sql-expr-app
+                                         sql/op-count
+                                         (sql/make-sql-expr-column name-2))]))))))])))
 
             (let [diff-project-alist (map (fn [[k _]] [k (rel/make-attribute-ref k)])
                                           (rel/rel-scheme-alist diff-scheme))
