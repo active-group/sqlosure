@@ -12,6 +12,31 @@
   [sql]
   (= :ALL (sql/sql-select-group-by sql)))
 
+(defn- inner-group
+  "This function takes a sql-select and makes sure that group marks are not
+  processed up the tree.
+  If there are columns to group by, make sure they stay at their current
+  position (no change).
+  If there is an :ALL mark, move it up the tree on the next level and remove it
+  from the underlying level."
+  [sql-select]
+  (let [grp (sql/sql-select-group-by sql-select)]
+    (cond
+      (map? grp) [nil sql-select]
+      (= :ALL grp) [:ALL (sql/set-sql-select-group-by nil)]
+      :else [nil sql-select])))
+
+(defn find-group
+  [sql-combine]
+  (let [op (sql/sql-select-combine-op sql-combine)
+        left (sql/sql-select-combine-left sql-combine)
+        right (sql/sql-select-combine-right sql-combine)
+        [g1 q1] (inner-group left)
+        [g2 q2] (inner-group right)]
+    (letfn [(orr [x y]
+              (if (nil? y) x y))]
+      [(orr g1 g2) (sql/make-sql-select-combine op q1 q2)])))
+
 (defn x->sql-select
   "Takes a sql expression and turns it into a sql-select."
   [sql]
