@@ -29,8 +29,8 @@
    put/default-sql-put-parameterization
    (query->sql query)))
 
-;; FIXME: Commented out until relational-algebra->sql is fixed.
-#_(deftest const-restrict-test
+
+(deftest const-restrict-test
   (is (= ["SELECT two AS foo FROM tbl1 WHERE (one = ?)" [string% "foobar"]]
          (sqlosure.sql-put/sql-select->string
           sqlosure.sql-put/default-sql-put-parameterization
