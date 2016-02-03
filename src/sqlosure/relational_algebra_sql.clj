@@ -252,14 +252,16 @@
             ;;        (HaskellDB uses Nothing, (Just alist) and Just ALL)
             ;; If so, group via the groupables just found. Otherwise, keep the old grouping.
             (substitute alist (if (group-mark? (sql/sql-select-group-by query-sql))
-                                (sql/set-sql-select-group-by query-sql groupables)
+                                ;; FIXME: Avoid creating an alist and then mac second...
+                                (sql/set-sql-select-group-by query-sql (map second groupables))
                                 query-sql)))
           (or (has-aggregations? alist) (group-mark? query-sql))
           (let [new-select (sql/set-sql-select-attributes query-sql (alist->sql alist))
                 g (group-by-alist alist new-select)]
             (if (empty? g)
               (sql/set-sql-select-group-by new-select nil)
-              (sql/set-sql-select-group-by new-select (alist->sql g))))
+              ;; FIXME: Avoid creating an alist and then mac second...
+              (sql/set-sql-select-group-by new-select (map second (alist->sql g)))))
           :else (sql/set-sql-select-attributes query-sql (alist->sql alist)))
         (sql/set-sql-select-nullary? (empty? alist)))))
 
