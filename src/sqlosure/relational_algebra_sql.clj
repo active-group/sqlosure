@@ -4,6 +4,14 @@
             [sqlosure.type :as t]
             [active.clojure.condition :as c]))
 
+(defn group-mark?
+  "The group-by part of a sql statement can have one of three possible values:
+   * nil
+   * :ALL
+   * an alist of attributes to group by."
+  [sql]
+  (= :ALL (sql/sql-select-group-by sql)))
+
 (defn x->sql-select
   "Takes a sql expression and turns it into a sql-select."
   [sql]
@@ -197,10 +205,10 @@
             ;; FIXME: More sensible representation for different types of grouping (all, some or nothing)
             ;;        (HaskellDB uses Nothing, (Just alist) and Just ALL)
             ;; If so, group via the groupables just found. Otherwise, keep the old grouping.
-            (substitute alist (if (nil? (sql/sql-select-group-by query-sql))
+            (substitute alist (if (group-mark? (sql/sql-select-group-by query-sql))
                                 (sql/set-sql-select-group-by query-sql groupables)
                                 query-sql)))
-          (or (has-aggregations? alist) (nil? (sql/sql-select-group-by query-sql)))
+          (or (has-aggregations? alist) (group-mark? query-sql))
           (let [new-select (sql/set-sql-select-attributes query-sql alist)
                 g (group-by-alist alist new-select)]
             (if (empty? g)
