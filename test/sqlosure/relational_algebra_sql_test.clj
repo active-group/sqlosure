@@ -91,15 +91,26 @@
 (deftest query->sql-test
   (is (= (make-sql-select-table "tbl1")
          (query->sql tbl1)))
-  (let [p (make-project [["two" (make-attribute-ref "two")]
-                         ["one" (make-attribute-ref "one")]]
-                        tbl1)
-        res (set-sql-select-attributes (x->sql-select (query->sql tbl1))
-                                       (alist->sql (project-alist p)))
-        nullary-p (make-project [] tbl1)]
-    (is (sql-select-nullary? (query->sql nullary-p)))
-    (is (= res (query->sql p))))
-
+  (testing "project"
+    (let [p (make-project [["two" (make-attribute-ref "two")]
+                           ["one" (make-attribute-ref "one")]]
+                          tbl1)
+          res (set-sql-select-attributes (x->sql-select (query->sql tbl1))
+                                         (alist->sql (project-alist p)))
+          nullary-p (make-project [] tbl1)
+          grouping-p (query->sql
+                      (make-project
+                       [["one" (make-attribute-ref "one")]
+                        ["count_twos" (make-aggregation :count (make-attribute-ref "two"))]]
+                       tbl1))]
+      (is (sql-select-nullary? (query->sql nullary-p)))
+      (is (= res (query->sql p)))
+      (testing "with aggregation"
+        (is (= [["one" (make-attribute-ref "one")]
+                ["count_twos" (make-aggregation :count (make-attribute-ref "two"))]]
+               (sql-select-attributes grouping-p)))
+        (is (= [[nil (make-sql-select-table "tbl1")]] (sql-select-tables grouping-p)))
+        (is (= [["one" (make-attribute-ref "one")]] (sql-select-group-by grouping-p))))))
   (testing "restrict"
     (let [test-universe (make-universe)
           t1 (make-sql-table 't1
