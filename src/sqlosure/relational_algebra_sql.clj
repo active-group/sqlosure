@@ -155,7 +155,7 @@
 (defn substitute-group
   [aliases group-attrs]
   (when group-attrs
-    (into {} (map (fn [[col expr]] [(get aliases col) expr]) group-attrs))))
+    (alist->sql (map (fn [[col expr]] [(get aliases col) expr]) group-attrs))))
 
 (defn substitute
   "Rename projected columns in a select. Since we did not create another layer
@@ -169,8 +169,9 @@
           orderby (sql/sql-select-order-by select)
           aliases (into {} (map (fn [[alias col]] [(rel/attribute-ref-name col) alias]) alist))]
       (-> select
-          (sql/set-sql-select-attributes (map (fn [[curr-col expr]] [(get aliases curr-col curr-col) expr])
-                                              attrs))
+          (sql/set-sql-select-attributes (alist->sql
+                                          (map (fn [[curr-col expr]] [(get aliases curr-col curr-col) expr])
+                                               attrs)))
           (sql/set-sql-select-criteria (map (fn [c] (substitute-expr aliases c)) criteria))
           (sql/set-sql-select-group-by (substitute-group aliases groupby))
           (sql/set-sql-select-order-by (map (fn [[expr ord]] [(substitute-expr aliases expr) ord]) attrs))))
@@ -187,8 +188,8 @@
                                       alist)
         groupable-order-cols (filter (fn [[k v]] (sql/sql-expr-column? k))
                                      (sql/sql-select-order-by select))]
-    (merge (map (fn [c] [(sql/sql-expr-column-name c) c]) groupable-order-cols)
-           groupable-projections)))
+    (concat (map (fn [c] [(sql/sql-expr-column-name c) c]) groupable-order-cols)
+            groupable-projections)))
 
 (defn project->sql
   "Takes a projcet query and returns the abstract Sql representation.
