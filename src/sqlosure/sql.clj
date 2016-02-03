@@ -32,7 +32,8 @@
   (make-sql-select options
                    attributes
                    nullary?
-                   tables outer-tables
+                   tables
+                   outer-tables
                    criteria
                    outer-criteria
                    group-by
@@ -107,7 +108,18 @@
 (defn ^{:test false} new-sql-select
   "Create a new, empty sql-select."
   []
-  (make-sql-select nil nil false nil nil nil nil nil false nil nil))
+  (make-sql-select nil    ;; options
+                   nil    ;; attributes
+                   false  ;; nullary?
+                   nil    ;; tables
+                   nil    ;; outer-tables
+                   nil    ;; criteria
+                   nil    ;; outer-criteria
+                   nil    ;; group-by
+                   false  ;; having
+                   nil    ;; order-by
+                   nil    ;; extra
+                   ))
 
 (def ^{:private true} sql-order #{:ascending :descending})
 
