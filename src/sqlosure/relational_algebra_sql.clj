@@ -38,6 +38,26 @@
       [(orr g1 g2) (sql/make-sql-select-combine op q1 q2)])))
 
 (defn x->sql-select
+  [sql]
+  (cond
+    (sql/sql-select-empty? sql) (sql/new-sql-select)
+    (sql/sql-select-table? sql)
+    (sql/set-sql-select-tables (sql/new-sql-select) [[nil sql]])
+    (sql/sql-select-combine? sql)
+    (let [[prev-group new-sql] (find-group sql)]
+      (-> (sql/new-sql-select)
+          (sql/set-sql-select-tables [[nil new-sql]])
+          (sql/set-sql-select-group-by prev-group)))
+    (and (sql/sql-select? sql) (empty? (sql/sql-select-attributes sql))) sql
+    (map? (sql/sql-select-group-by sql))
+    (-> (sql/new-sql-select)
+        (sql/set-sql-select-tables [[nil sql]]))
+    :else (-> (sql/new-sql-select)
+              (sql/set-sql-select-tables [[nil (-> sql
+                                                   (sql/set-sql-select-group-by nil))]])
+              (sql/set-sql-select-group-by (sql/sql-select-group-by sql)))))
+
+#_(defn x->sql-select
   "Takes a sql expression and turns it into a sql-select."
   [sql]
   (cond
