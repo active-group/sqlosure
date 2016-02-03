@@ -245,8 +245,12 @@
     (let [p (make-project [["two" (make-attribute-ref "two")]
                            ["one" (make-attribute-ref "one")]]
                           tbl1)
+          p2 (make-project [["two" (make-attribute-ref "two")]
+                            ["count_twos" (make-aggregation :count (make-attribute-ref "two"))]]
+                           tbl1)
           res (query-scheme p :typecheck? true)]
       (is (= (rel-scheme-alist res) {"two" integer% "one" string%}))
+      (is (= {"two" integer% "count_twos" integer%} (rel-scheme-alist (query-scheme p2))))
       (is (thrown? Exception  ;; should fail with typechecking because of aggregation
                    (query-scheme (make-project
                                   [["two" (make-attribute-ref "two")]
