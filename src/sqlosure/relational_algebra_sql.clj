@@ -214,7 +214,7 @@
             (if (empty? g)
               (sql/set-sql-select-group-by new-select nil)
               (sql/set-sql-select-group-by new-select g)))
-          :else (sql/set-sql-select-attributes alist))
+          :else (sql/set-sql-select-attributes query-sql (alist->sql alist)))
         (sql/set-sql-select-nullary? (empty? alist)))))
 
 (defn query->sql
