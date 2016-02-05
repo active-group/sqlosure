@@ -131,27 +131,60 @@
 
 (def the-empty-state (make-state rel/the-empty 0))
 
-(defn generate-query
+(def query-comprehension-monad-command-config
+  (null-monad-command-config nil the-empty-state))
+
+(defn run-query-comprehension*
   "Returns `[retval state]`."
   [prod state]
   (run-free-reader-state-exception
-   (null-monad-command-config nil nil)
+   query-comprehension-monad-command-config
    prod
    state))
 
+(defn run-query-comprehension
+  "Run the query comprehension against an empty state, and return the
+  result. To actually create an executable query use [[build-query!]]
+  or [[get-query]]."
+  [prod]
+  (let [[res state] (run-query-comprehension* prod nil)]
+    res))
+
+(defn generate-query
+  "Returns `[retval state]`."
+  [prod state]
+  (run-query-comprehension* prod state))
+
+(defn build-query+scheme!
+  "Monadic command to create the final query from the given relation and the current monad
+  state, and return it and the scheme. Also resets the state."
+  [rel]
+  (monadic
+   [state (get-state)]
+   (let [alias (relation-alias rel)
+         scheme (relation-scheme rel)
+         alist (map (fn [[k _]]
+                      [k (rel/make-attribute-ref (fresh-name k alias))])
+                    (rel/rel-scheme-alist scheme))
+         query (::query state)])
+   (put-state! (merge state the-empty-state))
+   (return [(rel/make-project alist query) scheme])))
+
+(defn build-query!
+  "Monadic command to create the final query from the given relation and the current monad
+  state, and return it and the scheme."
+  [rel]
+  (monadic
+   [[query scheme] (build-query+scheme! rel)]
+   (return query)))
+
 (defn get-query+scheme
   [prod]
-  (let [[rel state] (run-free-reader-state-exception
-                     (null-monad-command-config nil nil)
-                     prod
-                     the-empty-state)
-        alias (relation-alias rel)
-        scheme (relation-scheme rel)
-        alist (map (fn [[k _]]
-                     [k (rel/make-attribute-ref (fresh-name k alias))])
-                   (rel/rel-scheme-alist scheme))
-        query (get state ::query)]
-    [(rel/make-project alist query) scheme]))
+  (let [query+scheme (run-query-comprehension
+                      (monadic
+                       [rel prod]
+                       (build-query+scheme! rel)))]
+    query+scheme))
    
 (defn get-query
   [prod]
