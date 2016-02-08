@@ -277,11 +277,17 @@
       (sql/make-sql-select-table (sql/sql-table-name (rel/base-relation-handle q))))
     (rel/project? q) (project->sql q)
     (rel/restrict? q) (let [sql (x->sql-select (query->sql
-                                                (rel/restrict-query q)))]
-                        (-> sql
-                            (sql/set-sql-select-criteria
-                             (cons (expression->sql (rel/restrict-exp q))
-                                   (sql/sql-select-criteria sql)))))
+                                                (rel/restrict-query q)))
+                            exp (rel/restrict-exp q)]
+                        (if (rel/aggregate? exp)
+                          (sql/set-sql-select-having
+                           sql
+                           (cons (expression->sql exp)
+                                 (sql/sql-select-having sql)))
+                          (sql/set-sql-select-criteria
+                           sql
+                           (cons (expression->sql exp)
+                                 (sql/sql-select-criteria sql)))))
     (rel/restrict-outer? q) (let [sql (x->sql-select (query->sql
                                                       (rel/restrict-outer-query q)))]
                               (-> sql
