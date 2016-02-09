@@ -277,11 +277,17 @@
       (sql/make-sql-select-table (sql/sql-table-name (rel/base-relation-handle q))))
     (rel/project? q) (project->sql q)
     (rel/restrict? q) (let [sql (x->sql-select (query->sql
-                                                (rel/restrict-query q)))]
-                        (-> sql
-                            (sql/set-sql-select-criteria
-                             (cons (expression->sql (rel/restrict-exp q))
-                                   (sql/sql-select-criteria sql)))))
+                                                (rel/restrict-query q)))
+                            exp (rel/restrict-exp q)]
+                        (if (rel/aggregate? exp)
+                          (sql/set-sql-select-having
+                           sql
+                           (cons (expression->sql exp)
+                                 (sql/sql-select-having sql)))
+                          (sql/set-sql-select-criteria
+                           sql
+                           (cons (expression->sql exp)
+                                 (sql/sql-select-criteria sql)))))
     (rel/restrict-outer? q) (let [sql (x->sql-select (query->sql
                                                       (rel/restrict-outer-query q)))]
                               (-> sql
@@ -341,20 +347,20 @@
                    (map
                     (fn [[k _]] (sql/make-sql-expr-column k)) diff-alist))
                   (sql/set-sql-select-having
-                   (sql/make-sql-expr-app
-                    sql/op-=
-                    (sql/make-sql-expr-app
-                     sql/op-count
-                     (sql/make-sql-expr-column
-                      (ffirst (rel/rel-scheme-alist diff-scheme))))
-                    (sql/make-sql-expr-subquery
-                     (let [sql* (sql/new-sql-select)]
-                       (-> sql*
-                           (add-table sql2)
-                           (sql/set-sql-select-attributes
-                            (list [nil (sql/make-sql-expr-app
-                                        sql/op-count
-                                        (sql/make-sql-expr-column name-2))])))))))))
+                   [(sql/make-sql-expr-app
+                     sql/op-=
+                     (sql/make-sql-expr-app
+                      sql/op-count
+                      (sql/make-sql-expr-column
+                       (ffirst (rel/rel-scheme-alist diff-scheme))))
+                     (sql/make-sql-expr-subquery
+                      (let [sql* (sql/new-sql-select)]
+                        (-> sql*
+                            (add-table sql2)
+                            (sql/set-sql-select-attributes
+                             (list [nil (sql/make-sql-expr-app
+                                         sql/op-count
+                                         (sql/make-sql-expr-column name-2))]))))))])))
 
             (let [diff-project-alist (map (fn [[k _]] [k (rel/make-attribute-ref k)])
                                           (rel/rel-scheme-alist diff-scheme))

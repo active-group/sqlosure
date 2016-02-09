@@ -63,8 +63,8 @@
    criteria sql-select-criteria
    outer-criteria sql-select-outer-criteria
    group-by sql-select-group-by
-   ;; one-of: (sql-expr, nil)
-   ;; HAVING
+
+   ^{:doc "List of SQL expressions or nil."}
    having sql-select-having
    ;; [ {sql-expr sql-order} ]
    ;; ORDER BY
@@ -116,7 +116,7 @@
                    nil    ;; criteria
                    nil    ;; outer-criteria
                    nil    ;; group-by
-                   false  ;; having
+                   nil    ;; having
                    nil    ;; order-by
                    nil    ;; extra
                    ))

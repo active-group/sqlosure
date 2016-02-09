@@ -232,22 +232,22 @@
 (deftest put-having-test
   (is (= ["HAVING (year < ?)" [[integer% 2000]]]
          (with-out-str-and-value (put-having default-sql-put-parameterization
-                                             (make-sql-expr-app
-                                              op-<
-                                              (make-sql-expr-column "year")
-                                              (make-sql-expr-const integer% 2000))))))
+                                             [(make-sql-expr-app
+                                               op-<
+                                               (make-sql-expr-column "year")
+                                               (make-sql-expr-const integer% 2000))]))))
   (is (= ["HAVING ((year < ?), (director = ?))" [[integer% 2000] [string% "Luc Besson"]]]
          (with-out-str-and-value (put-having
                                   default-sql-put-parameterization
-                                  (make-sql-expr-tuple
-                                   [(make-sql-expr-app
-                                     op-<
-                                     (make-sql-expr-column "year")
-                                     (make-sql-expr-const integer% 2000))
-                                    (make-sql-expr-app
-                                     op-=
-                                     (make-sql-expr-column "director")
-                                     (make-sql-expr-const string% "Luc Besson"))]))))))
+                                  [(make-sql-expr-tuple
+                                    [(make-sql-expr-app
+                                      op-<
+                                      (make-sql-expr-column "year")
+                                      (make-sql-expr-const integer% 2000))
+                                     (make-sql-expr-app
+                                      op-=
+                                      (make-sql-expr-column "director")
+                                      (make-sql-expr-const string% "Luc Besson"))])])))))
 
 (deftest put-attributes-test
   (is (= "*" (with-out-str (put-attributes default-sql-put-parameterization nil))))

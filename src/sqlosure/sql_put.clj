@@ -172,9 +172,9 @@
                                        v))))
 
 (defn put-having
-  [param expr]
+  [param exprs]
   (print "HAVING ")
-  (put-sql-expression param expr))
+  (put-condition param exprs))
 
 (defn put-attributes
   [param attributes]
