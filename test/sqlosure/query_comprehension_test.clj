@@ -41,6 +41,15 @@
                                                  (make-const string% "foobar")))
                                    (project [["foo" (! t1 "two")]])))))))))
 
+(deftest group-test
+  (is (rel-scheme=?
+       (alist->rel-scheme [["foo" integer%]])
+       (query-scheme
+        (get-query (monadic [t1 (embed tbl1)]
+                            (group #{[t1 "one"]})
+                            (project [["foo" (make-aggregation :max (! t1 "two"))]])))))))
+
+
 (deftest trivial
   (is (rel-scheme=?
        (alist->rel-scheme [["foo" integer%]])

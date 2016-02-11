@@ -110,7 +110,24 @@
   (monadic
    (restrict expr)
    (return rel)))
-  
+
+(defn group
+  "Group by specified seq of column references `[rel name]`."
+  [colrefs]
+  (doseq [[rel name] colrefs]
+    (when-not (relation? rel)
+      (assertion-violation `group-by "not a relation" rel))
+    (when-not (string? name)
+      (assertion-violation `group-by "not a column name" name))
+    (when-not (contains? (rel/rel-scheme-alist (relation-scheme rel)) name)
+      (assertion-violation `group-by "unknown attribute" rel name)))
+  (monadic
+   [old current-query]
+   (set-query! (rel/make-group (map (fn [[rel name]]
+                                      (fresh-name name (relation-alias rel)))
+                                    colrefs)
+                               old))))
+
 (defn !
   [rel name]
   ;; check user args
