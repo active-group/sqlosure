@@ -357,10 +357,9 @@ Replaced alist with hash-map."
               (assertion-violation 'expression-type* "unknown aggregation" op)))
    ;; case-expr
    (fn [alist t] (if fail
-                   (for [[p r] alist]
-                     (do
-                       (when-not (t/type=? t/boolean% p) (fail 'boolean p))
-                       (when-not (t/type=? t r) (fail t r))))
+                   (doseq [[p r] alist]
+                     (when-not (t/type=? t/boolean% p) (fail 'boolean p))
+                     (when-not (t/type=? t r) (fail t r)))
                    t))
    (fn [subquery] (let [scheme (query-scheme* subquery env fail)
                         alist (rel-scheme-alist scheme)]
@@ -435,7 +434,7 @@ Replaced alist with hash-map."
       (project? q) (let [base-scheme (next-step (project-query q))
                          m (project-alist q)]
                      (when fail
-                       (for [[_ v] m]
+                       (doseq [[_ v] m]
                          (when (aggregate? v) (fail ": non-aggregate " v))))
                      (alist->rel-scheme (map (fn [[k v]]
                                                 (let [typ (expression-type* (to-env base-scheme)
@@ -466,7 +465,7 @@ Replaced alist with hash-map."
                                 (let [a1 (rel-scheme-alist r1)
                                       a2 (rel-scheme-alist r2)]
                                   (when fail
-                                    (for [[k _] a1]
+                                    (doseq [[k _] a1]
                                       (when (contains? a2 k)
                                         (fail (list 'not a1) a2)))))
                                 (rel-scheme-concat r1 r2))
@@ -477,7 +476,7 @@ Replaced alist with hash-map."
                        (let [a1 (rel-scheme-alist r1)
                              a2 (rel-scheme-alist r2)]
                          (when fail
-                           (for [[k _] a1]
+                           (doseq [[k _] a1]
                              (when (assoc k a2)
                                (fail (list 'not a1) a2)))))
                        (rel-scheme-concat r1 r2))
@@ -489,7 +488,7 @@ Replaced alist with hash-map."
                                    (let [a1 (rel-scheme-alist s1)
                                          a2 (rel-scheme-alist s2)]
 
-                                     (for [[k v] a2]
+                                     (doseq [[k v] a2]
                                        (when-let [p2 (get v a1)]
                                          (when-not (t/type=? v p2)
                                            (fail v p2))))))
@@ -504,7 +503,7 @@ Replaced alist with hash-map."
       (order? q) (let [scheme (next-step (order-query q))
                        env (to-env scheme)]
                    (when fail
-                     (for [p (order-alist q)]
+                     (doseq [p (order-alist q)]
                        (let [exp (first p)
                              t (expression-type* env exp fail)]
                          (when-not (t/ordered-type? t)
@@ -642,7 +641,7 @@ Replaced alist with hash-map."
                   (do
                     (when-not (= (count domain-types) (count arg-types))
                       (fail domain-types arg-types))
-                    (for [dd domain-types ad arg-types]
+                    (doseq [dd domain-types ad arg-types]
                       (when-not (t/type=? dd ad)
                         (fail dd ad)))))
                 range-type)
