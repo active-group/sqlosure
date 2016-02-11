@@ -9,6 +9,6 @@
                  ;; uncomment only one
                  ;; [org.xerial/sqlite-jdbc "3.8.11"]
                  [org.postgresql/postgresql "9.4-1206-jdbc41"]
-                 [active-clojure "0.11.0"]]
+                 [active-clojure "0.12.0"]]
   :plugins [[lein-cloverage "1.0.6"]
             [lein-kibit "0.1.2"]])
