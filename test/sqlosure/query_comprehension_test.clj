@@ -46,7 +46,7 @@
        (alist->rel-scheme [["foo" integer%]])
        (query-scheme
         (get-query (monadic [t1 (embed tbl1)]
-                            (group #{[t1 "one"]})
+                            (group [t1 "one"])
                             (project [["foo" (make-aggregation :max (! t1 "two"))]])))))))
 
 

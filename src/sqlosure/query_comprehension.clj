@@ -113,7 +113,7 @@
 
 (defn group
   "Group by specified seq of column references `[rel name]`."
-  [colrefs]
+  [& colrefs]
   (doseq [[rel name] colrefs]
     (when-not (relation? rel)
       (assertion-violation `group-by "not a relation" rel))
