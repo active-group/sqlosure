@@ -158,7 +158,7 @@
   "Takes a seq of sql-expr."
   [param group-by]
   (print "GROUP BY ")
-  (put-joining-infix group-by ", " (fn [b] (put-sql-expression param b))))
+  (put-joining-infix group-by ", " print))
 
 (defn put-order-by
   "Takes a seq of [sql-expr, sql-order]."

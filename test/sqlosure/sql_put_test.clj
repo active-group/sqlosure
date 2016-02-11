@@ -212,12 +212,12 @@
   (is (= "GROUP BY cost"
          (with-out-str
            (put-group-by default-sql-put-parameterization
-                         [(make-sql-expr-column "cost")]))))
+                         #{"cost"}))))
   (is (= "GROUP BY cost, supplier"
          (with-out-str
            (put-group-by default-sql-put-parameterization
-                         [(make-sql-expr-column "cost")
-                          (make-sql-expr-column "supplier")])))))
+                         #{"cost"
+                           "supplier"})))))
 
 (deftest put-order-by-test
   (is (= "ORDER BY one ASC"

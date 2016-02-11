@@ -62,6 +62,7 @@
    outer-tables sql-select-outer-tables
    criteria sql-select-criteria
    outer-criteria sql-select-outer-criteria
+   ^{:doc "set of SQL column names or `nil`."}
    group-by sql-select-group-by
 
    ^{:doc "List of SQL expressions or nil."}

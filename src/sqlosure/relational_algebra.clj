@@ -9,14 +9,17 @@ Replaced alist with hash-map."
             [clojure.set :refer [difference union intersection]]
             [active.clojure.record :refer [define-record-type]]
             [active.clojure.condition :as c]
-            [active.clojure.condition :refer [assertion-violation]]))
+            [active.clojure.condition :refer [assertion-violation]]
+            [active.clojure.lens :as lens]))
 
 (define-record-type rel-scheme
-  (^:private make-rel-scheme columns alist) rel-scheme?
+  (^:private make-rel-scheme columns alist grouped) rel-scheme?
   [^{:doc "Vector of the columns, i.e. the keys in the map, in order."}
    columns rel-scheme-columns
-   alist rel-scheme-alist]  ;; maps labels to types
-  )
+   ^{:doc "maps labels to types"}
+   alist rel-scheme-alist
+   ^{:doc "`nil` or set of grouped column labels"}
+   (grouped rel-scheme-grouped rel-scheme-grouped-lens)])
 
 (defn rel-scheme-types
   "Returns the types of a rel-scheme, in the order they were created."
@@ -30,7 +33,7 @@ Replaced alist with hash-map."
   [alist]
   (let [cols (map first alist)]
     (c/assert (count (set cols)) (count cols))
-    (make-rel-scheme cols (into {} alist))))
+    (make-rel-scheme cols (into {} alist) nil)))
 
 (def the-empty-rel-scheme (alist->rel-scheme []))
 (def the-empty-environment {})
@@ -45,7 +48,16 @@ Replaced alist with hash-map."
   (make-rel-scheme (concat (rel-scheme-columns s1)
                            (rel-scheme-columns s2))
                    (merge (rel-scheme-alist s1)
-                          (rel-scheme-alist s2))))
+                          (rel-scheme-alist s2))
+                   (cond
+                     (nil? (rel-scheme-grouped s1))
+                     (rel-scheme-grouped s2)
+
+                     (nil? (rel-scheme-grouped s2))
+                     (rel-scheme-grouped s1)
+
+                     :else (union (rel-scheme-grouped s1)
+                                  (rel-scheme-grouped s2)))))
 
 (defn rel-scheme-difference
   "Return a new rel-scheme resulting of the (set-)difference of s1's and s2's
@@ -55,7 +67,9 @@ Replaced alist with hash-map."
         cols (filter (complement cols2) (rel-scheme-columns s1))]
     (c/assert (not-empty cols))
     (make-rel-scheme cols
-                     (select-keys (rel-scheme-alist s1) cols))))
+                     (select-keys (rel-scheme-alist s1) cols)
+                     (difference (rel-scheme-grouped s1) cols2))))
+
 
 (defn rel-scheme-unary?
   "Returns true if the rel-scheme's alist consist of only one pair."
@@ -69,7 +83,8 @@ Replaced alist with hash-map."
                    (into {}
                          (map (fn [[name type]]
                                 [name (t/make-nullable-type type)])
-                              (rel-scheme-alist scheme)))))
+                              (rel-scheme-alist scheme)))
+                   (rel-scheme-grouped scheme)))
 
 (defn rel-scheme->environment
   "Returns the relation table of a rel-scheme."
@@ -266,6 +281,22 @@ Replaced alist with hash-map."
    count top-count
    query top-query])
 
+(define-record-type group
+  (really-make-group columns query)
+  group?
+  [^{:doc "set of columns to group by"}
+   columns group-columns
+   ^{:doc "underlying query"}
+   query group-query])
+
+(defn make-group
+  "Make a grouped query from a basic query.
+
+  - `columns` is a seq of columns to be grouped by
+  - `query` is the underlying query"
+  [columns query]
+  (really-make-group (set columns) query))
+
 (define-record-type tuple
   (make-tuple expressions) tuple?
   [expressions tuple-expressions])
@@ -423,6 +454,29 @@ Replaced alist with hash-map."
     (set-subquery? expr) false
     :else (assertion-violation 'aggregate? "invalid expression" expr)))
 
+(defn- check-grouped
+  "Check whether all attribute refs in an expression 
+  that are not inside an application of an aggregate occur in `grouped`."
+  [fail grouped expr]
+  (cond
+    (attribute-ref? expr) (when-not (contains? grouped expr)
+                            (fail "non-aggregate" expr))
+    (const? expr) nil
+    (const-null? expr) nil
+    (application? expr) (doseq [r (application-rands expr)]
+                          (check-grouped fail grouped r))
+    (tuple? expr) (doseq [e (tuple-expressions expr)]
+                    (check-grouped fail grouped e))
+    (aggregation? expr) nil
+    (aggregation*? expr) nil
+    (case-expr? expr) (doseq [[k v] (case-expr-alist expr)]
+                        (check-grouped fail grouped k)
+                        (check-grouped fail grouped v)
+                        (check-grouped fail grouped (case-expr-default expr)))
+    (scalar-subquery? expr) nil
+    (set-subquery? expr) nil
+    :else (assertion-violation `check-grouped "invalid expression" expr)))
+
 (defn- query-scheme* [q env fail]
   (letfn [(to-env [scheme]
             (compose-environments (rel-scheme->environment scheme) env))
@@ -432,10 +486,16 @@ Replaced alist with hash-map."
       (empty-val? q) the-empty-rel-scheme
       (base-relation? q) (base-relation-scheme q)
       (project? q) (let [base-scheme (next-step (project-query q))
+                         grouped (rel-scheme-grouped base-scheme)
                          m (project-alist q)]
-                     (when fail
-                       (doseq [[_ v] m]
-                         (when (aggregate? v) (fail ": non-aggregate " v))))
+                     
+                     (when (and fail
+                                (or (some (comp aggregate? second) m)
+                                    (set? grouped)))
+                       ;; we're doing aggregation
+                       (doseq [[_ e] m]
+                         (check-grouped fail grouped e)))
+                     
                      (alist->rel-scheme (map (fn [[k v]]
                                                 (let [typ (expression-type* (to-env base-scheme)
                                                                             v fail)]
@@ -500,6 +560,7 @@ Replaced alist with hash-map."
                                                      (next-step (combine-query-2 q)))))
                          (fail s1 q))
                        s1))
+      
       (order? q) (let [scheme (next-step (order-query q))
                        env (to-env scheme)]
                    (when fail
@@ -509,6 +570,11 @@ Replaced alist with hash-map."
                          (when-not (t/ordered-type? t)
                            (fail ": not an ordered type " t)))))
                    scheme)
+      
+      (group? q) (lens/overhaul (next-step (group-query q))
+                                rel-scheme-grouped-lens
+                                union (group-columns q))
+                   
       (top? q) (next-step (top-query q))
       :else (assertion-violation 'query-scheme "unknown query" q))))
 
@@ -526,7 +592,7 @@ Replaced alist with hash-map."
   "Returns true if the `obj` is a query."
   [obj]
   (or (empty-val? obj) (base-relation? obj) (project? obj) (restrict? obj) (restrict-outer? obj)
-      (combine? obj) (order? obj) (top? obj)))
+      (combine? obj) (order? obj) (group? obj) (top? obj)))
 
 (declare query->datum)
 
@@ -568,6 +634,9 @@ Replaced alist with hash-map."
                                    (list (expression->datum k) v))
                                     (order-alist q))
                      (query->datum (order-query q)))
+    (group? q) (list 'group
+                     (group-columns q)
+                     (query->datum (group-query q)))
     (top? q) (list 'top (top-offset q) (top-count q) (query->datum (top-query q)))
     :else (assertion-violation 'query->datum "unknown query" q)))
 
@@ -718,6 +787,7 @@ Replaced alist with hash-map."
              (set (keys (rel-scheme-alist (query-scheme sub))))
              (query-attribute-names sub)
              (expression-attribute-names (restrict-outer-exp q))))
+
     (order? q)
     (let [subq (order-query q)
           alist (order-alist q)]
@@ -725,6 +795,10 @@ Replaced alist with hash-map."
              (set (map first (rel-scheme-alist (query-scheme subq))))
              (query-attribute-names subq)
              (map expression-attribute-names (keys alist))))
+
+    (group? q)
+    (recur (group-query q))
+    
     (top? q) (query-attribute-names (top-query q))
     :else (assertion-violation 'query-attribute-names "unknown query" q)))
 
@@ -747,7 +821,7 @@ Replaced alist with hash-map."
    expr))
 
 (defn cull-substitution-alist
-  "Takes an map and a 'underlying' map of substitutions and returns a map of
+  "Takes an map and a 'underlying' query and returns a map of
   substitutions not already featured in `underlying`."
   [alist underlying]
   (let [underlying-alist (rel-scheme-alist (query-scheme underlying))]
@@ -786,6 +860,10 @@ Replaced alist with hash-map."
                                       [(substitute-attribute-refs culled k) v])
                                     (order-alist q))
                                (next-step sub)))
+
+      (group? q) (make-group (group-columns q)
+                             (next-step (group-query q)))
+      
       (top? q) (make-top (top-offset q) (top-count q) (next-step (top-query q)))
       :else (assertion-violation 'query-substitute-attribute-refs "unknown query" q))))
 

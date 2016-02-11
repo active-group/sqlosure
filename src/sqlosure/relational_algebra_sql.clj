@@ -2,60 +2,33 @@
   (:require [sqlosure.relational-algebra :as rel]
             [sqlosure.sql :as sql]
             [sqlosure.type :as t]
+            [clojure.set :as set]
             [active.clojure.condition :as c]))
-
-(defn group-mark?
-  "The group-by part of a sql statement can have one of three possible values:
-   * nil
-   * :ALL
-   * an alist of attributes to group by."
-  [sql]
-  (= :ALL (sql/sql-select-group-by sql)))
-
-(defn- inner-group
-  "This function takes a sql-select and makes sure that group marks are not
-  processed up the tree.
-  If there are columns to group by, make sure they stay at their current
-  position (no change).
-  If there is an :ALL mark, move it up the tree on the next level and remove it
-  from the underlying level."
-  [sql-select]
-  (let [grp (sql/sql-select-group-by sql-select)]
-    (cond
-      (map? grp) [nil sql-select]
-      (= :ALL grp) [:ALL (sql/set-sql-select-group-by nil)]
-      :else [nil sql-select])))
-
-(defn find-group
-  [sql-combine]
-  (let [op (sql/sql-select-combine-op sql-combine)
-        left (sql/sql-select-combine-left sql-combine)
-        right (sql/sql-select-combine-right sql-combine)
-        [g1 q1] (inner-group left)
-        [g2 q2] (inner-group right)]
-    (letfn [(orr [x y]
-              (if (nil? y) x y))]
-      [(orr g1 g2) (sql/make-sql-select-combine op q1 q2)])))
 
 (defn x->sql-select
   [sql]
   (cond
     (sql/sql-select-empty? sql) (sql/new-sql-select)
+
     (sql/sql-select-table? sql)
     (sql/set-sql-select-tables (sql/new-sql-select) [[nil sql]])
+
     (sql/sql-select-combine? sql)
-    (let [[prev-group new-sql] (find-group sql)]
-      (-> (sql/new-sql-select)
-          (sql/set-sql-select-tables [[nil new-sql]])
-          (sql/set-sql-select-group-by prev-group)))
-    (and (sql/sql-select? sql) (empty? (sql/sql-select-attributes sql))) sql
-    (map? (sql/sql-select-group-by sql))
     (-> (sql/new-sql-select)
         (sql/set-sql-select-tables [[nil sql]]))
-    :else (-> (sql/new-sql-select)
-              (sql/set-sql-select-tables [[nil (-> sql
-                                                   (sql/set-sql-select-group-by nil))]])
-              (sql/set-sql-select-group-by (sql/sql-select-group-by sql)))))
+    
+    (sql/sql-select? sql)
+    (cond
+      (empty? (sql/sql-select-attributes sql)) sql
+      
+      (some? (sql/sql-select-group-by sql))
+      (-> (sql/new-sql-select)
+          (sql/set-sql-select-tables [[nil sql]]))
+    
+      :else
+      (-> (sql/new-sql-select)
+          (sql/set-sql-select-tables [[nil (sql/set-sql-select-group-by sql nil)]])
+          (sql/set-sql-select-group-by (sql/sql-select-group-by sql))))))
 
 #_(defn x->sql-select
   "Takes a sql expression and turns it into a sql-select."
@@ -225,44 +198,14 @@
 (defn has-aggregations?
   "Takes an alist and checks if there are any aggregations on the right sides."
   [alist]
-  (not= 0 (count (filter rel/aggregate? (map second alist)))))
-
-(defn group-by-alist
-  [alist select]
-  (let [groupable-projections (filter (fn [[k v]] (not (or (rel/aggregate? v) (rel/constant? v))))
-                                      alist)
-        groupable-order-cols (filter (fn [[k v]] (sql/sql-expr-column? k))
-                                     (sql/sql-select-order-by select))]
-    (concat (map (fn [c] [(sql/sql-expr-column-name c) c]) groupable-order-cols)
-            groupable-projections)))
+  (not (empty? (filter rel/aggregate? (map second alist)))))
 
 (defn project->sql
-  "Takes a projcet query and returns the abstract Sql representation.
-  "
+  "Takes a projcet query and returns the abstract Sql representation."
   [q]
-  (let [alist (rel/project-alist q)
-        query (rel/project-query q)
-        query-sql (x->sql-select (query->sql query))]
-    (-> (cond
-          (and (every? rel/attribute-ref? (map second alist))
-               (not (empty? (sql/sql-select-attributes query-sql))))
-          (let [groupables (groupables query-sql)]
-            ;; If the group-by clause is nil, we'll treat is as though it would group everything.
-            ;; FIXME: More sensible representation for different types of grouping (all, some or nothing)
-            ;;        (HaskellDB uses Nothing, (Just alist) and Just ALL)
-            ;; If so, group via the groupables just found. Otherwise, keep the old grouping.
-            (substitute alist (if (group-mark? (sql/sql-select-group-by query-sql))
-                                ;; FIXME: Avoid creating an alist and then mac second...
-                                (sql/set-sql-select-group-by query-sql (map second groupables))
-                                query-sql)))
-          (or (has-aggregations? alist) (group-mark? query-sql))
-          (let [new-select (sql/set-sql-select-attributes query-sql (alist->sql alist))
-                g (group-by-alist alist new-select)]
-            (if (empty? g)
-              (sql/set-sql-select-group-by new-select nil)
-              ;; FIXME: Avoid creating an alist and then mac second...
-              (sql/set-sql-select-group-by new-select (map second (alist->sql g)))))
-          :else (sql/set-sql-select-attributes query-sql (alist->sql alist)))
+  (let [alist (rel/project-alist q)]
+    (-> (sql/set-sql-select-attributes (x->sql-select (query->sql (rel/project-query q)))
+                                       (alist->sql alist))
         (sql/set-sql-select-nullary? (empty? alist)))))
 
 (defn query->sql
@@ -376,12 +319,19 @@
 
         (sql/make-sql-select-combine op (query->sql q1) (query->sql q2))))
 
-
     (rel/order? q)
     (let [sql (x->sql-select (query->sql (rel/order-query q)))
           new-order (map (fn [[k v]] [(expression->sql k) v])
                          (rel/order-alist q))]
       (sql/set-sql-select-order-by sql (concat new-order (sql/sql-select-order-by sql))))
+
+
+    (rel/group? q)
+    (let [sql (x->sql-select (query->sql (rel/group-query q)))]
+      (sql/set-sql-select-group-by sql
+                                   (set/union (sql/sql-select-group-by sql)
+                                              (rel/group-columns q))))
+    
     (rel/top? q)
     (let [sql (x->sql-select (query->sql (rel/top-query q)))]
       (sql/set-sql-select-extra sql (cons (if-let [off (rel/top-offset q)]

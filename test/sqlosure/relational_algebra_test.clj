@@ -3,6 +3,7 @@
             [sqlosure.universe :refer :all]
             [sqlosure.sql :as sql :refer :all]
             [sqlosure.type :refer :all]
+            [active.clojure.lens :as lens]
             [clojure.pprint :refer :all]
             [clojure.test :refer :all]))
 
@@ -235,48 +236,82 @@
                                  (alist->rel-scheme [["C" string%]])
                                  :universe test-universe
                                  :handle "SUBA")]
-    ;; empty val
-    (is (= the-empty-rel-scheme (query-scheme (make-empty-val))))
-    ;; base relation
-    (is (= (alist->rel-scheme [["one" string%]
-                               ["two" integer%]])
-           (query-scheme tbl1 :typecheck? true)))
-    ;; projection
-    (let [p (make-project [["two" (make-attribute-ref "two")]
-                           ["one" (make-attribute-ref "one")]]
-                          tbl1)
-          p2 (make-project [["two" (make-attribute-ref "two")]
-                            ["count_twos" (make-aggregation :count (make-attribute-ref "two"))]]
-                           tbl1)
-          res (query-scheme p :typecheck? true)]
-      (is (= (rel-scheme-alist res) {"two" integer% "one" string%}))
-      (is (= {"two" integer% "count_twos" integer%} (rel-scheme-alist (query-scheme p2))))
-      (is (thrown? Exception  ;; should fail with typechecking because of aggregation
-                   (query-scheme (make-project
-                                  [["two" (make-attribute-ref "two")]
-                                   ["one" (make-aggregation
-                                           :min
-                                           (make-tuple [(make-const integer% 42)
-                                                        (make-const integer% 23)]))]]
-                                   tbl1)
-                                 :typecheck? true))))
-    (let [r (make-restrict (sql/=$ (make-scalar-subquery
-                                    (make-project [["C" (make-attribute-ref "C")]]
-                                                  SUBB))
-                                   (make-attribute-ref "C"))
-                           SUBA)]
-      (is (= (rel-scheme-alist (query-scheme r)) {"C" string%}))
-      (is (thrown? Exception (query-scheme r :typecheck? true))))
+    (testing "empty val"
+      (is (= the-empty-rel-scheme (query-scheme (make-empty-val)))))
 
-
-    (let [r (make-restrict-outer (sql/=$ (make-scalar-subquery
-                                          (make-project [["C" (make-attribute-ref "C")]]
-                                                        SUBB))
-                                         (make-attribute-ref "C"))
-                                 SUBA)]
-      (is (= (rel-scheme-alist (query-scheme r)) {"C" string%}))
-      (is (thrown? Exception (query-scheme r :typecheck? true))))
     
+    (testing "base relation"
+      (is (= (alist->rel-scheme [["one" string%]
+                                 ["two" integer%]])
+             (query-scheme tbl1 :typecheck? true))))
+
+    (testing "projection"
+      (let [p (make-project [["two" (make-attribute-ref "two")]
+                             ["one" (make-attribute-ref "one")]]
+                            tbl1)
+            p2 (make-project [["two" (make-attribute-ref "two")]
+                              ["count_twos" (make-aggregation :count (make-attribute-ref "two"))]]
+                             tbl1)
+            res (query-scheme p :typecheck? true)]
+        (is (= (rel-scheme-alist res) {"two" integer% "one" string%}))
+        (is (= {"two" integer% "count_twos" integer%} (rel-scheme-alist (query-scheme p2))))
+        (is (thrown? Exception  ;; should fail with typechecking because of aggregation
+                     (query-scheme (make-project
+                                    [["two" (make-attribute-ref "two")]
+                                     ["one" (make-aggregation
+                                             :min
+                                             (make-tuple [(make-const integer% 42)
+                                                          (make-const integer% 23)]))]]
+                                    tbl1)
+                                   :typecheck? true)))))
+
+    (testing "restriction"
+      (let [r (make-restrict (sql/=$ (make-scalar-subquery
+                                      (make-project [["C" (make-attribute-ref "C")]]
+                                                    SUBB))
+                                     (make-attribute-ref "C"))
+                             SUBA)]
+        (is (= (rel-scheme-alist (query-scheme r)) {"C" string%}))
+        (is (thrown? Exception (query-scheme r :typecheck? true)))))
+      
+
+    (testing "outer restriction"
+      (let [r (make-restrict-outer (sql/=$ (make-scalar-subquery
+                                            (make-project [["C" (make-attribute-ref "C")]]
+                                                          SUBB))
+                                           (make-attribute-ref "C"))
+                                   SUBA)]
+        (is (= (rel-scheme-alist (query-scheme r)) {"C" string%}))
+        (is (thrown? Exception (query-scheme r :typecheck? true)))))
+
+    (testing "grouping"
+      (is (lens/overhaul (alist->rel-scheme [["one" string%]
+                                             ["two" integer%]])
+                         rel-scheme-grouped-lens
+                         #{"one"})
+          (query-scheme (make-group #{"one"} tbl1)))
+      (is (lens/overhaul (alist->rel-scheme [["one" string%]
+                                             ["two" integer%]])
+                         rel-scheme-grouped-lens
+                         #{"one" "two"})
+          (query-scheme (make-group #{"two"} (make-group #{"one"} tbl1))))
+      (is (thrown-with-msg?
+           Throwable
+           #"type violation"
+           (query-scheme (make-project [["x" (make-attribute-ref "one")]
+                                        ["y" (make-aggregation :max
+                                                               (make-attribute-ref "two"))]]
+                                       tbl1)
+                         :typecheck? true)))
+
+      (is (thrown-with-msg?
+           Throwable
+           #"type violation"
+           (query-scheme (make-project [["x" (make-attribute-ref "one")]]
+                                       (make-group #{"two"} tbl1))
+                         :typecheck? true))))
+
+
     (testing "scheme for various combinations"
       (let [test-universe (make-universe)
             rel1 (make-base-relation 'tbl1

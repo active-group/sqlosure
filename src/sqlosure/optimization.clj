@@ -70,6 +70,12 @@
               (worker (concat (order-alist-attribute-names alist)
                               live)
                       (r/order-query q))))
+           
+           (r/group? q)
+           (r/make-group
+            (set/intersection live (r/group-columns q))
+            (worker live (r/group-query q)))
+           
            (r/top? q) (r/make-top (r/top-offset q) (r/top-count q) (worker live (r/top-query q)))
            (r/combine? q)
            (let [r (r/combine-rel-op q)
@@ -134,6 +140,10 @@
 
     (r/order? q) (r/make-order (r/order-alist q)
                                (merge-project (r/order-query q)))
+
+    (r/group? q) (r/make-group (r/group-columns q)
+                               (merge-project (r/group-query q)))
+    
     (r/top? q) (r/make-top (r/top-offset q) (r/top-count q) (merge-project (r/top-query q)))
     (r/combine? q) (r/make-combine (r/combine-rel-op q)
                                    (merge-project (r/combine-query-1 q))
@@ -193,6 +203,11 @@
         (r/order? rq) (r/make-order (r/order-alist rq)
                                     (push-restrict
                                      (r/make-restrict re (r/order-query rq))))
+
+        (r/group? rq) (r/make-group (r/group-columns rq)
+                                    (push-restrict
+                                     (r/group-query rq)))
+        
         :else (r/make-restrict re (push-restrict rq))))
 
     (r/restrict-outer? q)
@@ -242,6 +257,7 @@
         (r/order? rq) (r/make-order (r/order-alist rq)
                                     (push-restrict
                                      (r/make-restrict-outer re (r/order-query rq))))
+        
         :else (r/make-restrict-outer re (push-restrict rq))))
     
     (r/order? q)
@@ -272,6 +288,11 @@
                         new
                         (push-restrict new)))
         :else (r/make-order alist (push-restrict oq))))
+
+    (r/group? q)
+    (r/make-group (r/group-columns q)
+                  (push-restrict (r/group-query q)))
+    
     (r/top? q)
     (let [tq (r/top-query q)
           offset (r/top-offset q)
