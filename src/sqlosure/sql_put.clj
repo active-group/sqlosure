@@ -306,8 +306,8 @@
                 v2 (put-sql-expression param (third rands))
                 _ (print ")")]
             (concat v1 v2))
-        :else (assertion-violation 'put-sql-expression
-                                   (str "unhandled operator arity " (pr-str op)))))
+        (assertion-violation 'put-sql-expression
+                             (str "unhandled operator arity " (pr-str op)))))
     (sql/sql-expr-const? expr)
     (put-literal param (sql/sql-expr-const-type expr)
                  (sql/sql-expr-const-val expr))
