@@ -295,6 +295,14 @@
                             rel-scheme-grouped-lens
                             #{"one" "two"})
              (query-scheme (make-group #{"two"} (make-group #{"one"} tbl1)))))
+      ;; Note: make-extend is used by query-comprehension/project,
+      ;; which currently keeps un-aggregated and un-grouped column,
+      ;; making SQL server unhappy; only 'one' and 'cnt' may be there in the end (maybe not here)
+      #_(is (= (alist->rel-scheme [["one" string%]
+                                 ["cnt" integer%]])
+             (query-scheme (make-group #{"one"} (make-extend [["one" (make-attribute-ref "one")]
+                                                              ["cnt" (make-aggregation :count-all)]]
+                                                             tbl1)))))
       (is (thrown-with-msg?
            Throwable
            #"type violation"
