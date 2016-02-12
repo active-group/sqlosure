@@ -459,7 +459,7 @@ Replaced alist with hash-map."
   that are not inside an application of an aggregate occur in `grouped`."
   [fail grouped expr]
   (cond
-    (attribute-ref? expr) (when-not (contains? grouped expr)
+    (attribute-ref? expr) (when-not (contains? grouped (attribute-ref-name expr))
                             (fail "non-aggregate" expr))
     (const? expr) nil
     (const-null? expr) nil

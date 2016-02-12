@@ -298,11 +298,14 @@
       ;; Note: make-extend is used by query-comprehension/project,
       ;; which currently keeps un-aggregated and un-grouped column,
       ;; making SQL server unhappy; only 'one' and 'cnt' may be there in the end (maybe not here)
-      #_(is (= (alist->rel-scheme [["one" string%]
-                                 ["cnt" integer%]])
-             (query-scheme (make-group #{"one"} (make-extend [["one" (make-attribute-ref "one")]
-                                                              ["cnt" (make-aggregation :count-all)]]
-                                                             tbl1)))))
+      (is (= (alist->rel-scheme [["one*" string%]
+                                 ["cnt" integer%]
+                                 ["one" string%]
+                                 ["two" integer%]])
+             (query-scheme  (make-extend [["one*" (make-attribute-ref "one")]
+                                          ["cnt" (make-aggregation :count-all)]]
+                                         (make-group #{"one" "two"} tbl1))
+                           :typecheck? true)))
       (is (thrown-with-msg?
            Throwable
            #"type violation"
