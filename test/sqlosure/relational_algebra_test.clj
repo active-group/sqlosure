@@ -285,15 +285,15 @@
         (is (thrown? Exception (query-scheme r :typecheck? true)))))
 
     (testing "grouping"
-      (is (= (lens/overhaul (alist->rel-scheme [["one" string%]
+      (is (= (lens/shove (alist->rel-scheme [["one" string%]
                                                 ["two" integer%]])
-                            rel-scheme-grouped-lens
-                            #{"one"})
+                         rel-scheme-grouped-lens
+                         #{"one"})
              (query-scheme (make-group #{"one"} tbl1))))
-      (is (= (lens/overhaul (alist->rel-scheme [["one" string%]
-                                                ["two" integer%]])
-                            rel-scheme-grouped-lens
-                            #{"one" "two"})
+      (is (= (lens/shove (alist->rel-scheme [["one" string%]
+                                             ["two" integer%]])
+                         rel-scheme-grouped-lens
+                         #{"one" "two"})
              (query-scheme (make-group #{"two"} (make-group #{"one"} tbl1)))))
       ;; Note: make-extend is used by query-comprehension/project,
       ;; which currently keeps un-aggregated and un-grouped column,
