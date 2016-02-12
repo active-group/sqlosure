@@ -328,8 +328,8 @@
                             (when fail
                               (do
                                 (check-numerical t1 fail)
-                                (check-numerical t2 fail)
-                                t1)))
+                                (check-numerical t2 fail)))
+                            t1)
                           -
                           :universe sql-universe
                           :data op--)]
