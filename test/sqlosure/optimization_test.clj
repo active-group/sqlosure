@@ -63,4 +63,16 @@
                                                      ["two" integer%]
                                                      ["three" double%]])
                                  :handle "tbl1")]
-    (is (= the-empty (merge-project the-empty)))))
+    (is (= the-empty (merge-project the-empty))))
+
+  (testing "optimization should not merge aggregates"
+    (let [expr (let [tbl1 (make-base-relation "tbl1"
+                                              (alist->rel-scheme [["one" string%]
+                                                                  ["two" integer%]])
+                                              :handle "tbl1")]
+                 (make-project [["m" (make-aggregation :max (make-attribute-ref "c"))]]
+                               (make-project [["c" (make-aggregation :count-all)]]
+                                             (make-group #{"one"}
+                                                         tbl1))))]
+      (is (= expr (merge-project expr))))))
+

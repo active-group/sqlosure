@@ -109,9 +109,12 @@
           pa (r/project-alist q)]
       (cond
         (r/project? pq)
-        (r/make-project (project-alist-substitute-attribute-refs
-                         (into {} (r/project-alist pq)) pa)
-                        (r/project-query pq))
+        (if (some (fn [[col expr]] (r/aggregate? expr))
+                  (r/project-alist pq))
+          (r/make-project pa pq)
+          (r/make-project (project-alist-substitute-attribute-refs
+                           (into {} (r/project-alist pq)) pa)
+                          (r/project-query pq)))
         (r/combine? pq)
         (let [op (r/combine-rel-op pq)]
           (case op
