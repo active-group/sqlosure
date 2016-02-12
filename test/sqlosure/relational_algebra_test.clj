@@ -271,7 +271,7 @@
                                                     SUBB))
                                      (make-attribute-ref "C"))
                              SUBA)]
-        (is (= (rel-scheme-alist (query-scheme r)) {"C" string%}))
+        (is (= {"C" string%} (rel-scheme-alist (query-scheme r))))
         (is (thrown? Exception (query-scheme r :typecheck? true)))))
       
 
@@ -281,20 +281,20 @@
                                                           SUBB))
                                            (make-attribute-ref "C"))
                                    SUBA)]
-        (is (= (rel-scheme-alist (query-scheme r)) {"C" string%}))
+        (is (= {"C" string%} (rel-scheme-alist (query-scheme r))))
         (is (thrown? Exception (query-scheme r :typecheck? true)))))
 
     (testing "grouping"
-      (is (lens/overhaul (alist->rel-scheme [["one" string%]
-                                             ["two" integer%]])
-                         rel-scheme-grouped-lens
-                         #{"one"})
-          (query-scheme (make-group #{"one"} tbl1)))
-      (is (lens/overhaul (alist->rel-scheme [["one" string%]
-                                             ["two" integer%]])
-                         rel-scheme-grouped-lens
-                         #{"one" "two"})
-          (query-scheme (make-group #{"two"} (make-group #{"one"} tbl1))))
+      (is (= (lens/overhaul (alist->rel-scheme [["one" string%]
+                                                ["two" integer%]])
+                            rel-scheme-grouped-lens
+                            #{"one"})
+             (query-scheme (make-group #{"one"} tbl1))))
+      (is (= (lens/overhaul (alist->rel-scheme [["one" string%]
+                                                ["two" integer%]])
+                            rel-scheme-grouped-lens
+                            #{"one" "two"})
+             (query-scheme (make-group #{"two"} (make-group #{"one"} tbl1)))))
       (is (thrown-with-msg?
            Throwable
            #"type violation"
