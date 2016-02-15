@@ -61,7 +61,6 @@
   [q]
   (add-to-product rel/make-left-outer-product rel/rel-scheme-nullable q))
 
-(defn project
 (defn- project0
   "Project the some columns of the current query."
   [alist extend?]
