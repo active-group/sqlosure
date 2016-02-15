@@ -254,13 +254,16 @@
                   compute-scheme
                   alias0)))
 
- (defn first-scheme
-   [s1 s2]
-   s1)
+(defn first-scheme
+  [s1 s2]
+  s1)
 
 (defn union
-  [prod1 prod2]
-  (combination :union first-scheme prod1 prod2))
+  [p1 & prods]
+  (if (empty? prods)
+    p1
+    (combination :union first-scheme p1
+                 (apply union prods))))
 
 (defn intersect
   [prod1 prod2]
