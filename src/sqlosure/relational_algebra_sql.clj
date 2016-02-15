@@ -133,44 +133,6 @@
                                     (on-subquery sub))
     :else (c/assertion-violation `fold-sql-expression "invalid sql expression" expr)))
 
-(defn substitute-expr
-  "Taḱes a map of aliases and substitutes all column aliases with their values."
-  [aliases expr]
-  (fold-sql-expression
-   (fn [e] (sql/make-sql-expr-column (get aliases e e))) ;; column
-   sql/make-sql-expr-app ;; app
-   sql/make-sql-expr-const ;; const
-   sql/make-sql-expr-tuple ;; tuple
-   sql/make-sql-expr-case ;; case
-   sql/make-sql-expr-exists ;; exists
-   sql/make-sql-expr-subquery;; subquery
-   expr))
-
-(defn substitute-group
-  [aliases group-attrs]
-  (when group-attrs
-    (alist->sql (map (fn [[col expr]] [(get aliases col) expr]) group-attrs))))
-
-(defn substitute
-  "Rename projected columns in a select. Since we did not create another layer
-  of SELECT, we have to propagate the associtation list provided in the current
-  query or it will not create columns with the right names."
-  [alist select]
-  (if (sql/sql-select? select)
-    (let [attrs (sql/sql-select-attributes select)
-          criteria (sql/sql-select-criteria select)
-          groupby (sql/sql-select-group-by select)
-          orderby (sql/sql-select-order-by select)
-          aliases (into {} (map (fn [[alias col]] [(rel/attribute-ref-name col) alias]) alist))]
-      (-> select
-          (sql/set-sql-select-attributes (alist->sql
-                                          (map (fn [[curr-col expr]] [(get aliases curr-col curr-col) expr])
-                                               attrs)))
-          (sql/set-sql-select-criteria (map (fn [c] (substitute-expr aliases c)) criteria))
-          (sql/set-sql-select-group-by (substitute-group aliases groupby))
-          (sql/set-sql-select-order-by (map (fn [[expr ord]] [(substitute-expr aliases expr) ord]) attrs))))
-    (c/assertion-violation `substitute "invalid expr" select)))
-
 (defn has-aggregations?
   "Takes an alist and checks if there are any aggregations on the right sides."
   [alist]
