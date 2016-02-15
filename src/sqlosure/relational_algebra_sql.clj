@@ -110,34 +110,6 @@
   (sql/set-sql-select-outer-tables sql
                                    (conj (sql/sql-select-outer-tables sql) [nil q])))
 
-(defn fold-sql-expression
-  [on-column on-app on-const on-tuple on-case on-exists on-subquery expr]
-  (cond
-    (sql/sql-expr-column? expr) (on-column (sql/sql-expr-column-name expr))
-    (sql/sql-expr-app? expr) (let [rator (sql/sql-expr-app-rator expr)
-                                   rands (sql/sql-expr-app-rands expr)]
-                               (on-app rator (map fold-sql-expression rands)))
-    (sql/sql-expr-const? expr) (let [t (sql/sql-expr-const-type expr)
-                                     v (sql/sql-expr-const-val expr)]
-                                 (on-const t v))
-    (sql/sql-expr-tuple? expr) (on-tuple (map fold-sql-expression (sql/sql-expr-tuple-expressions expr)))
-    (sql/sql-expr-case? expr) (let [branches (sql/sql-expr-case-branches expr)
-                                    default (sql/sql-expr-case-default expr)]
-                                (on-case (map (fn [[k v]]
-                                                [(fold-sql-expression k) (fold-sql-expression v)])
-                                              branches)
-                                         (fold-sql-expression default)))
-    (sql/sql-expr-exists? expr) (let [select (sql/sql-expr-exists-select expr)]
-                                  (on-exists select))
-    (sql/sql-expr-subquery? expr) (let [sub (sql/sql-expr-subquery-query expr)]
-                                    (on-subquery sub))
-    :else (c/assertion-violation `fold-sql-expression "invalid sql expression" expr)))
-
-(defn has-aggregations?
-  "Takes an alist and checks if there are any aggregations on the right sides."
-  [alist]
-  (not (empty? (filter rel/aggregate? (map second alist)))))
-
 (defn project->sql
   "Takes a projcet query and returns the abstract Sql representation."
   [q]
