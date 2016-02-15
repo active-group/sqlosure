@@ -416,25 +416,6 @@ Replaced alist with hash-map."
                                                 "type-violation (expected/found)"
                                                 expected thing)))))
 
-(defn constant?
-  "Determines if a query represents a constant or an expression that only
-  contains constants."
-  [query]
-  (letfn [(count-attr [expr]
-            (fold-expression
-             (constantly 1)  ;; attr
-             (constantly 0)  ;; const
-             (constantly 0)  ;; const-null
-             (constantly 1)  ;; application
-             #(reduce + 0 %)  ;; tuple
-             (fn [_ exprs] exprs)  ;; aggregation
-             (fn [_] 1)  ;; aggregation*
-             (fn [branches default] (+ (reduce + 0 branches) default)) ;; case-expr
-             (constantly 0)  ;; scalar
-             (constantly 0)  ;; set
-             expr))]
-    (= 0 (count-attr query))))
-
 (defn aggregate?
   "Returns true if `expr` is or contains an aggregation."
   [expr]
