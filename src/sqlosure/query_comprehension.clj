@@ -62,22 +62,35 @@
   (add-to-product rel/make-left-outer-product rel/rel-scheme-nullable q))
 
 (defn project
+(defn- project0
   "Project the some columns of the current query."
-  [alist]
+  [alist extend?]
   (monadic
    [alias new-alias]
    [query current-query]
-   (set-query! (rel/make-extend
-                (map (fn [[k v]] [(fresh-name k alias) v])
-                     alist)
-                query))
+   (let [query' ((if extend? rel/make-extend rel/make-project)
+                 (map (fn [[k v]] [(fresh-name k alias) v])
+                      alist)
+                 query)])
+   (set-query! query')
    (return (make-relation
             alias
-            (let [scheme (rel/query-scheme query)]
+            (let [scheme (rel/query-scheme query)
+                  env (rel/rel-scheme->environment scheme)]
               (rel/alist->rel-scheme
                (map (fn [[k v]]
-                      [k (rel/expression-type (rel/rel-scheme->environment scheme) v)])
+                      [k (rel/expression-type env v)])
                     alist)))))))
+
+(defn project
+  "Project the some columns of the current query."
+  [alist]
+  (project0 alist true))
+
+(defn project-only ;; FIXME: temporary solution? Can't detect automatically what's needed?
+  "Project the some columns of the current query."
+  [alist]
+  (project0 alist false))
 
 ;; FIXME: add !
 (defn restrict
