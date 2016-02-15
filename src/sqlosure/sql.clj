@@ -172,7 +172,7 @@
 (define-record-type sql-operator
   (make-sql-operator name arity) sql-operator?
   [name sql-operator-name
-   arity sql-operator-arity  ;; -1 means postfix
+   arity sql-operator-arity  ;; -1 means postfix, -2 prefix
    ])
 
 (defn make-sql-expr-app
@@ -207,6 +207,8 @@
 (def op-bit-or (make-sql-operator "|" 2))
 (def op-bit-xor (make-sql-operator "^" 2))
 (def op-asg (make-sql-operator "=" 2))
+
+(def op-concat (make-sql-operator "CONCAT" -2))
 
 (def op-not (make-sql-operator "NOT" 1))
 (def op-null? (make-sql-operator "IS NULL" -1))
@@ -333,6 +335,22 @@
                           -
                           :universe sql-universe
                           :data op--)]
+    (fn [expr1 expr2]
+      (make-application rator expr1 expr2))))
+
+(def concat$
+  (let [rator (make-rator 'concat
+                          (fn [fail t1 t2]
+                            #_(when fail
+                              (do
+                                ;; TODO: check-string maybe?
+                                ;; (check-numerical t1 fail)
+                                ;; (check-numerical t2 fail)
+                                ))
+                            t1)
+                          str
+                          :universe sql-universe
+                          :data op-concat)]
     (fn [expr1 expr2]
       (make-application rator expr1 expr2))))
 

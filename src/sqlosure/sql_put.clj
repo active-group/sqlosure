@@ -185,8 +185,9 @@
                          (if (and (sql/sql-expr-column? expr)
                                   (= col (sql/sql-expr-column-name expr)))
                            (print col)
-                           (do (put-sql-expression param expr)
-                               (default-put-alias col)))))))
+                           (let [v (put-sql-expression param expr)]
+                             (default-put-alias col)
+                             v))))))
 
 (defn put-sql-join
   "Put the tables involved in the join of a SQL select."
@@ -286,6 +287,16 @@
                 v1 (put-sql-expression param (first rands))
                 _ (print ")")]
             v1)
+        ;; prefix 2
+        -2 (let [_ (print name)
+                 _ (print "(")
+                 v1 (put-sql-expression param (first rands))
+                 _ (print ",")
+                 _ (put-space)
+                 v2 (put-sql-expression param (second rands))
+                 _ (print ")")]
+             (concat v1 v2))
+        ;; infix 2
         2 (let [_ (print "(")
                 v1 (put-sql-expression param (first rands))
                 _ (put-space)
