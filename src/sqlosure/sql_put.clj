@@ -92,8 +92,8 @@
 (defn put-tables
   "Takes a sql-put-parameterization and the sql-select-tables field of a
   sql-select and prints them as a sql statement."
-  [param tables]
-  (put-joining-infix tables ", "
+  [param tables between]
+  (put-joining-infix tables between
                      (fn [[alias select]]
                        (if (sql/sql-select-table? select)
                          (do
@@ -197,22 +197,23 @@
     (let [t (put-padding-if-non-null tables
                                      (fn [tables]
                                        (print "FROM ")
-                                       (put-tables param tables)))
+                                       (put-tables param tables ", ")))
           
           o (if (not-empty outer-tables)
               (do
                 (print " LEFT JOIN ")
-                (put-tables param outer-tables))
+                ;; every LEFT JOIN needs an ON
+                (put-tables param outer-tables " ON (1=1) LEFT JOIN "))
               [])]
       (concat t o))
     ;; outer tables AND more than one regular tablew
     (let [_ (print " FROM (SELECT * FROM ")
-          t  (put-tables param tables)
+          t  (put-tables param tables ", ")
           _ (do (print ")")
                 (put-alias param nil))
           o (do
               (print " LEFT JOIN ")
-              (put-tables param outer-tables))]
+              (put-tables param outer-tables " ON (1=1) LEFT JOIN" ))]
       (concat t o))))
 
 (defn put-sql-select-1
