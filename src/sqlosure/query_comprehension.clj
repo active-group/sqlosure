@@ -140,6 +140,18 @@
                                     colrefs)
                                old))))
 
+(defn group-refs
+  "Group by specified seq of attribute references `(qc/! rel name)`."
+  [& refs]
+  (doseq [ref refs]
+    (when-not (rel/attribute-ref? ref)
+      (assertion-violation `group-by "not a column name" name)))
+  (monadic
+   [old current-query]
+   (set-query! (rel/make-group (map rel/attribute-ref-name
+                                    refs)
+                               old))))
+
 (defn !
   [rel name]
   ;; check user args
