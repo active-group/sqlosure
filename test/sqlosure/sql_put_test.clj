@@ -147,11 +147,13 @@
 (deftest put-tables-test
   (is (= "foo"
          (with-out-str (put-tables default-sql-put-parameterization
-                                   [[nil (make-sql-select-table "foo")]]))))
+                                   [[nil (make-sql-select-table "foo")]]
+                                   ", "))))
   (is (= "foo, bar AS b"
          (with-out-str (put-tables default-sql-put-parameterization
                                    [[nil (make-sql-select-table "foo")]
-                                    ["b" (make-sql-select-table "bar")]])))))
+                                    ["b" (make-sql-select-table "bar")]]
+                                   ", ")))))
 
 (deftest default-put-literal-test
   (is (= ["?" [[integer% 42]]] (with-out-str-and-value (default-put-literal integer% 42))))
