@@ -116,15 +116,23 @@
            (project-alist p)))
     (is (= tbl1 (project-query p)))))
 
-;; TODO: what should be the result?
-#_(deftest make-extend-test
-  (let [p (make-extend {"three" (make-attribute-ref "three")
-                        "four" (make-attribute-ref "four")} tbl1)]
-    (is (= (project-alist p) (merge {"three" (make-attribute-ref "three")
-                                     "four" (make-attribute-ref "four")}
-                                    {"one" string%
-                                     "two" integer%})))
-    (is (= (project-query p) tbl1))))
+(deftest make-extend-test
+  (let [p (make-extend [["three" (make-const integer% 3)]
+                        ["four" (make-const integer% 4)]]
+                       tbl1)]
+    (is (= [["three" (make-const integer% 3)]
+            ["four" (make-const integer% 4)]
+            ["one" (make-attribute-ref "one")]
+            ["two" (make-attribute-ref "two")]]
+         (project-alist p)))
+    (is (= tbl1
+           (project-query p))))
+  (testing "make-extend only copies grouped attributes"
+    (let [p (make-extend [["three" (make-const integer% 3)]]
+                         (make-group #{"one"} tbl1))]
+      (is (= [["three" (make-const integer% 3)]
+              ["one" (make-attribute-ref "one")]]
+             (project-alist p))))))
 
 (deftest expression-type-test
   (let [one-ref (make-attribute-ref "one")
@@ -286,7 +294,7 @@
 
     (testing "grouping"
       (is (= (lens/shove (alist->rel-scheme [["one" string%]
-                                                ["two" integer%]])
+                                             ["two" integer%]])
                          rel-scheme-grouped-lens
                          #{"one"})
              (query-scheme (make-group #{"one"} tbl1))))

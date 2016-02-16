@@ -199,13 +199,18 @@ Replaced alist with hash-map."
   "Creates a projection of some attributes while keeping all other attributes in
   the relation visible too."
   [alist query]
-  (make-project
-   (concat alist
-           (map (fn [p]
-                  [(first p)
-                   (make-attribute-ref (first p))])
-                (rel-scheme-alist (query-scheme query))))
-   query))
+  (let [scheme (query-scheme query)]
+    (make-project
+     (concat alist
+             (map (fn [p]
+                    [(first p)
+                     (make-attribute-ref (first p))])
+                  (if-let [grouped (rel-scheme-grouped scheme)]
+                    (filter (fn [[col _]]
+                              (contains? grouped col))
+                            (rel-scheme-alist scheme))
+                    (rel-scheme-alist scheme))))
+     query)))
 
 (define-record-type restrict
   (make-restrict exp query) restrict?
