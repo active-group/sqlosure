@@ -71,6 +71,17 @@
         (is (= r1 (remove-dead r1)))
         (testing "removes dead projection from underlying project"
           (is (= (alist->rel-scheme {"one" string%})
+                 (-> r2 remove-dead restrict-query project-query query-scheme))))))
+    (testing "restrict-outer"
+      (let [r1 (make-restrict-outer (=$ (make-attribute-ref "one")
+                                        (make-const string% "foobar"))
+                                    tbl1)
+            r2 (make-restrict-outer (=$ (make-attribute-ref "one")
+                                        (make-const string% "foobar"))
+                                    p2)]
+        (is (= r1 (remove-dead r1))
+            (= (alist->rel-scheme {"one" string%})
+               (-> r2 remove-dead restrict-outer-query project-query query-scheme)))))))
                  (-> r2 remove-dead restrict-query project-query query-scheme))))))))
 
 (deftest merge-project-test
