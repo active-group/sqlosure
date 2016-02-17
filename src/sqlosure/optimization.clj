@@ -30,10 +30,7 @@
   "Takes a sequence of 'live' values and a query and returns the intersection of
   all refs in both the live-list and the rel-scheme-alist of the query."
   [live q]
-  (into []
-        (set/intersection
-         (into #{} live)
-         (into #{} (keys (query->alist q))))))
+  (set (filter #(contains? live %) (query->columns q))))
 
 (defn elem?
   "Does a collection contain e?"
