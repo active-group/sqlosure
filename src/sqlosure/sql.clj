@@ -295,8 +295,8 @@
                                        :universe sql-universe
                                        :data op-and))
 
-(def >=$
-  (let [rator (make-rator '>=
+(defn- make-ordering-combinator [sym clj op]
+  (let [rator (make-rator sym
                           (fn [fail t1 t2]
                             (when fail
                               (do
@@ -304,11 +304,16 @@
                                 (check-numerical t2 fail)
                                 (when-not (type=? t1 t2) (fail t1 t2))))
                             boolean%)
-                          (null-lift-binary-predicate >=)
+                          (null-lift-binary-predicate clj)
                           :universe sql-universe
-                          :data op->=)]
+                          :data op)]
     (fn [expr1 expr2]
       (make-application rator expr1 expr2))))
+
+(def >=$ (make-ordering-combinator '>= >= op->=))
+(def <=$ (make-ordering-combinator '<= <= op-<=))
+(def <$ (make-ordering-combinator '< >= op-<))
+(def >$ (make-ordering-combinator '> >= op->))
 
 (def plus$
   (let [rator (make-rator '+
