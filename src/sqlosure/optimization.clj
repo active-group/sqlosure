@@ -131,8 +131,8 @@
                                 (merge-project
                                  (r/make-project (subst q2 pa)
                                                  (r/project-query q2))))
-                (r/make-project pa pq)))))
-        :else (r/make-project pa pq)))
+                (r/make-project pa (merge-project pq))))))
+        :else (r/make-project pa (merge-project pq))))
     (r/restrict? q) (r/make-restrict (r/restrict-exp q)
                                      (merge-project (r/restrict-query q)))
     (r/restrict-outer? q) (r/make-restrict-outer (r/restrict-outer-exp q)
