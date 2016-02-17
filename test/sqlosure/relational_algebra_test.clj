@@ -67,6 +67,17 @@
   (is (rel-scheme-unary? test-scheme4))
   (is (not (rel-scheme-unary? test-scheme1))))
 
+(deftest rel-scheme-nullable-test
+  (let [scheme (alist->rel-scheme [["one" string%]
+                                   ["two" integer%]])
+        scheme-nullable (alist->rel-scheme [["one" (make-nullable-type string%)]
+                                            ["two" (make-nullable-type integer%)]])]
+    (is (= scheme-nullable (rel-scheme-nullable scheme)))
+    (testing "nil should throw an assertion"
+      (is (thrown? Exception (rel-scheme-nullable nil))))
+    (testing "should result in input if all types are nullable"
+      (is (= scheme-nullable (rel-scheme-nullable scheme-nullable))))))
+
 (deftest rel-scheme->environment-test
   (is (= {:fizz :buzz} (rel-scheme->environment test-scheme4)))
   (is (= {:foo :bar :some :thing} (rel-scheme->environment test-scheme2))))
