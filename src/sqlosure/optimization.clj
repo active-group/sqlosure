@@ -317,11 +317,10 @@
                                    (push-restrict (r/combine-query-2 q)))
     :else (c/assertion-violation 'push-restrict "unknown query" q)))
 
-;; FIXME: what about remove-dead?
-
 (defn optimize-query
   "Takes a query and performs some optimizations."
   [q]
   (-> q
       push-restrict
+      remove-dead
       merge-project))
