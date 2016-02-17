@@ -36,6 +36,7 @@
   [q]
   (letfn
       [(worker [live q]
+         (assert (set? live))
          (cond
            (r/empty-val? q) q
            (r/base-relation? q) q
@@ -51,8 +52,8 @@
            (r/restrict? q)
            (let [e (r/restrict-exp q)]
              (r/make-restrict
-              e (worker (concat (r/expression-attribute-names e)
-                                live)
+              e (worker (set (concat (r/expression-attribute-names e)
+                                     live))
                         (r/restrict-query q))))
 
            (r/restrict-outer? q)
@@ -95,7 +96,7 @@
                                  (worker live1 q1)
                                  (worker live1 q2)))))
            :else (c/assertion-violation 'remove-dead "unknown query" q)))]
-    (worker (keys (query->alist q)) q)))
+    (worker (set (query->columns q)) q)))
 
 (defn merge-project
   [q]
