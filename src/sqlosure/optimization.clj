@@ -32,11 +32,6 @@
   [live q]
   (set (filter #(contains? live %) (query->columns q))))
 
-(defn elem?
-  "Does a collection contain e?"
-  [coll e]
-  (some #(= % e) coll))
-
 (defn remove-dead
   [q]
   (letfn
