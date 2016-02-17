@@ -33,6 +33,8 @@
   (set (filter #(contains? live %) (query->columns q))))
 
 (defn remove-dead
+  "Takes a query and removes all references to variables in underlying queries
+  that are not used/unnecessary further up the query."
   [q]
   (letfn
       [(worker [live q]
