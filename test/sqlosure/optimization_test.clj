@@ -49,7 +49,9 @@
         p2 (make-project [["one" (make-attribute-ref "one")]]
                          (make-project [["one" (make-attribute-ref "one")]
                                         ["two" (make-attribute-ref "two")]]
-                                       tbl1))]
+                                       tbl1))
+        o1 (make-order [[(make-attribute-ref "one") :ascending]]
+                       tbl1)]
     (testing "empty-val"
       (is (= (make-empty-val) (remove-dead (make-empty-val)))))
     (testing "base-relation"
@@ -80,9 +82,7 @@
             (= (alist->rel-scheme {"one" string%})
                (-> r2 remove-dead restrict-outer-query project-query query-scheme)))))
     (testing "order"
-      (let [o1 (make-order [[(make-attribute-ref "one") :ascending]]
-                           tbl1)
-            o2 (make-order [[(make-attribute-ref "one") :ascending]]
+      (let [o2 (make-order [[(make-attribute-ref "one") :ascending]]
                            p2)]
         (is (= o1 (remove-dead o1)))
         (is (= (alist->rel-scheme {"one" string%})
@@ -98,11 +98,20 @@
             t2 (make-top 0 1 p2)]
         (is (= t1 (remove-dead t1)))
         (is (= (alist->rel-scheme {"one" string%})
-               (-> t2 remove-dead top-query project-query query-scheme)))))))
-
-(let [tbl1 (make-base-relation "tbl1"
-               (-> r2 remove-dead restrict-outer-query project-query query-scheme)))))))
-                 (-> r2 remove-dead restrict-query project-query query-scheme))))))))
+               (-> t2 remove-dead top-query project-query query-scheme)))))
+    (testing "combine"
+      (testing ":product"
+        (let [c1 (make-combine :product p1 o1)
+              c2 (make-combine :product p2 o1)]
+          (is (= c1 (remove-dead c1)))
+          (is (= (alist->rel-scheme {"one" string%})
+                 (-> c2 remove-dead combine-query-1 query-scheme)))))
+      (testing ":quotient"
+        (let [c1 (make-combine :quotient o1 p1)
+              c2 (make-combine :quotient o1 p2)]
+          (is (= c1 (remove-dead c1)))
+          (is (= (alist->rel-scheme {"one" string%})
+                 (-> c2 remove-dead combine-query-2 query-scheme))))))))
 
 (deftest merge-project-test
   (let [tbl1 (make-base-relation "tbl1"

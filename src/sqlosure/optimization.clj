@@ -88,8 +88,8 @@
                  :quotient
                  (r/make-combine
                   :quotient
-                  (worker (keys (r/rel-scheme-alist (r/query-scheme q1))) q1)
-                  (worker (keys (r/rel-scheme-alist (r/query-scheme q2))) q2))
+                  (worker (set (query->columns q1)) q1)
+                  (worker (set (query->columns q2)) q2))
                  (r/make-combine r
                                  (worker live1 q1)
                                  (worker live1 q2)))))
