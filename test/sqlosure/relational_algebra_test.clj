@@ -29,6 +29,23 @@
                     (alist->rel-scheme [[:foo "bar"]
                                         [:fizz "buzz"]]))))
 
+(deftest rel-scheme-concat-test
+  (let [a [["one" "one"] ["two" "two"]]
+        b [["three" "three"] ["four" "four"]]
+        a-scheme (alist->rel-scheme a)
+        ab-scheme (alist->rel-scheme (concat a b))]
+    (testing "with either one of the inputs nil"
+      ;; FIXME I guess this should rather be an assertion violation?
+      (is (= a-scheme (rel-scheme-concat a-scheme nil)))
+      (is (= a-scheme (rel-scheme-concat nil a-scheme))))
+    (testing "with either one of the input alists empty"
+      (is (= a-scheme (rel-scheme-concat (alist->rel-scheme []) a-scheme)))
+      (is (= a-scheme (rel-scheme-concat a-scheme (alist->rel-scheme [])))))
+    (testing "with both alists not empty"
+      (let [res (rel-scheme-concat a-scheme (alist->rel-scheme b))]
+        (is (= ab-scheme res))
+        (is (= (into {} (concat a b)) (rel-scheme-alist res)))))))
+
 (deftest rel-scheme-difference-test
   (is (= (rel-scheme-difference test-scheme1 test-scheme3)
          (alist->rel-scheme [[:fizz :buzz]])))

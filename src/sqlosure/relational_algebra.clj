@@ -44,20 +44,30 @@ Replaced alist with hash-map."
   (= t1 t2))
 
 (defn rel-scheme-concat
+  "Takes two rel-schemes and concatenates them. This means:
+  - concatenate columns
+  - merge alists
+  - union grouped-sets"
   [s1 s2]
-  (make-rel-scheme (concat (rel-scheme-columns s1)
-                           (rel-scheme-columns s2))
-                   (merge (rel-scheme-alist s1)
-                          (rel-scheme-alist s2))
-                   (cond
-                     (nil? (rel-scheme-grouped s1))
-                     (rel-scheme-grouped s2)
+  (cond
+    ;; FIXME I guess this should rather be an assertion violation?
+    ;; (or (nil? s1) (nil? s2)) (assertion-violation `rel-scheme-concat "arguments must not be nil")
+    (nil? s1) s2
+    (nil? s2) s1
+    :else
+    (make-rel-scheme (concat (rel-scheme-columns s1)
+                             (rel-scheme-columns s2))
+                     (merge (rel-scheme-alist s1)
+                            (rel-scheme-alist s2))
+                     (cond
+                       (nil? (rel-scheme-grouped s1))
+                       (rel-scheme-grouped s2)
 
-                     (nil? (rel-scheme-grouped s2))
-                     (rel-scheme-grouped s1)
+                       (nil? (rel-scheme-grouped s2))
+                       (rel-scheme-grouped s1)
 
-                     :else (union (rel-scheme-grouped s1)
-                                  (rel-scheme-grouped s2)))))
+                       :else (union (rel-scheme-grouped s1)
+                                    (rel-scheme-grouped s2))))))
 
 (defn rel-scheme-difference
   "Return a new rel-scheme resulting of the (set-)difference of s1's and s2's
