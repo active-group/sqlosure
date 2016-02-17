@@ -72,7 +72,8 @@
             (set/intersection live (r/group-columns q))
             (worker live (r/group-query q)))
 
-           (r/top? q) (r/make-top (r/top-offset q) (r/top-count q) (worker live (r/top-query q)))
+           (r/top? q) (r/make-top (r/top-offset q) (r/top-count q)
+                                  (worker live (r/top-query q)))
            (r/combine? q)
            (let [r (r/combine-rel-op q)
                  q1 (r/combine-query-1 q)

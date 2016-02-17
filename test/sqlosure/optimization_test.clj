@@ -92,7 +92,13 @@
             g2 (make-group #{"one"} p2)]
         (is (= g1 (remove-dead g1)))
         (is (= (alist->rel-scheme {"one" string%})
-               (-> g2 remove-dead group-query project-query query-scheme)))))))
+               (-> g2 remove-dead group-query project-query query-scheme)))))
+    (testing "top"
+      (let [t1 (make-top 0 1 tbl1)
+            t2 (make-top 0 1 p2)]
+        (is (= t1 (remove-dead t1)))
+        (is (= (alist->rel-scheme {"one" string%})
+               (-> t2 remove-dead top-query project-query query-scheme)))))))
 
 (let [tbl1 (make-base-relation "tbl1"
                (-> r2 remove-dead restrict-outer-query project-query query-scheme)))))))
