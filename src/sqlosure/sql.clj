@@ -366,6 +366,22 @@
     (fn [expr1 expr2]
       (make-application rator expr1 expr2))))
 
+(def like$
+  (let [rator (make-rator 'like
+                          (fn [fail t1 t2]
+                            #_(when fail
+                              (do
+                                ;; TODO: check-string maybe?
+                                ;; (check-numerical t1 fail)
+                                ;; (check-numerical t2 fail)
+                                ))
+                            boolean%)
+                          = ;; TODO: not really =
+                          :universe sql-universe
+                          :data op-like)]
+    (fn [expr1 expr2]
+      (make-application rator expr1 expr2))))
+
 (defn member
   "Locates the first element of xs that is equal to x. If such an element
   exists, the rest of xs starting with that element is returned. Otherwise,
