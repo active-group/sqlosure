@@ -27,7 +27,8 @@
 (defn put-query [query]
   (put/sql-select->string
    put/default-sql-put-parameterization
-   (query->sql query)))
+   (query->sql
+    (opt/optimize-query query))))
 
 
 (deftest const-restrict-test

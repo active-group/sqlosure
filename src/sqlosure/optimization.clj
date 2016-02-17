@@ -21,62 +21,59 @@
   [q]
   (-> q r/query-scheme r/rel-scheme-alist))
 
+(defn query->columns
+  "Return the rel-scheme-columns of a query's query-scheme."
+  [q]
+  (-> q r/query-scheme r/rel-scheme-columns))
+
 (defn intersect-live
   "Takes a sequence of 'live' values and a query and returns the intersection of
   all refs in both the live-list and the rel-scheme-alist of the query."
   [live q]
-  (into []
-        (set/intersection
-         (into #{} live)
-         (into #{} (keys (query->alist q))))))
-
-(defn elem?
-  "Does a collection contain e?"
-  [coll e]
-  (some #(= % e) coll))
+  (set (filter #(contains? live %) (query->columns q))))
 
 (defn remove-dead
+  "Takes a query and removes all references to variables in underlying queries
+  that are not used/unnecessary further up the query."
   [q]
   (letfn
       [(worker [live q]
+         (assert (set? live))
          (cond
            (r/empty-val? q) q
            (r/base-relation? q) q
            (r/project? q)
-           (let [new-alist (filter (fn [[k _]] (elem? live k))
+           (let [new-alist (filter (fn [[k _]] (contains? live k))
                                    (r/project-alist q))]
              (r/make-project new-alist
-                             (worker (map (fn [[k v]]
-                                            (r/expression-attribute-names v))
-                                          new-alist)
+                             ;; live variables === values of this project's alist.
+                             (worker (apply set/union (map (fn [[_ v]]
+                                                             (r/expression-attribute-names v))
+                                                           new-alist))
                                      (r/project-query q))))
            (r/restrict? q)
            (let [e (r/restrict-exp q)]
              (r/make-restrict
-              e (worker (concat (r/expression-attribute-names e)
-                                live)
+              e (worker (set (concat (r/expression-attribute-names e) live))
                         (r/restrict-query q))))
-
            (r/restrict-outer? q)
            (let [e (r/restrict-outer-exp q)]
              (r/make-restrict-outer
-              e (worker (concat (r/expression-attribute-names e)
-                                live)
+              e (worker (set (concat (r/expression-attribute-names e) live))
                         (r/restrict-outer-query q))))
            (r/order? q)
            (let [alist (r/order-alist q)]
              (r/make-order
               alist
-              (worker (concat (order-alist-attribute-names alist)
-                              live)
+              (worker (set (concat (order-alist-attribute-names alist) live))
                       (r/order-query q))))
-           
            (r/group? q)
            (r/make-group
             (set/intersection live (r/group-columns q))
             (worker live (r/group-query q)))
-           
-           (r/top? q) (r/make-top (r/top-offset q) (r/top-count q) (worker live (r/top-query q)))
+
+           (r/top? q) (r/make-top (r/top-offset q) (r/top-count q)
+                                  (worker live (r/top-query q)))
            (r/combine? q)
            (let [r (r/combine-rel-op q)
                  q1 (r/combine-query-1 q)
@@ -91,13 +88,13 @@
                  :quotient
                  (r/make-combine
                   :quotient
-                  (worker (keys (r/rel-scheme-alist (r/query-scheme q1))) q1)
-                  (worker (keys (r/rel-scheme-alist (r/query-scheme q2))) q2))
+                  (worker (set (query->columns q1)) q1)
+                  (worker (set (query->columns q2)) q2))
                  (r/make-combine r
                                  (worker live1 q1)
                                  (worker live1 q2)))))
            :else (c/assertion-violation 'remove-dead "unknown query" q)))]
-    (worker (keys (query->alist q)) q)))
+    (worker (set (query->columns q)) q)))
 
 (defn merge-project
   [q]
@@ -134,8 +131,8 @@
                                 (merge-project
                                  (r/make-project (subst q2 pa)
                                                  (r/project-query q2))))
-                (r/make-project pa pq)))))
-        :else (r/make-project pa pq)))
+                (r/make-project pa (merge-project pq))))))
+        :else (r/make-project pa (merge-project pq))))
     (r/restrict? q) (r/make-restrict (r/restrict-exp q)
                                      (merge-project (r/restrict-query q)))
     (r/restrict-outer? q) (r/make-restrict-outer (r/restrict-outer-exp q)
@@ -320,11 +317,10 @@
                                    (push-restrict (r/combine-query-2 q)))
     :else (c/assertion-violation 'push-restrict "unknown query" q)))
 
-;; FIXME: what about remove-dead?
-
 (defn optimize-query
   "Takes a query and performs some optimizations."
   [q]
   (-> q
       push-restrict
+      remove-dead
       merge-project))
