@@ -21,6 +21,11 @@
   [q]
   (-> q r/query-scheme r/rel-scheme-alist))
 
+(defn query->columns
+  "Return the rel-scheme-columns of a query's query-scheme."
+  [q]
+  (-> q r/query-scheme r/rel-scheme-columns))
+
 (defn intersect-live
   "Takes a sequence of 'live' values and a query and returns the intersection of
   all refs in both the live-list and the rel-scheme-alist of the query."
