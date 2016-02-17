@@ -118,8 +118,29 @@
                                  (alist->rel-scheme [["one" string%]
                                                      ["two" integer%]
                                                      ["three" double%]])
-                                 :handle "tbl1")]
-    (is (= the-empty (merge-project the-empty))))
+                                 :handle "tbl1")
+        p1 (make-project [["one" (make-attribute-ref "one")]
+                          ["two" (make-attribute-ref "two")]]
+                         tbl1)
+        p2 (make-project [["one" (make-attribute-ref "one")]]
+                         (make-project [["one" (make-attribute-ref "one")]
+                                        ["two" (make-attribute-ref "two")]]
+                                       tbl1))
+        p3 (make-project [["one" (make-attribute-ref "one")]
+                          ["two" (make-attribute-ref "two")]]
+                         p1)]
+    (testing "empty-value"
+      (is (= (make-empty-val) (merge-project (make-empty-val)))))
+    (testing "base-relation"
+      (is (= tbl1 (merge-project tbl1))))
+    (testing "project"
+      (testing "with underlying project"
+        (is (= p1 (merge-project p1)))
+        (is (= (make-project [["one" (make-attribute-ref "one")]] tbl1)
+               (merge-project p2)))
+        (is (= (make-project [["one" (make-attribute-ref "one")]
+                              ["two" (make-attribute-ref "two")]] tbl1)
+               (merge-project p3))))))
 
   (testing "optimization should not merge aggregates"
     (let [expr (let [tbl1 (make-base-relation "tbl1"
