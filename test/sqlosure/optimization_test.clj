@@ -32,10 +32,10 @@
         p (make-project [["one" (make-attribute-ref "one")]
                          ["two" (make-attribute-ref "two")]]
                         tbl1)]
-    (is (= ["one"]
-           (intersect-live ["one"] p)))
-    (is (= ["two" "one"]
-           (intersect-live ["one" "two"] p)))))
+    (is (= #{"one"}
+           (intersect-live #{"one"} p)))
+    (is (= #{"two" "one"}
+           (intersect-live #{"one" "two"} p)))))
 
 (deftest remove-dead-test
   (let [tbl1 (make-base-relation "tbl1"
@@ -53,9 +53,14 @@
         po1 (make-project [["one" (make-attribute-ref "one")]]
                           (make-order [[(make-attribute-ref "one") :ascending]]
                                       tbl1))]
-    (is (= p1 (remove-dead p1)))
-    (is (not= p2 (remove-dead p2)))
-    (is (= po1 (remove-dead po1)))))
+    (testing "empty-val"
+      (is (= (make-empty-val) (remove-dead (make-empty-val)))))
+    (testing "base-relation"
+      (is (= tbl1 (remove-dead tbl1))))
+    (testing "project"
+      (is (= p1 (remove-dead p1)))
+      (is (= (alist->rel-scheme {"one" string%})
+             (query-scheme (remove-dead p2)))))
 
 (deftest merge-project-test
   (let [tbl1 (make-base-relation "tbl1"
