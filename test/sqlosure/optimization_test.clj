@@ -49,10 +49,7 @@
         p2 (make-project [["one" (make-attribute-ref "one")]]
                          (make-project [["one" (make-attribute-ref "one")]
                                         ["two" (make-attribute-ref "two")]]
-                                       tbl1))
-        po1 (make-project [["one" (make-attribute-ref "one")]]
-                          (make-order [[(make-attribute-ref "one") :ascending]]
-                                      tbl1))]
+                                       tbl1))]
     (testing "empty-val"
       (is (= (make-empty-val) (remove-dead (make-empty-val)))))
     (testing "base-relation"
@@ -81,6 +78,17 @@
                                     p2)]
         (is (= r1 (remove-dead r1))
             (= (alist->rel-scheme {"one" string%})
+               (-> r2 remove-dead restrict-outer-query project-query query-scheme)))))
+    (testing "order"
+      (let [o1 (make-order [[(make-attribute-ref "one") :ascending]]
+                           tbl1)
+            o2 (make-order [[(make-attribute-ref "one") :ascending]]
+                           p2)]
+        (is (= o1 (remove-dead o1)))
+        (is (= (alist->rel-scheme {"one" string%})
+               (-> o2 remove-dead order-query project-query query-scheme)))))))
+
+(let [tbl1 (make-base-relation "tbl1"
                (-> r2 remove-dead restrict-outer-query project-query query-scheme)))))))
                  (-> r2 remove-dead restrict-query project-query query-scheme))))))))
 

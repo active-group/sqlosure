@@ -54,29 +54,24 @@
            (r/restrict? q)
            (let [e (r/restrict-exp q)]
              (r/make-restrict
-              e (worker (set (concat (r/expression-attribute-names e)
-                                     live))
+              e (worker (set (concat (r/expression-attribute-names e) live))
                         (r/restrict-query q))))
-
            (r/restrict-outer? q)
            (let [e (r/restrict-outer-exp q)]
              (r/make-restrict-outer
-              e (worker (set (concat (r/expression-attribute-names e)
-                                     live))
+              e (worker (set (concat (r/expression-attribute-names e) live))
                         (r/restrict-outer-query q))))
            (r/order? q)
            (let [alist (r/order-alist q)]
              (r/make-order
               alist
-              (worker (concat (order-alist-attribute-names alist)
-                              live)
+              (worker (set (concat (order-alist-attribute-names alist) live))
                       (r/order-query q))))
-           
            (r/group? q)
            (r/make-group
             (set/intersection live (r/group-columns q))
             (worker live (r/group-query q)))
-           
+
            (r/top? q) (r/make-top (r/top-offset q) (r/top-count q) (worker live (r/top-query q)))
            (r/combine? q)
            (let [r (r/combine-rel-op q)
