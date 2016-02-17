@@ -45,12 +45,13 @@
            (r/empty-val? q) q
            (r/base-relation? q) q
            (r/project? q)
-           (let [new-alist (filter (fn [[k _]] (elem? live k))
+           (let [new-alist (filter (fn [[k _]] (contains? live k))
                                    (r/project-alist q))]
              (r/make-project new-alist
-                             (worker (map (fn [[k v]]
-                                            (r/expression-attribute-names v))
-                                          new-alist)
+                             ;; live variables === values of this project's alist.
+                             (worker (apply set/union (map (fn [[_ v]]
+                                                             (r/expression-attribute-names v))
+                                                           new-alist))
                                      (r/project-query q))))
            (r/restrict? q)
            (let [e (r/restrict-exp q)]
