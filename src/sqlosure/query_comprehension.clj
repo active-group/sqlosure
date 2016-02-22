@@ -47,10 +47,9 @@
          project-alist (map (fn [[k _] fresh]
                               [fresh (rel/make-attribute-ref k)])
                             alist fresh)
-         qq (rel/make-project project-alist q)]
-     (monadic
-      (set-query! (make-product query qq))
-      (return (make-relation alias scheme))))))
+         qq (rel/make-project project-alist q)])
+   (set-query! (make-product query qq))
+   (return (make-relation alias scheme))))
 
 (defn embed
   "Embed a RA query into the current query."
@@ -71,17 +70,16 @@
    (let [query' ((if extend? rel/make-extend rel/make-project)
                  (map (fn [[k v]] [(fresh-name k alias) v])
                       alist)
-                 query)]
-     (monadic
-      (set-query! query')
-      (return (make-relation
-               alias
-               (let [scheme (rel/query-scheme query)
-                     env (rel/rel-scheme->environment scheme)]
-                 (rel/alist->rel-scheme
-                  (map (fn [[k v]]
-                         [k (rel/expression-type env v)])
-                       alist)))))))))
+                 query)])
+   (set-query! query')
+   (return (make-relation
+            alias
+            (let [scheme (rel/query-scheme query)
+                  env (rel/rel-scheme->environment scheme)]
+              (rel/alist->rel-scheme
+               (map (fn [[k v]]
+                      [k (rel/expression-type env v)])
+                    alist)))))))
 
 (defn project
   "Project the some columns of the current query."
@@ -209,10 +207,9 @@
          alist (map (fn [[k _]]
                       [k (rel/make-attribute-ref (fresh-name k alias))])
                     (rel/rel-scheme-alist scheme))
-         query (::query state)]
-     (monadic
-      (put-state! (merge state the-empty-state))
-      (return [(rel/make-project alist query) scheme])))))
+         query (::query state)])
+   (put-state! (merge state the-empty-state))
+   (return [(rel/make-project alist query) scheme])))
 
 (defn build-query!
   "Monadic command to create the final query from the given relation and the current monad
@@ -263,12 +260,11 @@
    [query0 current-query
     alias0 current-alias]
     (let [[rel1 state1] (generate-query prod1 (make-state query0 alias0))
-          [rel2 state2] (generate-query prod2 (make-state query0 (::alias state1)))]
-      (monadic
-       (combination* rel-op query0
-                     rel1 (::query state1) rel2 (::query state2)
-                     compute-scheme
-                     alias0)))))
+          [rel2 state2] (generate-query prod2 (make-state query0 (::alias state1)))])
+    (combination* rel-op query0
+                  rel1 (::query state1) rel2 (::query state2)
+                  compute-scheme
+                  alias0)))
 
 (defn first-scheme
   [s1 s2]
