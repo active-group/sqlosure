@@ -76,31 +76,31 @@
   (is (not (any? nil)))
   (is (not (any? []))))
 
-;; TODO: Test type-member?
 (deftest type-member?-test
-  ;; base types
-  (is (type-member? 42 integer%))
-  (is (not (type-member? "false" integer%)))
-  (is (not (type-member? 42.0 integer%)))
-  ;; nullable
-  (is (type-member? nil nullable-integer%))
-  (is (type-member? 1 nullable-integer%))
-  (is (not (type-member? "string" nullable-integer%)))
-  ;; bounded-string-type
-  (let [string-5% (make-bounded-string-type 6)]
-    (is (type-member? "foobar" string-5%))
-    (is (type-member? "foo" string-5%))
-    (is (not (type-member? "arteides" string-5%))))
-  ;; product-type
-  (let [my-product% (make-product-type [string% integer%])]
-    (is (type-member? ["foobar" 42] my-product%))
-    (is (not (type-member? [42 "foobar"] my-product%))))
-  ;; set-type -- okay now i really don't know what a set type is supposed to be...
-  (let [my-set% (make-set-type string%)]
-    (is (type-member? ["foobar" "fizzbuzz"] my-set%))
-    (is (not (type-member? ["foobar" 42] my-set%)))
-    (is (not (type-member? [42 "foobar"] my-set%)))
-    (is (not (type-member? [42 false] my-set%)))))
+  (testing "base types"
+    (is (type-member? 42 integer%))
+    (is (not (type-member? "false" integer%)))
+    (is (not (type-member? 42.0 integer%))))
+  (testing "nullable types"
+    (is (type-member? nil nullable-integer%))
+    (is (type-member? 1 nullable-integer%))
+    (is (not (type-member? "string" nullable-integer%))))
+  (testing "bounded string type"
+    (let [string-5% (make-bounded-string-type 6)]
+      (is (type-member? "foobar" string-5%))
+      (is (type-member? "foo" string-5%))
+      (is (not (type-member? "arteides" string-5%)))))
+  (testing "product type"
+    (let [my-product% (make-product-type [string% integer%])]
+      (is (type-member? ["foobar" 42] my-product%))
+      (is (not (type-member? [42 "foobar"] my-product%)))))
+  (testing "set type"
+    (let [my-set% (make-set-type string%)]
+      (is (type-member? ["foobar" "fizzbuzz"] my-set%))
+      (is (not (type-member? ["foobar" 42] my-set%)))
+      (is (not (type-member? [42 "foobar"] my-set%)))
+      (is (not (type-member? [42 false] my-set%)))))
+  (is (thrown? Exception (type-member? String "foobar"))))
 
 (deftest numeric-type?-test
   (is (numeric-type? integer%))
@@ -139,7 +139,9 @@
   (is (= (type->datum (make-set-type string%))
          (list 'set (list 'string))))
   (is (= (type->datum (make-bounded-string-type 5))
-         (list 'bounded-string 5))))
+         (list 'bounded-string 5)))
+  (testing "anything else should return an assertion"
+    (is (thrown? Exception (type->datum nil)))))
 
 (deftest datum->type-test
   (let [test-universe (u/make-universe)
@@ -151,6 +153,8 @@
     (is (= (datum->type (list 'double) test-universe) double%))
     (is (= (datum->type (list 'boolean) test-universe) boolean%))
     (is (= (datum->type (list 'blob) test-universe) blob%))
+    (is (= (datum->type (list 'date) test-universe) date%))
+    (is (= (datum->type (list 'timestamp) test-universe) timestamp%))
     (is (= (datum->type (list 'bounded-string 6) test-universe)
            my-bounded-string%))
     (is (= (datum->type (list 'nullable (list 'string)) test-universe)
@@ -176,19 +180,28 @@
     (is (= (const->datum double%-nullable 42.0) 42.0))
     (is (= (const->datum double%-nullable nil) nil))
     (is (= (const->datum my-bounded% "foobar") "foobar"))
-    (is (= (const->datum my-product% [42 "foobar"]) [42 "foobar"]))
-    (is (thrown? Exception (const->datum my-product% 42)))
+    (testing "product"
+      (is (= (const->datum my-product% [42 "foobar"]) [42 "foobar"]))
+      (is (= (const->datum my-product% '(42 "foobar")) [42 "foobar"])))
     (is (= (const->datum my-set% [23 42]) [23 42]))
-    (is (thrown? Exception (const->datum :non-existent-type 42.0)))))
+    (is (thrown? Exception (const->datum my-product% 42)))
+    (is (thrown? Exception (const->datum :non-existent-type 42.0)))
+    (is (thrown? Exception (const->datum my-product% 42)))))
 
 (deftest datum->const-test
   (let [my-bounded% (make-bounded-string-type 5)
         my-product% (make-product-type [integer% string%])
-        my-set% (make-set-type integer%)]
+        my-set% (make-set-type integer%)
+        my-nullable% (make-nullable-type string%)]
     (is (= (datum->const double% 42.0) 42.0))
     (is (= (datum->const string% "foobar") "foobar"))
     (is (= (datum->const my-bounded% "foobar") "foobar"))
     (is (= (datum->const my-product% [42 "foobar"]) [42 "foobar"]))
     (is (= (datum->const my-set% ["foo" "bar"]) ["foo" "bar"]))
+    (testing "nullable"
+      (is (= (datum->const my-nullable% 42) 42))
+      (is (= (datum->const my-nullable% nil) nil))
+      (is (= (datum->const my-nullable% []) nil))
     (is (thrown? Exception (datum->const my-product% 42)))
-    (is (thrown? Exception (datum->const my-set% 42)))))
+    (is (thrown? Exception (datum->const my-set% 42)))
+    (is (thrown? Exception (datum->const String "foobar"))))))
