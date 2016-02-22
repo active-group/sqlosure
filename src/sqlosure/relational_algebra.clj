@@ -101,12 +101,6 @@ Replaced alist with hash-map."
   [s]
   (rel-scheme-alist s))
 
-(defn contains-key?
-  "Checks wheter alist contains the key k."
-  [alist k]
-  (not (empty? (filter (fn [[alist-k _]]
-                         (= alist-k k)) alist))))
-
 (defn compose-environments
   "Combine two environments. e1 takes precedence over e2."
   [e1 e2]
