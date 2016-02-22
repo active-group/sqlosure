@@ -255,7 +255,7 @@ Replaced alist with hash-map."
                  (empty-val? query-1) query-2
                  (empty-val? query-2) query-1
                  :else (really-make-combine rel-op query-1 query-2))
-          (really-make-combine rel-op query-1 query-2))))
+      (really-make-combine rel-op query-1 query-2))))
 
 (defn make-left-outer-product [query-1 query-2] (make-combine
   :left-outer-product query-1 query-2))
@@ -403,11 +403,13 @@ Replaced alist with hash-map."
                      (when-not (t/type=? t/boolean% p) (fail 'boolean p))
                      (when-not (t/type=? t r) (fail t r)))
                    t))
+   ;; FIXME what should the result here really be?
    (fn [subquery] (let [scheme (query-scheme* subquery env fail)
                         alist (rel-scheme-alist scheme)]
                     (when (and fail (or (empty? alist) (t/pair? (rest alist))))
                       (fail 'unary-relation subquery))
                     (key (first alist))))
+   ;; FIXME what should the result here really be?
    (fn [subquery] (let [scheme (query-scheme* subquery env fail)
                         alist (rel-scheme-alist scheme)]
                     (when (and fail (or (empty? alist) (t/pair? (rest alist))))
