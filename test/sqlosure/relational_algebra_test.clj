@@ -33,6 +33,7 @@
   (let [a [["one" "one"] ["two" "two"]]
         b [["three" "three"] ["four" "four"]]
         a-scheme (alist->rel-scheme a)
+        b-scheme (alist->rel-scheme b)
         ab-scheme (alist->rel-scheme (concat a b))]
     (testing "with either one of the inputs nil"
       ;; FIXME I guess this should rather be an assertion violation?
@@ -42,9 +43,19 @@
       (is (= a-scheme (rel-scheme-concat (alist->rel-scheme []) a-scheme)))
       (is (= a-scheme (rel-scheme-concat a-scheme (alist->rel-scheme [])))))
     (testing "with both alists not empty"
-      (let [res (rel-scheme-concat a-scheme (alist->rel-scheme b))]
+      (let [res (rel-scheme-concat a-scheme b-scheme)]
         (is (= ab-scheme res))
-        (is (= (into {} (concat a b)) (rel-scheme-alist res)))))))
+        (is (= (into {} (concat a b)) (rel-scheme-alist res)))))
+    (testing "with groupings"
+      (let [a-scheme-grouped (assoc a-scheme :grouped #{"one"})
+            b-scheme-grouped (assoc b-scheme :grouped #{"three"})
+            ab-scheme-grouped (assoc ab-scheme :grouped #{"one"})
+            ba-scheme-grouped (rel-scheme-concat b-scheme a-scheme-grouped)
+            ab-scheme-grouped-both (assoc (alist->rel-scheme (concat a b))
+                                          :grouped #{"one" "three"})]
+        (is (= ab-scheme-grouped (rel-scheme-concat a-scheme-grouped b-scheme)))
+        (is (= ba-scheme-grouped (rel-scheme-concat b-scheme a-scheme-grouped)))
+        (is (= ab-scheme-grouped-both (rel-scheme-concat a-scheme-grouped b-scheme-grouped)))))))
 
 (deftest rel-scheme-difference-test
   (is (= (rel-scheme-difference test-scheme1 test-scheme3)
