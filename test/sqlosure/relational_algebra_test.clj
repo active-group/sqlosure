@@ -333,6 +333,8 @@
   (is (aggregate? (sql/=$ (make-aggregation :min (make-tuple [(make-const integer% 42)
                                                               (make-const integer% 23)]))
                           (make-const boolean% false))))
+  (is (aggregate? (make-tuple [(make-const integer% 42)
+                               (make-aggregation :count (make-attribute-ref "one"))])))
   (is (not (aggregate? (make-case-expr
                         {(sql/plus$ (make-const string% "foobar")
                                     (make-const integer% 42))
@@ -345,8 +347,12 @@
                                                                    (make-const integer% 23)])))
                     (make-const boolean% true?)}
                    (make-const boolean% false))))
+  (testing "scalar subquery"
+    (is (not (aggregate? (make-scalar-subquery (make-attribute-ref "one")))))
+    ;; FIXME I think this too should count as an aggregate but the old schemeql2 code didn't treat it as one..
+    (is (not (aggregate? (make-scalar-subquery (make-aggregation :count-all))))))
   ;; scalar
-  (is (not (aggregate? (make-scalar-subquery tbl1)))))
+)
 
 (deftest query-scheme-test
   (let [test-universe (make-universe)
