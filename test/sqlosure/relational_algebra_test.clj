@@ -240,72 +240,86 @@
         string-null (make-null string%)
         my-aggregation (make-aggregation
                         :count (make-tuple [(make-const integer% 40)
-                                            (make-const integer% 2)]))
-        my-case (make-case-expr {(sql/=$ (make-const integer% 42)
-                                         (make-const integer% 42))
-                                 (make-const boolean% true)}
-                                (make-const boolean% false))]
-    ;; attribute ref
-    (is (thrown? Exception (expression-type the-empty-environment one-ref)))
-    (is (= string% (expression-type
-                    (rel-scheme->environment (base-relation-scheme tbl1))
-                    one-ref)))
-    ;; const
-    (is (base-type? (expression-type the-empty-environment string-const)))
-    (is (= string% (expression-type the-empty-environment string-const)))
-    ;; const-null
-    (is (= string% (expression-type the-empty-environment string-null)))
-    ;; application
-    (is (= integer% (expression-type the-empty-environment
-                                     (sql/plus$ (make-const integer% 1)
-                                                (make-const integer% 41)))))
-    (is (= boolean% (expression-type the-empty-environment
-                                     (sql/>=$ (make-const integer% 1)
-                                              (make-const integer% 2)))))
-    (is (thrown? Exception (expression-type
-                            (rel-scheme->environment (base-relation-scheme tbl1))
-                            (sql/>=$ (make-const integer% 1)
-                                     (make-attribute-ref "one"))
-                            :typecheck? true)))
-    ;; tuple
-    (is (= (make-product-type [integer% string%])
-           (expression-type the-empty-environment
-                            (make-tuple [(make-const integer% 42)
-                                         (make-const string% "foobar")]))))
-    (is (= (make-product-type [string%])
-           (expression-type {"string" string%}
-                            (make-tuple [(make-attribute-ref "string")]))))
-    (is (not= (make-product-type [string%])
-              (expression-type the-empty-environment
-                               (make-tuple [(make-const integer% 42)]))))
-    ;; aggregation
-    (is (= integer% (expression-type the-empty-environment my-aggregation)))
-    (is (= (make-product-type [integer% integer%])
-           (expression-type the-empty-environment
-                            (make-aggregation
-                             :min
-                             (make-tuple [(make-const integer% 42)
-                                          (make-const integer% 23)])))))
-    (is (thrown? Exception  ;; With typechecking, this expression should fail.
-                 (expression-type the-empty-environment
-                                  (make-aggregation
-                                   :min
-                                   (make-tuple [(make-const integer% 42)
-                                                (make-const integer% 23)]))
-                                  :typecheck? true)))
-    ;; case expression
-    (is (= boolean% (expression-type the-empty my-case)))
-    (is (thrown? Exception  ;; With typechecking, this should fail
-                 (expression-type
-                  the-empty-environment
-                  (make-case-expr
-                   {(sql/plus$ (make-const string% "foobar")
-                               (make-const integer% 42))
-                    (make-const boolean% true)}
-                   (make-const boolean% false))
-                  :typecheck? true)))
-    ;; scalar subquery
-    ))
+                                            (make-const integer% 2)]))]
+    (testing "attribute-ref"
+      (is (thrown? Exception (expression-type the-empty-environment one-ref)))
+      (is (= string% (expression-type
+                      (rel-scheme->environment (base-relation-scheme tbl1))
+                      one-ref))))
+    (testing "const and const-null"
+      (is (base-type? (expression-type the-empty-environment string-const)))
+      (is (= string% (expression-type the-empty-environment string-const)))
+      (is (= string% (expression-type the-empty-environment string-null))))
+    (testing "application"
+      (is (= integer% (expression-type the-empty-environment
+                                       (sql/plus$ (make-const integer% 1)
+                                                  (make-const integer% 41)))))
+      (is (= boolean% (expression-type the-empty-environment
+                                       (sql/>=$ (make-const integer% 1)
+                                                (make-const integer% 2)))))
+      (is (thrown? Exception (expression-type
+                              (rel-scheme->environment (base-relation-scheme tbl1))
+                              (sql/>=$ (make-const integer% 1)
+                                       (make-attribute-ref "one"))
+                              :typecheck? true))))
+    (testing "tuple"
+      (is (= (make-product-type [integer% string%])
+             (expression-type the-empty-environment
+                              (make-tuple [(make-const integer% 42)
+                                           (make-const string% "foobar")]))))
+      (is (= (make-product-type [string%])
+             (expression-type {"string" string%}
+                              (make-tuple [(make-attribute-ref "string")]))))
+      (is (not= (make-product-type [string%])
+                (expression-type the-empty-environment
+                                 (make-tuple [(make-const integer% 42)])))))
+    (testing "aggregation + aggregation*"
+      (is (= integer% (expression-type the-empty-environment my-aggregation)))
+      (is (= (make-product-type [integer% integer%])
+             (expression-type the-empty-environment
+                              (make-aggregation
+                               :min
+                               (make-tuple [(make-const integer% 42)
+                                            (make-const integer% 23)])))))
+      (testing "should fail with non matching operators and field references \\
+                with typechecking set to true"
+        (is (thrown? Exception  ;; With typechecking, this expression should fail.
+                     (expression-type the-empty-environment
+                                      (make-aggregation
+                                       :min
+                                       (make-tuple [(make-const integer% 42)
+                                                    (make-const integer% 23)]))
+                                      :typecheck? true)))
+        (is (thrown? Exception (expression-type
+                                {"one" string%}
+                                (make-aggregation :sum (make-attribute-ref "one"))
+                                :typecheck? true)))
+        (is (thrown? Exception (expression-type
+                                {"one" date%}  ;; FIXME actually, dates should be orderable
+                                (make-aggregation :min (make-attribute-ref "one"))
+                                :typecheck? true))))
+      (testing "should fail with anything but :count-all"
+        (is (thrown? Exception (expression-type the-empty-environment
+                                                (make-aggregation :count-something))))))
+    (testing "case expression"
+      (let [my-case (make-case-expr {(sql/=$ (make-const integer% 42)
+                                             (make-const integer% 42))
+                                     (make-const boolean% true)}
+                                    (make-const boolean% false))
+            invalid-case (make-case-expr {(sql/plus$ (make-const integer% 42)
+                                                  (make-const integer% 42))
+                                          (make-const boolean% true)}
+                                         (make-const boolean% false))]
+        (is (= boolean% (expression-type the-empty my-case)))
+        (is (thrown? Exception  ;; With typechecking, this should fail
+                     (expression-type
+                      the-empty-environment
+                      (make-case-expr
+                       {(sql/plus$ (make-const string% "foobar")
+                                   (make-const integer% 42))
+                        (make-const boolean% true)}
+                       (make-const boolean% false))
+                      :typecheck? true)))))))
 
 (deftest aggregate?-test
   (is (not (aggregate? (make-attribute-ref "one"))))
