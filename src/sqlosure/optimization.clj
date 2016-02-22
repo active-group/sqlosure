@@ -143,7 +143,7 @@
 
     (r/group? q) (r/make-group (r/group-columns q)
                                (merge-project (r/group-query q)))
-    
+
     (r/top? q) (r/make-top (r/top-offset q) (r/top-count q) (merge-project (r/top-query q)))
     (r/combine? q) (r/make-combine (r/combine-rel-op q)
                                    (merge-project (r/combine-query-1 q))
@@ -182,24 +182,24 @@
                               (contains? attrs k))
                             (query->alist q1))))
             (r/make-combine op q1 (push-restrict (r/make-restrict re q2)))
-            
+
             (not (some (fn [[k v]]
                          (contains? attrs k))
                        (query->alist q2)))
             (r/make-combine op (push-restrict (r/make-restrict re q1)) q2)
-            
+
             :else (r/make-restrict re (push-restrict rq))))
 
         (r/restrict? rq) (let [pushed (push-restrict rq)]
                            (if (r/restrict? pushed)
                              (r/make-restrict re pushed)
                              (push-restrict (r/make-restrict re pushed))))
-        
+
         (r/restrict-outer? rq) (let [pushed (push-restrict rq)]
                                  (if (r/restrict-outer? pushed)
                                    (r/make-restrict re pushed)
                                    (push-restrict (r/make-restrict re pushed))))
-        
+
         (r/order? rq) (r/make-order (r/order-alist rq)
                                     (push-restrict
                                      (r/make-restrict re (r/order-query rq))))
@@ -207,7 +207,7 @@
         (r/group? rq) (r/make-group (r/group-columns rq)
                                     (push-restrict
                                      (r/group-query rq)))
-        
+
         :else (r/make-restrict re (push-restrict rq))))
 
     (r/restrict-outer? q)
@@ -230,36 +230,36 @@
           (cond
             (= :left-outer-product op)
             (r/make-restrict-outer re (push-restrict rq))
-            
+
             (and (not (= :difference op))
                  (not (= :quotient op))
                  (not-empty
                   (filter (fn [[k v]]
                             (contains? attrs k)) (query->alist q1))))
             (r/make-combine op q1 (push-restrict (r/make-restrict-outer re q2)))
-            
+
             (not-empty (filter (fn [[k v]] (contains? attrs k))
                                (query->alist q2)))
             (r/make-combine op (push-restrict (r/make-restrict-outer re q1) q2))
-            
+
             :else (r/make-restrict-outer re (push-restrict rq))))
 
         (r/restrict? rq) (let [pushed (push-restrict rq)]
                            (if (r/restrict? pushed)
                              (r/make-restrict-outer re pushed)
                              (push-restrict (r/make-restrict-outer re pushed))))
-        
+
         (r/restrict-outer? rq) (let [pushed (push-restrict rq)]
                                  (if (r/restrict-outer? pushed)
                                    (r/make-restrict-outer re pushed)
                                    (push-restrict (r/make-restrict-outer re pushed))))
-        
+
         (r/order? rq) (r/make-order (r/order-alist rq)
                                     (push-restrict
                                      (r/make-restrict-outer re (r/order-query rq))))
-        
+
         :else (r/make-restrict-outer re (push-restrict rq))))
-    
+
     (r/order? q)
     (let [oq (r/order-query q)
           alist (r/order-alist q)]
@@ -288,7 +288,7 @@
     (r/group? q)
     (r/make-group (r/group-columns q)
                   (push-restrict (r/group-query q)))
-    
+
     (r/top? q)
     (let [tq (r/top-query q)
           offset (r/top-offset q)
