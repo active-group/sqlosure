@@ -531,7 +531,7 @@ Replaced alist with hash-map."
                              a2 (rel-scheme-alist r2)]
                          (when fail
                            (doseq [[k _] a1]
-                             (when (assoc k a2)
+                             (when (contains? a2 k)
                                (fail (list 'not a1) a2)))))
                        (rel-scheme-concat r1 r2))
 
