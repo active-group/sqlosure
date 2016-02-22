@@ -21,9 +21,13 @@
       run-query returns.
     "
   [conn q & opts]
-  (let [qq (o/optimize-query q)]
+  (let [opts-map (apply hash-map opts)
+        qq (if (or (not (contains? opts-map :optimize?))
+                   (:optimize? opts-map)) ;; optimize? on by default
+             (o/optimize-query q)
+             q)]
     (c/db-query conn (rsql/query->sql qq) (rel/query-scheme qq)
-                (apply hash-map opts))))
+                (dissoc opts-map :optimize?))))
 
 (defn insert!
   "Takes a database connection"
