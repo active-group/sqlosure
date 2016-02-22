@@ -140,11 +140,18 @@
       (is (= (universe-lookup-rator test-universe '+)
              rator)))))
 
-(def tbl1 (make-base-relation 'tbl1
-                              (alist->rel-scheme [["one" string%]
-                                                  ["two" integer%]])
-                              :universe (make-universe)
-                              :handle "tbl1"))
+(let [test-universe (make-universe)]
+  (def tbl1 (make-base-relation 'tbl1
+                                (alist->rel-scheme [["one" string%]
+                                                    ["two" integer%]])
+                                :universe test-universe
+                                :handle "tbl1"))
+
+  (def tbl2 (make-base-relation 'tbl2
+                                (alist->rel-scheme [["one" integer%]
+                                                    ["two" string%]])
+                                :universe test-universe
+                                :handle "tbl2")))
 
 (deftest make-project-test
   (let [p (make-project [["two" (make-attribute-ref "two")]
