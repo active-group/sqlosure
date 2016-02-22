@@ -92,9 +92,10 @@
                   (worker (set (query->columns q2)) q2))
                  (r/make-combine r
                                  (worker live1 q1)
-                                 (worker live1 q2)))))
-           :else (c/assertion-violation 'remove-dead "unknown query" q)))]
-    (worker (set (query->columns q)) q)))
+                                 (worker live1 q2)))))))]
+    (if-not (rel/query? q)
+      (c/assertion-violation 'remove-dead "unknown query" q)
+      (worker (set (query->columns q)) q))))
 
 (defn merge-project
   [q]
