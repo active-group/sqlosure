@@ -11,4 +11,10 @@
                  [org.postgresql/postgresql "9.4-1206-jdbc41"]
                  [active-clojure "0.12.0"]]
   :plugins [[lein-cloverage "1.0.6"]
-            [lein-kibit "0.1.2"]])
+            [lein-kibit "0.1.2"]]
+
+  ;; Use `lein cover` to run cloverage. Reason: cloverage is not happy with lets
+  ;; in monadic code. cover excludes the files that use
+  ;; active.clojure.monad/monadic. Coverage for these namespaces must be done by
+  ;; hand.
+  :aliases {"cover" ["cloverage" "-e" ".*query.*"]})
