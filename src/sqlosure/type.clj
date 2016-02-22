@@ -62,11 +62,13 @@
 
 (defn all?
   [bs]
-  (reduce #(and %1 %2) true bs))
+  (when bs
+    (reduce #(and %1 %2) true bs)))
 
 (defn any?
   [bs]
-  (reduce #(or %1 %2) false bs))
+  (when bs
+    (reduce #(or %1 %2) false bs)))
 
 (defn type-member?
   "Checks if `thing` is a member of a type."
@@ -119,9 +121,9 @@
   (instance? Double x))
 
 (defn boolean?
-  "checks if a value if of type boolean"
+  "Checks if a value if of type boolean. This includes booleans and nil."
   [x]
-  (instance? Boolean x))
+  (or (nil? x) (instance? Boolean x)))
 
 ;; SEE: http://stackoverflow.com/a/14797271
 (defn test-array
