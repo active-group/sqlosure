@@ -381,7 +381,6 @@
     (testing "empty val"
       (is (= the-empty-rel-scheme (query-scheme (make-empty-val)))))
 
-    
     (testing "base relation"
       (is (= (alist->rel-scheme [["one" string%]
                                  ["two" integer%]])
@@ -397,15 +396,16 @@
             res (query-scheme p :typecheck? true)]
         (is (= (rel-scheme-alist res) {"two" integer% "one" string%}))
         (is (= {"two" integer% "count_twos" integer%} (rel-scheme-alist (query-scheme p2))))
-        (is (thrown? Exception  ;; should fail with typechecking because of aggregation
-                     (query-scheme (make-project
-                                    [["two" (make-attribute-ref "two")]
-                                     ["one" (make-aggregation
-                                             :min
-                                             (make-tuple [(make-const integer% 42)
-                                                          (make-const integer% 23)]))]]
-                                    tbl1)
-                                   :typecheck? true)))))
+        (testing "aggregations and product-types should make it fail"
+          (is (thrown? Exception
+                       (query-scheme (make-project
+                                      [["two" (make-attribute-ref "two")]
+                                       ["one" (make-aggregation
+                                               :min
+                                               (make-tuple [(make-const integer% 42)
+                                                            (make-const integer% 23)]))]]
+                                      tbl1)
+                                     :typecheck? true))))))
 
     (testing "restriction"
       (let [r (make-restrict (sql/=$ (make-scalar-subquery
@@ -414,8 +414,12 @@
                                      (make-attribute-ref "C"))
                              SUBA)]
         (is (= {"C" string%} (rel-scheme-alist (query-scheme r))))
-        (is (thrown? Exception (query-scheme r :typecheck? true)))))
-      
+        (is (thrown? Exception (query-scheme r :typecheck? true)))
+        (testing "should fail with typecheck on and non-boolean applications")
+        (is (thrown? Exception (query-scheme (make-restrict (sql/plus$ (make-const integer% 41)
+                                                                       (make-const integer% 1))
+                                                            tbl1)
+                                             :typecheck? true)))))
 
     (testing "outer restriction"
       (let [r (make-restrict-outer (sql/=$ (make-scalar-subquery
@@ -424,7 +428,13 @@
                                            (make-attribute-ref "C"))
                                    SUBA)]
         (is (= {"C" string%} (rel-scheme-alist (query-scheme r))))
-        (is (thrown? Exception (query-scheme r :typecheck? true)))))
+        (is (thrown? Exception (query-scheme r :typecheck? true)))
+        (testing "should fail with typecheck on and non-boolean applications"
+          (is (thrown? Exception (query-scheme (make-restrict-outer
+                                                (sql/plus$ (make-const integer% 41)
+                                                           (make-const integer% 1))
+                                                tbl1)
+                                               :typecheck? true))))))
 
     (testing "grouping"
       (is (= (lens/shove (alist->rel-scheme [["one" string%]
@@ -464,7 +474,6 @@
                                        (make-group #{"two"} tbl1))
                          :typecheck? true))))
 
-
     (testing "scheme for various combinations"
       (let [test-universe (make-universe)
             rel1 (make-base-relation 'tbl1
@@ -492,10 +501,32 @@
           (is (= (rel-scheme-concat (base-relation-scheme rel1)
                                     (rel-scheme-nullable (base-relation-scheme rel2)))
                  (query-scheme l))))))
-    ;; order
-    (let [o (make-order {(make-attribute-ref "one") :ascending} tbl1)]
-      (is (= (rel-scheme-alist (query-scheme o))
-             {"one" string% "two" integer%})))))
+    (testing "order"
+      (let [o (make-order {(make-attribute-ref "one") :ascending} tbl1)]
+        (is (= (rel-scheme-alist (query-scheme o))
+               {"one" string% "two" integer%}))
+        (is (thrown? Exception
+                     (query-scheme (make-order {(make-attribute-ref "one") :ascending}
+                                               (make-base-relation 'rel
+                                                                   (alist->rel-scheme [["one" date%]])
+                                                                   :universe (make-universe)
+                                                                   :handle "rel"))
+                                   :typecheck? true)))))
+    (testing "combine"
+      (let [p (make-project {"one" (make-attribute-ref "one")} tbl1)
+            p2 (make-project {"one" (make-attribute-ref "one")} tbl2)
+            r (make-restrict (sql/=$ (make-attribute-ref "one")
+                                     (make-const string% "foobar"))
+                             tbl1)
+            cp (make-product p p)
+            clop (make-left-outer-product p p)
+            cu (make-union p p2)]
+        (is (thrown? Exception (query-scheme clop :typecheck? true)))
+        (is (thrown? Exception (query-scheme cp :typecheck? true)))
+        (is (thrown? Exception (query-scheme clop :typecheck? true)))
+        (is (thrown? Exception (query-scheme cu :typecheck? true))))))
+  (testing "anything else should fail"
+    (is (thrown? Exception (query-scheme nil)))))
 
 (deftest query?-test
   ;; everything else is basically the same...
@@ -542,51 +573,58 @@
          (query->datum (make-project [["two" (make-attribute-ref "two")]
                                       ["one" (make-attribute-ref "one")]]
                                      tbl1))))
-  (let [test-universe (make-universe)
-        SUBB (make-base-relation 'SUBB
-                                 (alist->rel-scheme [["C" string%]])
-                                 test-universe
-                                 "SUBB")
-        SUBA (make-base-relation 'SUBA
-                                 (alist->rel-scheme [["C" string%]])
-                                 test-universe
-                                 "SUBA")
-        r (make-restrict (sql/>=$ (make-scalar-subquery
-                                   (make-project [["C" (make-attribute-ref "C")]]
-                                                 SUBB))
-                                  (make-attribute-ref "C"))
-                         SUBA)]
-    (is (= (list 'restrict
-                 (list 'application
-                       '>=
-                       (list (list 'scalar-subquery
-                                   (list 'project
-                                         (list (list "C" 'attribute-ref "C"))
-                                         (list 'base-relation 'SUBB)))
-                             (list 'attribute-ref "C")))
-                 (list 'base-relation 'SUBA))
-           (query->datum r))))
+  (testing "restrict"
+    (let [test-universe (make-universe)
+          SUBB (make-base-relation 'SUBB
+                                   (alist->rel-scheme [["C" string%]])
+                                   test-universe
+                                   "SUBB")
+          SUBA (make-base-relation 'SUBA
+                                   (alist->rel-scheme [["C" string%]])
+                                   test-universe
+                                   "SUBA")
+          r (make-restrict (sql/>=$ (make-scalar-subquery
+                                     (make-project [["C" (make-attribute-ref "C")]]
+                                                   SUBB))
+                                    (make-attribute-ref "C"))
+                           SUBA)]
+      (is (= (list 'restrict
+                   (list 'application
+                         '>=
+                         (list (list 'scalar-subquery
+                                     (list 'project
+                                           (list (list "C" 'attribute-ref "C"))
+                                           (list 'base-relation 'SUBB)))
+                               (list 'attribute-ref "C")))
+                   (list 'base-relation 'SUBA))
+             (query->datum r)))))
 
-
-  (let [test-universe (make-universe)
-        SUBB (make-base-relation 'SUBB
-                                 (alist->rel-scheme [["B" string%]])
-                                 test-universe
-                                 "SUBB")
-        SUBA (make-base-relation 'SUBA
-                                 (alist->rel-scheme [["A" string%]])
-                                 test-universe
-                                 "SUBA")
-        r (make-restrict-outer (sql/=$ (make-attribute-ref "A")
-                                       (make-attribute-ref "B"))
-                               (make-product SUBB SUBA))]
-    (is (= (list 'restrict-outer
-                 (list 'application
-                       '=
-                       (list (list 'attribute-ref "A")
-                             (list 'attribute-ref "B")))
-                 (list :product (list 'base-relation 'SUBB) (list 'base-relation 'SUBA)))
-           (query->datum r)))))
+  (testing "restrict outer"
+    (let [test-universe (make-universe)
+          SUBB (make-base-relation 'SUBB
+                                   (alist->rel-scheme [["B" string%]])
+                                   test-universe
+                                   "SUBB")
+          SUBA (make-base-relation 'SUBA
+                                   (alist->rel-scheme [["A" string%]])
+                                   test-universe
+                                   "SUBA")
+          r (make-restrict-outer (sql/=$ (make-attribute-ref "A")
+                                         (make-attribute-ref "B"))
+                                 (make-product SUBB SUBA))]
+      (is (= (list 'restrict-outer
+                   (list 'application
+                         '=
+                         (list (list 'attribute-ref "A")
+                               (list 'attribute-ref "B")))
+                   (list :product (list 'base-relation 'SUBB) (list 'base-relation 'SUBA)))
+             (query->datum r)))))
+  (testing "group"
+    (let [grp (make-group #{"one"} tbl1)]
+      (is (= (list 'group (group-columns grp) (query->datum tbl1))
+             (query->datum grp)))))
+  (testing "every other input should fail"
+    (is (thrown? Exception (query->datum :not-a-query)))))
 
 (deftest datum->query-test
   (let [test-universe (register-base-relation! (make-universe)
@@ -673,7 +711,10 @@
     (let [t (make-top nil 10 tbl1)]
       (is (= t (query->datum->query t))))
     (let [t (make-top 5 10 tbl1)]
-      (is (= t (query->datum->query t))))))
+      (is (= t (query->datum->query t)))))
+  (testing "every other input should fail"
+    (is (thrown? Exception
+                 (datum->query '(:invalid-argument) (make-universe))))))
 
 (deftest datum->expression-test
   (let [test-universe (make-universe)
@@ -686,42 +727,56 @@
            (make-const string% "foobar")))
     (is (= (expression->datum->expression (make-null string%))
            (make-null string%)))
-    (let [a (make-application (make-rator '+
-                                          (fn [fail t1 t2]
-                                            (when fail
-                                              (do
-                                                (sql/check-numerical t1 fail)
-                                                (sql/check-numerical t2 fail)))
-                                            t1)
-                                          +
-                                          :universe sql-universe
-                                          :data op-+)
-                              (make-const integer% 40)
-                              (make-const integer% 2))]
-      (is (= (datum->expression (expression->datum a) sql-universe)
-             a)))
-    (is (= (expression->datum->expression (make-tuple [(make-const integer% 40)
-                                                       (make-const integer% 2)]))
-           (make-tuple [(make-const integer% 40)
-                        (make-const integer% 2)])))
-    (is (= (expression->datum->expression (make-aggregation
-                                           :count (make-tuple [(make-const integer% 40)
-                                                               (make-const integer% 2)])))
-           (make-aggregation
-            :count (make-tuple [(make-const integer% 40)
-                                (make-const integer% 2)]))))
-    (is (= (datum->expression (expression->datum
-                               (make-case-expr {(sql/=$ (make-const integer% 42)
-                                                        (make-const integer% 42))
-                                                (make-const boolean% true)}
-                                               (make-const boolean% false)))
-                              sql-universe)
-           (make-case-expr {(make-application
-                             (universe-lookup-rator sql-universe '=)
-                             (make-const integer% 42)
-                             (make-const integer% 42))
-                            (make-const boolean% true)}
-                           (make-const boolean% false))))))
+    (testing "application"
+      (let [a (make-application (make-rator '+
+                                            (fn [fail t1 t2]
+                                              (when fail
+                                                (do
+                                                  (sql/check-numerical t1 fail)
+                                                  (sql/check-numerical t2 fail)))
+                                              t1)
+                                            +
+                                            :universe sql-universe
+                                            :data op-+)
+                                (make-const integer% 40)
+                                (make-const integer% 2))]
+        (is (= (datum->expression (expression->datum a) sql-universe)
+               a)))
+      (testing "application with unknown operator should fail"
+        (is (thrown? Exception (datum->expression
+                                (list 'application 'quux 2 2)
+                                sql-universe)))))
+
+    (testing "tuple"
+      (is (= (expression->datum->expression (make-tuple [(make-const integer% 40)
+                                                         (make-const integer% 2)]))
+             (make-tuple [(make-const integer% 40)
+                          (make-const integer% 2)]))))
+    (testing "aggregation"
+      (is (= (expression->datum->expression (make-aggregation
+                                             :count (make-tuple [(make-const integer% 40)
+                                                                 (make-const integer% 2)])))
+             (make-aggregation
+              :count (make-tuple [(make-const integer% 40)
+                                  (make-const integer% 2)])))))
+    (testing "aggregation*"
+      (is (= (make-aggregation :count-all)) (datum->expression (list 'aggregation* :count-all)
+                                                               sql-universe)))
+    (testing "case expression"
+      (is (= (datum->expression (expression->datum
+                                 (make-case-expr {(sql/=$ (make-const integer% 42)
+                                                          (make-const integer% 42))
+                                                  (make-const boolean% true)}
+                                                 (make-const boolean% false)))
+                                sql-universe)
+             (make-case-expr {(make-application
+                               (universe-lookup-rator sql-universe '=)
+                               (make-const integer% 42)
+                               (make-const integer% 42))
+                              (make-const boolean% true)}
+                             (make-const boolean% false))))))
+  (testing "everything else should fail"
+    (is (thrown? Exception (datum->expression (list 'doesnotexists) sql-universe)))))
 
 (deftest expression-attribute-names-test
   (is (= #{"two"} (expression-attribute-names (make-attribute-ref "two"))))
@@ -761,31 +816,38 @@
 
 (deftest query-attribute-names-test
   (is (nil? (query-attribute-names the-empty)))
-  (is (nil? (query-attribute-names tbl1)))
-  (is (= #{"two" "one"} (query-attribute-names
-                            (make-project [["two" (make-attribute-ref "two")]
-                                           ["one" (make-attribute-ref "one")]]
-                                          tbl1))))
-  (let [test-universe (make-universe)
-        SUBB (make-base-relation 'SUBB
-                                 (alist->rel-scheme [["C" string%]])
-                                 :universe test-universe
-                                 :handle "SUBB")
-        SUBA (make-base-relation 'SUBA
-                                 (alist->rel-scheme [["C" string%]])
-                                 :universe test-universe
-                                 :handle "SUBA")
-        r1 (make-restrict (sql/=$ (make-scalar-subquery
-                                   (make-project [["C" (make-attribute-ref "C")]
-                                                  ["D" (make-attribute-ref "D")]]
-                                                 SUBB))
-                                  (make-attribute-ref "C"))
-                          SUBA)
-        r2 (make-restrict (sql/=$ (make-attribute-ref "C")
-                                  (make-attribute-ref "C"))
-                          (make-left-outer-product SUBB SUBA))]
-    (is (= #{"C" "D"} (query-attribute-names r1)))
-    (is (= #{"C"} (query-attribute-names r2))))
+  (testing "base-relation"
+    (is (nil? (query-attribute-names tbl1))))
+  (testing "project"
+    (is (= #{"two" "one"} (query-attribute-names
+                           (make-project [["two" (make-attribute-ref "two")]
+                                          ["one" (make-attribute-ref "one")]]
+                                         tbl1)))))
+  (testing "restrict"
+    (let [test-universe (make-universe)
+          SUBB (make-base-relation 'SUBB
+                                   (alist->rel-scheme [["C" string%]])
+                                   :universe test-universe
+                                   :handle "SUBB")
+          SUBA (make-base-relation 'SUBA
+                                   (alist->rel-scheme [["C" string%]])
+                                   :universe test-universe
+                                   :handle "SUBA")
+          r1 (make-restrict (sql/=$ (make-scalar-subquery
+                                     (make-project [["C" (make-attribute-ref "C")]
+                                                    ["D" (make-attribute-ref "D")]]
+                                                   SUBB))
+                                    (make-attribute-ref "C"))
+                            SUBA)
+          r2 (make-restrict (sql/=$ (make-attribute-ref "C")
+                                    (make-attribute-ref "C"))
+                            (make-left-outer-product SUBB SUBA))
+          r3 (make-restrict-outer (sql/=$ (make-attribute-ref "C")
+                                          (make-attribute-ref "C"))
+                                  (make-left-outer-product SUBB SUBA))]
+      (is (= #{"C" "D"} (query-attribute-names r1)))
+      (is (= #{"C"} (query-attribute-names r2)))
+      (is (= #{"C"} (query-attribute-names r3)))))
   (let [test-universe (make-universe)
         rel1 (make-base-relation 'tbl1
                                  (alist->rel-scheme [["one" string%]
@@ -811,10 +873,21 @@
     (is (= #{"two" "one"} (query-attribute-names q)))
     (is (= #{"two" "one" "three" "four"} (query-attribute-names u)))
     (is (= #{"two" "one"} (query-attribute-names l))))
-  (is (= #{"one" "two"} (query-attribute-names
-                          (make-order {(make-attribute-ref "one") :ascending}
-                                      tbl1))))
-  (is (nil? (query-attribute-names (make-top 5 10 tbl1)))))
+  (testing "group"
+    (is (= #{"one" "two"} (query-attribute-names
+                           (make-order {(make-attribute-ref "one") :ascending}
+                                       tbl1)))))
+  (testing "top"
+    (is (nil? (query-attribute-names (make-top 5 10 tbl1)))))
+  (testing "group"
+    (is (nil? (query-attribute-names (make-group #{} tbl1))))
+    (is (= #{"one" "two"}
+           (query-attribute-names
+            (make-group #{"one"}
+                        (make-project
+                         {"one" (make-attribute-ref "one")} tbl1))))))
+  (testing "everything else should fail"
+    (is (thrown? Exception (query-attribute-names nil)))))
 
 (deftest substitute-attribute-refs-test
   (is (= (make-const string% "foobar")
@@ -882,8 +955,10 @@
          (cull-substitution-alist {"three" (make-attribute-ref "three")} tbl1))))
 
 (deftest query-substitute-attribute-refs-test
-  (is (= the-empty (query-substitute-attribute-refs {} the-empty)))
-  (is (= tbl1 (query-substitute-attribute-refs {} tbl1))))
+  (testing "the empty"
+    (is (= the-empty (query-substitute-attribute-refs {} the-empty))))
+  (testing "base-relation"
+    (is (= tbl1 (query-substitute-attribute-refs {} tbl1)))))
 
 (deftest count-aggregations-test
   (let [aggr (make-aggregation
