@@ -30,14 +30,14 @@
     (Date/valueOf d)
 
     :else
-    (assertion-violation 'to-sql-date "value of invalid date type" d)))
+    (assertion-violation `to-sql-date "value of invalid date type" d)))
 
 (defn from-sql-date
   "Takes a date object of type java.sql.Date and returns a java.time.LocalDate."
   [sql-date]
   (if (instance? Date sql-date)
     (.toLocalDate sql-date)
-    (assertion-violation 'from-sql-date "value of invalid date type" sql-date)))
+    (assertion-violation `from-sql-date "value of invalid date type" sql-date)))
 
 (defn to-sql-timestamp
   "Takes a date object produced by java.time.LocalDateTime and returns a
@@ -50,14 +50,14 @@
     (Timestamp/valueOf t)
 
     :else
-    (assertion-violation 'to-sql-timestamp "value of invalid timestamp type" t)))
+    (assertion-violation `to-sql-timestamp "value of invalid timestamp type" t)))
 
 (defn from-sql-timestamp
   "Takes a date object of type java.sql.Timestamp and returns a java.time.LocalDateTime."
   [sql-timestamp]
   (if (instance? Timestamp sql-timestamp)
     (.toLocalDateTime sql-timestamp)
-    (assertion-violation 'from-sql-timestamp "value of invalid timestamp type" sql-timestamp)))
+    (assertion-violation `from-sql-timestamp "value of invalid timestamp type" sql-timestamp)))
 
 (defn coerce-time-values
   "Takes the list of arguments and returns the list with all time values coerced
