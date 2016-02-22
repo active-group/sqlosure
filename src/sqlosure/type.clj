@@ -56,7 +56,7 @@
 
 (defn null?
   [v]
-  (if (seq? v)
+  (if (or (vector? v) (map? v) (list? v) (set? v))
     (empty? v)
     (nil? v)))
 
