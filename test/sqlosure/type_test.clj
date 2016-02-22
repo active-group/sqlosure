@@ -27,6 +27,7 @@
 (deftest boolean?-test
   (is (boolean? true))
   (is (boolean? false))
+  (is (boolean? nil))
   (is (not (boolean? 42)))
   (is (not (boolean? "string")))
   (is (not (boolean? :keyword))))
