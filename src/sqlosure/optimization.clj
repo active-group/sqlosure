@@ -93,7 +93,7 @@
                  (r/make-combine r
                                  (worker live1 q1)
                                  (worker live1 q2)))))))]
-    (if-not (rel/query? q)
+    (if-not (r/query? q)
       (c/assertion-violation 'remove-dead "unknown query" q)
       (worker (set (query->columns q)) q))))
 
