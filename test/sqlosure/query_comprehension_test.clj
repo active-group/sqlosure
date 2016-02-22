@@ -30,6 +30,10 @@
    (query->sql
     (opt/optimize-query query))))
 
+(defn put-query-no [query]
+  (put/sql-select->string
+   put/default-sql-put-parameterization
+   (query->sql query)))
 
 (deftest const-restrict-test
   (is (= ["SELECT two AS foo FROM tbl1 WHERE (one = ?)" [string% "foobar"]]
