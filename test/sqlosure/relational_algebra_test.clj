@@ -182,6 +182,58 @@
               ["one" (make-attribute-ref "one")]]
              (project-alist p))))))
 
+(deftest make-combine-test
+  (let [p1 (make-project {"two" (make-attribute-ref "two")} tbl1)
+        p2 (make-project {"one" (make-attribute-ref "one")} tbl1)
+        c (make-combine :union p1 p2)
+        c2 (make-combine :product p1 the-empty)
+        c3 (make-combine :product p2 the-empty)]
+    (testing "with valid relational operator"
+      (is (= :union (combine-rel-op c)))
+      (is (= p1 (combine-query-1 c)))
+      (is (= p2 (combine-query-2 c))))
+    (testing "with either one query empty it should return the non empty query"
+      (is (= p1 c2))
+      (is (= p2 c3)))
+    (testing "with invalid relational operator it should throw an assertion"
+      (is (thrown? Exception (make-combine :non-existent-operator p1 p2))))))
+
+(deftest combinations-test
+  (let [p1 (make-project {"two" (make-attribute-ref "two")} tbl1)
+        p2 (make-project {"one" (make-attribute-ref "one")} tbl1)]
+    (is (= (make-combine :product p1 p2) (make-product p1 p2)))
+    (is (= (make-combine :union p1 p2) (make-union p1 p2)))
+    (is (= (make-combine :intersection p1 p2) (make-intersection p1 p2)))
+    (is (= (make-combine :difference p1 p2) (make-difference p1 p2)))
+    (is (= (make-combine :quotient p1 p2) (make-quotient p1 p2)))
+    (is (= (make-combine :quotient p1 the-empty) (make-quotient p1 the-empty)))))
+
+(deftest order-op?-test
+  (is (order-op? :ascending))
+  (is (order-op? :descending))
+  (is (not (order-op? :anything-else))))
+
+(deftest aggregations-op?-test
+  (is (reduce #(and %1 (aggregations-op? %2)) true
+              [:count :count-all :sum :avg :min
+               :max :std-dev :std-dev-p :var :var-p]))
+  (is (not (aggregations-op? :anything-else))))
+
+(deftest make-aggregation-test
+  (testing "for regular aggregations"
+    (let [aggr (make-aggregation :count (make-attribute-ref "one"))]
+      (is (aggregation? aggr))
+      (is (= :count (aggregation-operator aggr)))
+      (is (= (make-attribute-ref "one") (aggregation-expr aggr)))))
+  (testing "for aggregation*"
+    (let [aggr (make-aggregation :count)]
+      (is (aggregation*? aggr))
+      (is (= :count (aggregation*-operator aggr)))))
+  (testing "for an invalid number of aruguments it should throw an assertion"
+    (is (thrown? Exception (make-aggregation :count
+                                             (make-attribute-ref "one")
+                                             (make-attribute-ref "one"))))))
+
 (deftest expression-type-test
   (let [one-ref (make-attribute-ref "one")
         string-const (make-const string% "foobar")
