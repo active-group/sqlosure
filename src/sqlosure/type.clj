@@ -90,7 +90,7 @@
     (set-type? ty) (let [mem (set-type-member-type ty)]
                      (and (or (vector? thing) (seq? thing))
                           (every? #(type-member? % mem) thing)))
-    :else (assertion-violation 'type-member? "unhandled type" thing)))
+    :else (assertion-violation `type-member? "unhandled type" thing)))
 
 (defmulti numeric-type? "Defines if a base-type is numeric, in the sense of the server's capability to call standard operations like MAX and AVG on them."
   (fn [t] (base-type-name t))
@@ -190,7 +190,7 @@
     (bounded-string-type? t) (list 'bounded-string
                                    (bounded-string-type-max-size t))
     (base-type? t) (list (base-type-name t))
-    :else (assertion-violation 'type->datum "unknown type" t)))
+    :else (assertion-violation `type->datum "unknown type" t)))
 
 (defn datum->type
   "`datum->type` takes a datum (as produced by `type->datum`) and a universe and
@@ -216,7 +216,7 @@
     blob blob%
     bounded-string (make-bounded-string-type (second d))
     (or (universe-lookup-type universe (first d))
-        (assertion-violation 'datum->type "unknown type" (first d)))))
+        (assertion-violation `datum->type "unknown type" (first d)))))
 
 (defn pair?
   "Returns true if v is a sequence not empty (like schemes pair? function)."
@@ -247,7 +247,7 @@
                                                   t val))
     (set-type? t) (let [mem (set-type-member-type t)]
                     (map (fn [v] (const->datum mem v)) val))
-    :else (assertion-violation 'const->datum "invalid type" t val)))
+    :else (assertion-violation `const->datum "invalid type" t val)))
 
 (defn datum->const
   "`datum->const` takes a type and a datum and turns the datum in the
@@ -266,14 +266,14 @@
                         (or (pair? d) (nil? d))
                         ;; Maybe add type check here?
                         (map datum->const (product-type-components t) d)
-                        :else (assertion-violation 'datum->const
+                        :else (assertion-violation `datum->const
                                                    "invalid product type datum for type"
                                                    t d))
     (set-type? t) (cond
                     (or (pair? d) (nil? d))
                     (let [mem (set-type-member-type t)]
                       (map (fn [dd] (datum->const mem dd)) d))
-                    :else (assertion-violation 'datum->const
+                    :else (assertion-violation `datum->const
                                                "invalid set type datum for type"
                                                t d))
-    :else (assertion-violation 'datum->const "invalid type" t)))
+    :else (assertion-violation `datum->const "invalid type" t)))
