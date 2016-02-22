@@ -190,6 +190,8 @@ Replaced alist with hash-map."
   (let [alist (if (map? alist)
                 (vec alist)
                 alist)]
+    ;; If the alist is empty and the underlying query is a projection, push down
+    ;; the empty alist to avoid unnecessary projections.
     (if (empty? alist)
       (loop [query query]
         (if (project? query)

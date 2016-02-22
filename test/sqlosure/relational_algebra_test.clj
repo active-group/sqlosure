@@ -150,10 +150,19 @@
   (let [p (make-project [["two" (make-attribute-ref "two")]
                          ["one" (make-attribute-ref "one")]]
                         tbl1)]
-    (is (= [["two" (make-attribute-ref "two")]
-            ["one" (make-attribute-ref "one")]]
-           (project-alist p)))
-    (is (= tbl1 (project-query p)))))
+    (testing "with alist"
+      (is (= [["two" (make-attribute-ref "two")]
+              ["one" (make-attribute-ref "one")]]
+             (project-alist p)))
+      (is (= tbl1 (project-query p))))
+    (testing "with map"
+      (let [p1 (make-project {"two" (make-attribute-ref "two")
+                              "one" (make-attribute-ref "one")} tbl1)]
+        (is (= p p1))))
+    (testing "with nested projects"
+      (let [pp (make-project nil p)]
+        (is (= (make-project nil tbl1) pp))
+        (is (= tbl1 (project-query pp)))))))
 
 (deftest make-extend-test
   (let [p (make-extend [["three" (make-const integer% 3)]
