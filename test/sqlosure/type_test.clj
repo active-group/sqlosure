@@ -37,6 +37,16 @@
   (is (date? (java.time.LocalDate/of 1989 10 31)))
   (is (not (date? 42))))
 
+(deftest byte-array?-test
+  (testing "an empty byte array of fixed length"
+    (is (byte-array? (byte-array 10))))
+  (testing "a byte array filled with some values"
+    (is (byte-array? (byte-array [(byte 0x43) (byte 0x6c) (byte 0x6f)]))))
+  (testing "nil or another seq should not be a byte array"
+    (is (not (byte-array? nil)))
+    (is (not (byte-array? [1 2 3])))
+    (is (not (byte-array? (range 0 10))))))
+
 (deftest make-nullable-type-test
   (let [really-nullable (really-make-nullable-type 'string)]
     (is (not (nullable-type? string%)))
@@ -44,6 +54,27 @@
     (is (nullable-type? (make-nullable-type 'boolean)))
     (is (= (nullable-type-underlying (make-nullable-type 'boolean)) 'boolean))
     (is (not= (nullable-type-underlying (make-nullable-type 'string)) nil))))
+
+(deftest null?-test
+  (is (null? []))
+  (is (null? '()))
+  (is (null? {}))
+  (is (null? #{}))
+  (is (null? nil)))
+
+(deftest all?-test
+  (is (all? [true true]))
+  (is (not (any? [])))
+  (is (not (all? nil)))
+  (is (not (all? [true false])))
+  (is (not (all? [false true]))))
+
+(deftest any?-test
+  (is (not (any? [false false])))
+  (is (any? [true false]))
+  (is (any? [true true]))
+  (is (not (any? nil)))
+  (is (not (any? []))))
 
 ;; TODO: Test type-member?
 (deftest type-member?-test
