@@ -351,8 +351,15 @@
     (is (not (aggregate? (make-scalar-subquery (make-attribute-ref "one")))))
     ;; FIXME I think this too should count as an aggregate but the old schemeql2 code didn't treat it as one..
     (is (not (aggregate? (make-scalar-subquery (make-aggregation :count-all))))))
-  ;; scalar
-)
+  (testing "set subquery"
+    (let [s (make-set-subquery (make-project {"one" (make-attribute-ref "one")} tbl1))
+          sa (make-set-subquery (make-project {"one" (make-aggregation :count (make-attribute-ref "one"))}
+                                              tbl1))]
+      ;; FIXME I think this too should count as an aggregate but the old schemeql2 code didn't treat it as one..
+      (is (not (aggregate? s)))
+      (is (not (aggregate? sa)))))
+  (testing "everything else should throw an assertion"
+    (is (thrown? Exception (aggregate? :invalid-input)))))
 
 (deftest query-scheme-test
   (let [test-universe (make-universe)
