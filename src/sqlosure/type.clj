@@ -240,9 +240,9 @@
                          (const->datum (nullable-type-underlying t) val))
     (bounded-string-type? t) val  ;; Maybe check here for correct value again?
     (product-type? t) (cond
-                       (or (empty? val) (pair? val))
-                       (map const->datum (product-type-components t) val)
-                       :else (assertion-violation 'const->datum
+                        (or (null? val) (sequential? val))
+                        (map const->datum (product-type-components t) val)
+                        :else (assertion-violation `const->datum
                                                   "invalid product-type value"
                                                   t val))
     (set-type? t) (let [mem (set-type-member-type t)]
