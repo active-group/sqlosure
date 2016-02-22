@@ -777,11 +777,10 @@ Replaced alist with hash-map."
                   (query-attribute-names (combine-query-2 q)))
     (restrict-outer? q)
     (let [sub (restrict-outer-query q)]
-      (apply union
-             (set (keys (rel-scheme-alist (query-scheme sub))))
-             (query-attribute-names sub)
-             (expression-attribute-names (restrict-outer-exp q))))
-
+      (union
+       (set (keys (rel-scheme-alist (query-scheme sub))))
+       (query-attribute-names sub)
+       (expression-attribute-names (restrict-outer-exp q))))
     (order? q)
     (let [subq (order-query q)
           alist (order-alist q)]
