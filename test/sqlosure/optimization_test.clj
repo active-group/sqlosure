@@ -113,6 +113,8 @@
           (is (= (alist->rel-scheme {"one" string%})
                  (-> c2 remove-dead combine-query-2 query-scheme))))))))
 
+
+
 (deftest merge-project-test
   (let [tbl1 (make-base-relation "tbl1"
                                  (alist->rel-scheme [["one" string%]
@@ -140,7 +142,13 @@
                (merge-project p2)))
         (is (= (make-project [["one" (make-attribute-ref "one")]
                               ["two" (make-attribute-ref "two")]] tbl1)
-               (merge-project p3))))))
+               (merge-project p3)))))
+
+    (testing "shouldn't zap project over group"
+      (let [c (make-project [["all" (make-aggregation :count-all)]]
+                            (make-project []
+                                          (make-group #{"one"} tbl1)))]
+        (is (= c (merge-project c))))))
 
   (testing "optimization should not merge aggregates"
     (let [expr (let [tbl1 (make-base-relation "tbl1"
