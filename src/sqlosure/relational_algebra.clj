@@ -448,6 +448,13 @@ Replaced alist with hash-map."
     (set-subquery? expr) false
     :else (assertion-violation `aggregate? "invalid expression" expr)))
 
+(defn project-aggregate?
+  "Test whether a project contains aggregate right-hand sides."
+  [pr]
+  (boolean
+   (some (fn [[col expr]] (aggregate? expr))
+         (project-alist pr))))
+
 (defn- check-grouped
   "Check whether all attribute refs in an expression 
   that are not inside an application of an aggregate occur in `grouped`."
