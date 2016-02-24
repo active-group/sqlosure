@@ -5,7 +5,8 @@
             [sqlosure.universe :refer [make-universe make-derived-universe]]
             [sqlosure.type :refer [boolean% numeric-type? type=? make-set-type null% any%]]
             [active.clojure.record :refer [define-record-type]]
-            [active.clojure.condition :refer [assertion-violation]]))
+            [active.clojure.condition :refer [assertion-violation]]
+            [clojure.string :as string]))
 
 (define-record-type sql-table
   (really-make-sql-table name scheme) sql-table?
@@ -210,6 +211,8 @@
 (def op-asg (make-sql-operator "=" 2))
 
 (def op-concat (make-sql-operator "CONCAT" -2))
+(def op-lower (make-sql-operator "LOWER" 1))
+(def op-upper (make-sql-operator "UPPER" 1))
 
 (def op-not (make-sql-operator "NOT" 1))
 (def op-null? (make-sql-operator "IS NULL" -1))
@@ -359,6 +362,23 @@
                           :data op-concat)]
     (fn [expr1 expr2]
       (make-application rator expr1 expr2))))
+
+(defn- make-string-converter [sym clj op]
+  (let [rator (make-rator sym
+                          (fn [fail t]
+                            #_(when fail
+                                (do
+                                  ;; TODO: check-string maybe?
+                                  (check-numerical t fail)))
+                            t)
+                          clj
+                          :universe sql-universe
+                          :data op)]
+    (fn [expr]
+      (make-application rator expr))))
+
+(def lower$ (make-string-converter 'lower string/lower-case op-lower))
+(def upper$ (make-string-converter 'upper string/upper-case op-upper))
 
 (def =$
   (let [rator (make-rator '=
