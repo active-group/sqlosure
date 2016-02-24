@@ -358,6 +358,81 @@
                                                          (make-const string% "foobar")) p1)))
                    (push-restrict (ro* c))))
             (is (= (make-union (push-restrict (ro* p)) p1)
-                   (push-restrict (ro* (make-union p p1)))))))))
+                   (push-restrict (ro* (make-union p p1)))))
+            (let [rr (ro* (make-union p p))]
+              (is (= (make-restrict-outer (restrict-outer-exp rr)
+                                          (push-restrict (restrict-outer-query rr)))
+                     (push-restrict rr)))))))
+      (testing "with underlying restrict"
+        (let [t (=$ (make-attribute-ref "one")
+                    (make-const string% "foobar"))
+              rr1 (ro* (make-restrict t (make-restrict t tbl1)))
+              rr2 (ro* (make-restrict t tbl1))]
+          (is (= (make-restrict-outer (restrict-outer-exp rr1)
+                                      (push-restrict (restrict-outer-query rr1)))
+                 (push-restrict rr1)))
+          (is (= (push-restrict (make-restrict-outer t (push-restrict (restrict-outer-query rr2))))
+                 (push-restrict rr2)))))
+      (testing "with underlying order"
+        (is (= (make-order {(make-attribute-ref "one") :ascending}
+                           (push-restrict (ro* tbl1)))
+               (push-restrict
+                (make-restrict-outer (=$ (make-attribute-ref "one")
+                                         (make-const string% "foobar"))
+                                     (make-order {(make-attribute-ref "one") :ascending} tbl1)))))))
+    (testing "order"
+      (let [o1 (make-order {(make-attribute-ref "one") :descending} p1)
+            o2 (make-order {(make-attribute-ref "one") :descending}
+                           (make-project {"one" (make-aggregation :count (make-attribute-ref "one"))}
+                                         tbl1))
+            o* (fn [q] (make-order {(make-attribute-ref "one") :ascending} q))
+            o3 (o* (make-order {(make-attribute-ref "two") :descending} tbl1))
+            o4 (o* (make-order {(make-attribute-ref "two") :descending}
+                               (make-order {(make-attribute-ref "one") :ascending} tbl1)))
+            o5 (o* (make-top 0 1 (make-top 0 1 tbl1)))
+            o6 (o* (make-top 0 1 tbl1))]
+        (testing "with underlying project"
+          (is (= (make-project (project-alist p1)
+                               (push-restrict (make-order
+                                               {(make-attribute-ref "one") :descending}
+                                               (project-query p1))))
+                 (push-restrict o1)))
+          (is (= (make-order {(make-attribute-ref "one") :descending}
+                             (push-restrict (make-project {"one" (make-aggregation :count (make-attribute-ref "one"))}
+                                                          tbl1)))
+                 (push-restrict o2))))
+        (testing "with underlying order"
+          (is (= (make-order (order-alist o4) (push-restrict (order-query o4)))
+                 (push-restrict o4)))
+          (is (= (push-restrict (make-order (order-alist o3) (push-restrict (order-query o3)))) ;; == pushed != order
+                 (push-restrict o3))))
+        (testing "with underlying top"
+          (is (= (make-order (order-alist o5) (push-restrict (order-query o5)))
+                 (push-restrict o5)))
+          (is (= (push-restrict (make-order (order-alist o6) (push-restrict (order-query o6))))
+                 (push-restrict o6))))))
+    (testing "group"
+      (is (= (make-group #{"one"} tbl1)
+             (push-restrict (make-group #{"one"} tbl1)))))
+    (testing "top"
+      (let [t* (fn [q] (make-top 0 1 q))
+            t1 (t* (make-project {"one" (make-attribute-ref "one")} tbl1))
+            t2 (t* (make-project {"one" (make-aggregation :count (make-attribute-ref "one"))} tbl1))
+            t3 (t* (make-order {(make-attribute-ref "one") :ascending} tbl1))
+            t4 (t* (make-order {(make-attribute-ref "one") :ascending}
+                               (make-order {(make-attribute-ref "two") :desceding} tbl1)))]
+        (testing "with underlying project"
+          (is (= (make-project (project-alist (top-query t1))
+                               (push-restrict (make-top 0 1 (project-query (top-query t1)))))
+                 (push-restrict t1)))
+          (is (= (make-top 0  1 (push-restrict (top-query t2)))
+                 (push-restrict t2))))
+        (testing "with underlying order"
+          (is (= (push-restrict (make-top 0 1 (push-restrict (top-query t3))))
+                 (push-restrict t3)))
+          (is (= (make-top 0 1 (push-restrict (top-query t4)))
+                 (push-restrict t4))))))
     (testing "combine"
-      (is (= c1 (push-restrict c1))))))
+      (is (= c1 (push-restrict c1))))
+    (testing "everything else should fail"
+      (is (thrown? Exception (push-restrict nil))))))
