@@ -199,7 +199,7 @@ Replaced alist with hash-map."
           (really-make-project alist query)))
       (really-make-project alist query))))
 
-(declare query-scheme)
+(declare query-scheme project-alist-aggregate?)
 
 (defn make-extend
   "Creates a projection of some attributes while keeping all other attributes in
@@ -215,7 +215,9 @@ Replaced alist with hash-map."
                     (filter (fn [[col _]]
                               (contains? grouped col))
                             (rel-scheme-alist scheme))
-                    (rel-scheme-alist scheme))))
+                    (if (project-alist-aggregate? alist)
+                      []
+                      (rel-scheme-alist scheme)))))
      query)))
 
 (define-record-type restrict
@@ -447,6 +449,18 @@ Replaced alist with hash-map."
     (scalar-subquery? expr) false
     (set-subquery? expr) false
     :else (assertion-violation `aggregate? "invalid expression" expr)))
+
+(defn project-alist-aggregate?
+  "Test whether a project alist contains aggregate right-hand sides."
+  [alist]
+  (boolean
+   (some (fn [[col expr]] (aggregate? expr))
+         alist)))
+
+(defn project-aggregate?
+  "Test whether a project contains aggregate right-hand sides."
+  [pr]
+  (project-alist-aggregate? (project-alist pr)))
 
 (defn- check-grouped
   "Check whether all attribute refs in an expression 

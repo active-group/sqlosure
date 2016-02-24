@@ -19,13 +19,13 @@
     
     (sql/sql-select? sql)
     (cond
-      (empty? (sql/sql-select-attributes sql)) sql
-      
+      (nil? (sql/sql-select-attributes sql)) sql
+    
       (some? (sql/sql-select-group-by sql))
       (-> (sql/new-sql-select)
           (sql/set-sql-select-tables [[nil sql]]))
-    
-      :else
+
+       :else
       (-> (sql/new-sql-select)
           (sql/set-sql-select-tables [[nil (sql/set-sql-select-group-by sql nil)]])
           (sql/set-sql-select-group-by (sql/sql-select-group-by sql))))))
@@ -111,7 +111,7 @@
                                    (conj (sql/sql-select-outer-tables sql) [nil q])))
 
 (defn project->sql
-  "Takes a projcet query and returns the abstract Sql representation."
+  "Takes a project query and returns the abstract Sql representation."
   [q]
   (let [alist (rel/project-alist q)]
     (-> (sql/set-sql-select-attributes (x->sql-select (query->sql (rel/project-query q)))

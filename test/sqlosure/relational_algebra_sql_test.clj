@@ -97,23 +97,23 @@
                           tbl1)
           res (set-sql-select-attributes (x->sql-select (query->sql tbl1))
                                          (alist->sql (project-alist p)))
-          nullary-p (make-project [] tbl1)
-          grouping-p (query->sql
-                      (make-project
-                       [["one" (make-attribute-ref "one")]
-                        ["count_twos" (make-aggregation :count (make-attribute-ref "two"))]]
-                       (make-group #{"one"}
-                                   tbl1)))]
+          nullary-p (make-project [] tbl1)]
       (is (sql-select-nullary? (query->sql nullary-p)))
       (is (= res (query->sql p)))
       (testing "with aggregation"
-        (is (= {"one" (make-sql-expr-column "one")
-                "count_twos" (make-sql-expr-app op-count
-                                                (make-sql-expr-column "two"))}
-               (sql-select-attributes grouping-p)))
-        (is (= [[nil (make-sql-select-table "tbl1")]] (sql-select-tables grouping-p)))
-
-        (is (= #{"one"} (sql-select-group-by grouping-p))))))
+        (let [grouping-p (query->sql
+                          (make-project
+                           [["one" (make-attribute-ref "one")]
+                            ["count_twos" (make-aggregation :count (make-attribute-ref "two"))]]
+                           (make-group #{"one"}
+                                       tbl1)))]
+          (is (= {"one" (make-sql-expr-column "one")
+                  "count_twos" (make-sql-expr-app op-count
+                                                  (make-sql-expr-column "two"))}
+                 (sql-select-attributes grouping-p)))
+          (is (= [[nil (make-sql-select-table "tbl1")]] (sql-select-tables grouping-p)))
+          
+          (is (= #{"one"} (sql-select-group-by grouping-p)))))))
   (testing "restrict"
     (let [test-universe (make-universe)
           t1 (make-sql-table 't1
@@ -155,4 +155,15 @@
                         (make-sql-table "tbl1"
                                         (alist->rel-scheme [["one" string%]
                                                             ["two" integer%]])))
-          q (query->sql o)])))
+          q (query->sql o)])) ;, FIXME: where's the test?
+
+  (testing "combining grouping with empty projection"
+    (let [s (query->sql
+             (make-project [["all" (make-aggregation :count-all)]]
+                           (make-project []
+                                         (make-group #{"one"}
+                                                     (make-sql-table "tbl1"
+                                                                     (alist->rel-scheme [["one" string%]
+                                                                                         ["two" integer%]]))))))]
+      ;; we want a subquery
+      (is (sql-select? (second (first (sql-select-tables s))))))))

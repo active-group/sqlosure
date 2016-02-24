@@ -760,8 +760,9 @@
               :count (make-tuple [(make-const integer% 40)
                                   (make-const integer% 2)])))))
     (testing "aggregation*"
-      (is (= (make-aggregation :count-all)) (datum->expression (list 'aggregation* :count-all)
-                                                               sql-universe)))
+      (is (= (make-aggregation :count-all)
+             (datum->expression (list 'aggregation* :count-all)
+                                sql-universe))))
     (testing "case expression"
       (is (= (datum->expression (expression->datum
                                  (make-case-expr {(sql/=$ (make-const integer% 42)
