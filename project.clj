@@ -13,6 +13,10 @@
   :plugins [[lein-cloverage "1.0.6"]
             [lein-kibit "0.1.2"]]
 
+  :profiles {:test {:dependencies [[pjstadig/humane-test-output "0.7.1"]]
+                    :injections [(require 'pjstadig.humane-test-output)
+                                 (pjstadig.humane-test-output/activate!)]}}
+
   ;; Use `lein cover` to run cloverage. Reason: cloverage is not happy with lets
   ;; in monadic code. cover excludes the files that use
   ;; active.clojure.monad/monadic. Coverage for these namespaces must be done by
