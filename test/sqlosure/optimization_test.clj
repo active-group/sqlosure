@@ -3,8 +3,16 @@
             [sqlosure.sql :refer :all]
             [sqlosure.type :refer :all]
             [sqlosure.relational-algebra :refer :all]
+            [sqlosure.universe :refer [make-universe]]
             [clojure.test :refer :all]
-            [clojure.pprint :refer [pprint]]))
+            [clojure.pprint :refer [pprint]]
+            [sqlosure.sql :as sql]))
+
+(def tbl1 (make-base-relation 'tbl1
+                              (alist->rel-scheme [["one" string%]
+                                                  ["two" integer%]])
+                              :universe (make-universe)
+                              :handle "tbl1"))
 
 (deftest project-alist-substitute-attribute-refs-test
   (is (= [["one" (make-const integer% 42)]]
