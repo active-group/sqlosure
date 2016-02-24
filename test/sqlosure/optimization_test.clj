@@ -134,7 +134,15 @@
               c2 (make-combine :quotient o1 p2)]
           (is (= c1 (remove-dead c1)))
           (is (= (alist->rel-scheme {"one" string%})
-                 (-> c2 remove-dead combine-query-2 query-scheme))))))))
+                 (-> c2 remove-dead combine-query-2 query-scheme)))))
+      (testing ":difference"
+        (let [c1 (make-difference o1 p1)
+              c2 (make-difference o1 p2)]
+          (is (= c1 (remove-dead c1)))
+          (is (= (alist->rel-scheme {"one" string%})
+                 (-> c2 remove-dead combine-query-2 query-scheme)))))
+      (testing "everything else should fail"
+        (is (thrown? Exception (remove-dead nil)))))))
 
 (deftest merge-project-test
   (let [tbl1 (make-base-relation "tbl1"
@@ -151,7 +159,10 @@
                                        tbl1))
         p3 (make-project [["one" (make-attribute-ref "one")]
                           ["two" (make-attribute-ref "two")]]
-                         p1)]
+                         p1)
+        r1 (make-restrict (sql/=$ (make-attribute-ref "one")
+                                  (make-const string% "foo"))
+                          tbl1)]
     (testing "empty-value"
       (is (= (make-empty-val) (merge-project (make-empty-val)))))
     (testing "base-relation"
@@ -163,16 +174,57 @@
                (merge-project p2)))
         (is (= (make-project [["one" (make-attribute-ref "one")]
                               ["two" (make-attribute-ref "two")]] tbl1)
-               (merge-project p3))))))
-
-  (testing "optimization should not merge aggregates"
-    (let [expr (let [tbl1 (make-base-relation "tbl1"
-                                              (alist->rel-scheme [["one" string%]
-                                                                  ["two" integer%]])
-                                              :handle "tbl1")]
-                 (make-project [["m" (make-aggregation :max (make-attribute-ref "c"))]]
-                               (make-project [["c" (make-aggregation :count-all)]]
-                                             (make-group #{"one"}
-                                                         tbl1))))]
-      (is (= expr (merge-project expr))))))
-
+               (merge-project p3))))
+      (testing "with underlying combine"
+        (let [c1 (make-project {"one" (make-attribute-ref "one")}
+                               (make-product p1 p2))
+              c2 (make-project {"one" (make-attribute-ref "one")}
+                               (make-union p1 r1))
+              c3 (make-project {"one" (make-attribute-ref "one")}
+                               (make-union p1 p2))]
+          (is (= (make-project (project-alist c1)
+                               (merge-project (project-query c1)))
+                 (merge-project c1)))
+          (is (= (make-project (project-alist c2)
+                               (merge-project (project-query c2)))
+                 (merge-project c2)))
+          (is (= (make-union (merge-project (make-project
+                                             {"one" (make-attribute-ref "one")}
+                                             tbl1))
+                             (merge-project (make-project
+                                             {"one" (make-attribute-ref "one")}
+                                             tbl1))))
+              (merge-project c3)))))
+    (testing "restrict-outer"
+      (let [ro1 (make-restrict-outer (sql/=$ (make-attribute-ref "one")
+                                             (make-const string% "foobar"))
+                                     tbl1)
+            ro2 (make-restrict-outer (sql/=$ (make-attribute-ref "one")
+                                             (make-const string% "foobar"))
+                                     p3)]
+        (is (= ro1 (merge-project ro1)))
+        (is (= (make-restrict-outer (sql/=$ (make-attribute-ref "one")
+                                            (make-const string% "foobar"))
+                                    (merge-project p3))
+               (merge-project ro2)))))
+    (testing "order"
+      (let [o1 (make-order {(make-attribute-ref "one") :ascending}
+                           tbl1)
+            o2 (make-order {(make-attribute-ref "one") :descending}
+                           p3)]
+        (is (= o1 (merge-project o1)))
+        (is (= (make-order {(make-attribute-ref "one") :descending}
+                           (merge-project p3))
+               (merge-project o2)))))
+    (testing "optimization should not merge aggregates"
+      (let [expr (let [tbl1 (make-base-relation "tbl1"
+                                                (alist->rel-scheme [["one" string%]
+                                                                    ["two" integer%]])
+                                                :handle "tbl1")]
+                   (make-project [["m" (make-aggregation :max (make-attribute-ref "c"))]]
+                                 (make-project [["c" (make-aggregation :count-all)]]
+                                               (make-group #{"one"}
+                                                           tbl1))))]
+        (is (= expr (merge-project expr)))))
+    (testing "evereything else should fail"
+      (is (thrown? Exception (merge-project nil))))))
