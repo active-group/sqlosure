@@ -311,7 +311,7 @@
         (r/project? tq)
         (let [passoc (r/project-alist tq)]
           (if (not-empty (filter (fn [[k v]] (r/aggregate? v)) passoc))
-            (r/make-top count (push-restrict tq))
+            (r/make-top offset count (push-restrict tq))
             (r/make-project
              passoc
              (push-restrict (r/make-top offset count (r/project-query tq))))))
