@@ -19,13 +19,13 @@
     
     (sql/sql-select? sql)
     (cond
-      (empty? (sql/sql-select-attributes sql)) sql
-      
+      (nil? (sql/sql-select-attributes sql)) sql
+    
       (some? (sql/sql-select-group-by sql))
       (-> (sql/new-sql-select)
           (sql/set-sql-select-tables [[nil sql]]))
-    
-      :else
+
+       :else
       (-> (sql/new-sql-select)
           (sql/set-sql-select-tables [[nil (sql/set-sql-select-group-by sql nil)]])
           (sql/set-sql-select-group-by (sql/sql-select-group-by sql))))))

@@ -46,6 +46,7 @@
    options sql-select-options
    ;; list [sql-column sql-expr]
    ;; [] is for '*'
+   ;; nil means open - can still add some
    ;; result
    attributes sql-select-attributes
    ;; true if the select represents a nullary relation. In this case,
