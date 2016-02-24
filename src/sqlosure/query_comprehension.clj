@@ -42,11 +42,11 @@
    [alias new-alias]
    [query current-query]
    (let [scheme (transform-scheme (rel/query-scheme q))
-         alist (rel/rel-scheme-alist scheme)
-         fresh (map (fn [[k _]] (fresh-name k alias)) alist)
-         project-alist (map (fn [[k _] fresh]
+         columns (rel/rel-scheme-columns scheme)
+         fresh (map (fn [k] (fresh-name k alias)) columns)
+         project-alist (map (fn [k fresh]
                               [fresh (rel/make-attribute-ref k)])
-                            alist fresh)
+                            columns fresh)
          qq (rel/make-project project-alist q)])
    (set-query! (make-product query qq))
    (return (make-relation alias scheme))))
@@ -155,12 +155,11 @@
 (defn !
   [rel name]
   ;; check user args
-  (if (not (relation? rel))
+  (when-not (relation? rel)
     (assertion-violation '! (str "not a relation: " rel)))
-  (let [alist (rel/rel-scheme-alist (relation-scheme rel))]
-    (if (contains? alist name)
-      (rel/make-attribute-ref (fresh-name name (relation-alias rel)))
-      (assertion-violation '! "unkown attribute" rel name))))
+  (when-not (contains? (rel/rel-scheme-alist (relation-scheme rel)) name)
+    (assertion-violation '! "unkown attribute" rel name))
+  (rel/make-attribute-ref (fresh-name name (relation-alias rel))))
 
 ;; A map representing the empty state for building up the query.
 
@@ -204,9 +203,9 @@
    [state (get-state)]
    (let [alias (relation-alias rel)
          scheme (relation-scheme rel)
-         alist (map (fn [[k _]]
+         alist (map (fn [k]
                       [k (rel/make-attribute-ref (fresh-name k alias))])
-                    (rel/rel-scheme-alist scheme))
+                    (rel/rel-scheme-columns scheme))
          query (::query state)])
    (put-state! (merge state the-empty-state))
    (return [(rel/make-project alist query) scheme])))
@@ -238,15 +237,15 @@
         a2 (relation-alias rel2)
         scheme1 (relation-scheme rel1)
         scheme2 (relation-scheme rel2)
-        p1 (rel/make-project (map (fn [[k _]]
+        p1 (rel/make-project (map (fn [k]
                                     [(fresh-name k alias)
                                      (rel/make-attribute-ref (fresh-name k a1))])
-                                  (rel/rel-scheme-alist scheme1))
+                                  (rel/rel-scheme-columns scheme1))
                              q1)
-        p2 (rel/make-project (map (fn [[k _]]
+        p2 (rel/make-project (map (fn [k]
                                     [(fresh-name k alias)
                                      (rel/make-attribute-ref (fresh-name k a2))])
-                                  (rel/rel-scheme-alist scheme2))
+                                  (rel/rel-scheme-columns scheme2))
                              q2)]
     (monadic
      (set-alias! (inc alias))

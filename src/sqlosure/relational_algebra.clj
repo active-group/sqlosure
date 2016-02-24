@@ -208,16 +208,15 @@ Replaced alist with hash-map."
   (let [scheme (query-scheme query)]
     (make-project
      (concat alist
-             (map (fn [p]
-                    [(first p)
-                     (make-attribute-ref (first p))])
+             (map (fn [k]
+                    [k (make-attribute-ref k)])
                   (if-let [grouped (rel-scheme-grouped scheme)]
-                    (filter (fn [[col _]]
+                    (filter (fn [col]
                               (contains? grouped col))
-                            (rel-scheme-alist scheme))
+                            (rel-scheme-columns scheme))
                     (if (project-alist-aggregate? alist)
                       []
-                      (rel-scheme-alist scheme)))))
+                      (rel-scheme-columns scheme)))))
      query)))
 
 (define-record-type restrict
@@ -777,13 +776,13 @@ Replaced alist with hash-map."
     (let [subq (project-query q)
           alist (project-alist q)]
       (apply union
-             (set (keys (rel-scheme-alist (query-scheme subq))))
+             (set (rel-scheme-columns (query-scheme subq)))
              (query-attribute-names subq)
              (map expression-attribute-names (map second alist))))
     (restrict? q)
     (let [sub (restrict-query q)]
       (union
-       (set (keys (rel-scheme-alist (query-scheme sub))))
+       (set (rel-scheme-columns (query-scheme sub)))
        (query-attribute-names sub)
        (expression-attribute-names (restrict-exp q))))
     (combine? q) (union
@@ -792,14 +791,14 @@ Replaced alist with hash-map."
     (restrict-outer? q)
     (let [sub (restrict-outer-query q)]
       (union
-       (set (keys (rel-scheme-alist (query-scheme sub))))
+       (set (rel-scheme-columns (query-scheme sub)))
        (query-attribute-names sub)
        (expression-attribute-names (restrict-outer-exp q))))
     (order? q)
     (let [subq (order-query q)
           alist (order-alist q)]
       (apply union
-             (set (map first (rel-scheme-alist (query-scheme subq))))
+             (set (rel-scheme-columns (query-scheme subq)))
              (query-attribute-names subq)
              (map expression-attribute-names (keys alist))))
 

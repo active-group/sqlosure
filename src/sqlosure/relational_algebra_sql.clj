@@ -93,10 +93,10 @@
                               (query->sql (rel/set-subquery-query expr)))
     :else (c/assertion-violation 'expression->sql": unknown expression " expr)))
 
-(defn alist->sql
-  "Takes a map and returns a corresponding sql statement."
+(defn project-alist->sql
+  "Takes a projection alist and returns a corresponding sql statement."
   [alist]
-  (into {} (map (fn [[k v]] [k (expression->sql v)])) alist))
+  (map (fn [[k v]] [k (expression->sql v)]) alist))
 
 (defn add-table
   "Takes an sql-select statement and adds a table to its select-tables list."
@@ -115,7 +115,7 @@
   [q]
   (let [alist (rel/project-alist q)]
     (-> (sql/set-sql-select-attributes (x->sql-select (query->sql (rel/project-query q)))
-                                       (alist->sql alist))
+                                       (project-alist->sql alist))
         (sql/set-sql-select-nullary? (empty? alist)))))
 
 (defn query->sql
@@ -127,6 +127,7 @@
     (rel/base-relation? q)
     (if-not (sql/sql-table? (rel/base-relation-handle q))
       (c/assertion-violation 'query->sql "base relation not a SQL table" q)
+      ;; FIXME: results in select * from, but should select in the order of column in rel:
       (sql/make-sql-select-table (sql/sql-table-name (rel/base-relation-handle q))))
     (rel/project? q) (project->sql q)
     (rel/restrict? q) (let [sql (x->sql-select (query->sql
@@ -183,14 +184,14 @@
           (if (rel/rel-scheme-unary? scheme-2)
             (let [sql1 (query->sql q1)
                   sql2 (query->sql q2)
-                  name-2 (ffirst (rel/rel-scheme-alist scheme-2))
-                  diff-alist (rel/rel-scheme-alist diff-scheme)
+                  name-2 (first (rel/rel-scheme-columns scheme-2))
+                  diff-columns (rel/rel-scheme-columns diff-scheme)
                   sql (sql/new-sql-select)]
               (-> sql
                   (add-table sql1)
                   (sql/set-sql-select-attributes
                    (map
-                    (fn [[k _]] [k (sql/make-sql-expr-column k)]) diff-alist))
+                    (fn [k] [k (sql/make-sql-expr-column k)]) diff-columns))
                   (sql/set-sql-select-criteria
                    (list (sql/make-sql-expr-app
                           sql/op-in
@@ -198,14 +199,14 @@
                           (sql/make-sql-expr-subquery sql2))))
                   (sql/set-sql-select-group-by
                    (map
-                    (fn [[k _]] (sql/make-sql-expr-column k)) diff-alist))
+                    (fn [k] (sql/make-sql-expr-column k)) diff-columns))
                   (sql/set-sql-select-having
                    [(sql/make-sql-expr-app
                      sql/op-=
                      (sql/make-sql-expr-app
                       sql/op-count
                       (sql/make-sql-expr-column
-                       (ffirst (rel/rel-scheme-alist diff-scheme))))
+                       (first diff-columns)))
                      (sql/make-sql-expr-subquery
                       (let [sql* (sql/new-sql-select)]
                         (-> sql*
@@ -215,10 +216,10 @@
                                          sql/op-count
                                          (sql/make-sql-expr-column name-2))]))))))])))
 
-            (let [diff-project-alist (map (fn [[k _]] [k (rel/make-attribute-ref k)])
-                                          (rel/rel-scheme-alist diff-scheme))
-                  q1-project-alist (map (fn [[k _]] [k (rel/make-attribute-ref k)])
-                                        (rel/rel-scheme-alist scheme-1))
+            (let [diff-project-alist (map (fn [k] [k (rel/make-attribute-ref k)])
+                                          (rel/rel-scheme-columns diff-scheme))
+                  q1-project-alist (map (fn [k] [k (rel/make-attribute-ref k)])
+                                        (rel/rel-scheme-columns scheme-1))
                   pruned (rel/make-project diff-project-alist q1)]
               (query->sql (rel/make-difference pruned
                                                (rel/make-project diff-project-alist

@@ -68,14 +68,14 @@
                                            (make-const boolean% true)}
                                           (make-const boolean% false))))))
 
-(deftest alist->sql-test
-  (is (= {"one" (make-sql-expr-column "one")
-          "two" (make-sql-expr-column "two")}
-         (alist->sql {"one" (make-attribute-ref "one")
-                      "two" (make-attribute-ref "two")})))
+(deftest project-alist->sql-test
+  (is (= [["one" (make-sql-expr-column "one")]
+          ["two" (make-sql-expr-column "two")]]
+         (project-alist->sql [["one" (make-attribute-ref "one")]
+                              ["two" (make-attribute-ref "two")]])))
   (is (thrown? Exception  ;; Should throw because string% and integer% are not
                           ;; expressions.
-               (alist->sql {"one" string% "two" integer%}))))
+               (doall (project-alist->sql {"one" string% "two" integer%})))))
 
 (deftest add-table-test
   (is (= tbl1 (-> (new-sql-select)
@@ -96,7 +96,7 @@
                            ["one" (make-attribute-ref "one")]]
                           tbl1)
           res (set-sql-select-attributes (x->sql-select (query->sql tbl1))
-                                         (alist->sql (project-alist p)))
+                                         (project-alist->sql (project-alist p)))
           nullary-p (make-project [] tbl1)]
       (is (sql-select-nullary? (query->sql nullary-p)))
       (is (= res (query->sql p)))
@@ -107,9 +107,9 @@
                             ["count_twos" (make-aggregation :count (make-attribute-ref "two"))]]
                            (make-group #{"one"}
                                        tbl1)))]
-          (is (= {"one" (make-sql-expr-column "one")
-                  "count_twos" (make-sql-expr-app op-count
-                                                  (make-sql-expr-column "two"))}
+          (is (= [["one" (make-sql-expr-column "one")]
+                  ["count_twos" (make-sql-expr-app op-count
+                                                   (make-sql-expr-column "two"))]]
                  (sql-select-attributes grouping-p)))
           (is (= [[nil (make-sql-select-table "tbl1")]] (sql-select-tables grouping-p)))
           

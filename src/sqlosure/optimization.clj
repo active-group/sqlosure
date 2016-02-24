@@ -113,6 +113,7 @@
              (r/project-aggregate? q)
              (r/project-aggregate? pq)) 
           (r/make-project pa pq)
+          ;; FIXME: explain why 'into {}' here and below does not affect the select-order.
           (r/make-project (project-alist-substitute-attribute-refs
                            (into {} (r/project-alist pq)) pa)
                           (r/project-query pq)))
