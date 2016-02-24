@@ -144,6 +144,8 @@
       (testing "everything else should fail"
         (is (thrown? Exception (remove-dead nil)))))))
 
+
+
 (deftest merge-project-test
   (let [tbl1 (make-base-relation "tbl1"
                                  (alist->rel-scheme [["one" string%]
@@ -227,4 +229,19 @@
                                                            tbl1))))]
         (is (= expr (merge-project expr)))))
     (testing "evereything else should fail"
-      (is (thrown? Exception (merge-project nil))))))
+      (is (thrown? Exception (merge-project nil)))))
+  (testing "shouldn't zap project over group"
+    (let [c (make-project [["all" (make-aggregation :count-all)]]
+                          (make-project []
+                                        (make-group #{"one"} tbl1)))]
+      (is (= c (merge-project c)))))
+  (testing "optimization should not merge aggregates"
+    (let [expr (let [tbl1 (make-base-relation "tbl1"
+                                              (alist->rel-scheme [["one" string%]
+                                                                  ["two" integer%]])
+                                              :handle "tbl1")]
+                 (make-project [["m" (make-aggregation :max (make-attribute-ref "c"))]]
+                               (make-project [["c" (make-aggregation :count-all)]]
+                                             (make-group #{"one"}
+                                                         tbl1))))]
+      (is (= expr (merge-project expr))))))

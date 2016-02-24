@@ -93,9 +93,16 @@
                  (r/make-combine r
                                  (worker live1 q1)
                                  (worker live1 q2)))))))]
-    (if-not (rel/query? q)
+    (if-not (r/query? q)
       (c/assertion-violation 'remove-dead "unknown query" q)
       (worker (set (query->columns q)) q))))
+
+(defn aggregate-project?
+  "Test whether a project contains aggregate right-hand sides."
+  [pr]
+  (boolean
+   (some (fn [[col expr]] (r/aggregate? expr))
+         (r/project-alist pr))))
 
 (defn merge-project
   [q]
@@ -107,8 +114,11 @@
           pa (r/project-alist q)]
       (cond
         (r/project? pq)
-        (if (some (fn [[col expr]] (r/aggregate? expr))
-                  (r/project-alist pq))
+        (if (or
+             ;; (project [... agg ....] (project [...] (group [...] ...)))
+             ;; ... is not the same as (project [... agg ...] (group [...] ...))
+             (aggregate-project? q)
+             (aggregate-project? pq)) 
           (r/make-project pa pq)
           (r/make-project (project-alist-substitute-attribute-refs
                            (into {} (r/project-alist pq)) pa)
