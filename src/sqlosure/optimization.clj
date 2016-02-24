@@ -278,13 +278,15 @@
       (cond
         (r/project? oq) (let [palist (r/project-alist oq)
                               palist-map (into {} palist)
-                              new-alist (map (fn [[k v]]
-                                               [(r/substitute-attribute-refs palist-map k) v])
-                                             alist)]
+                              new-alist (into {} (map (fn [[k v]]
+                                                        [(r/substitute-attribute-refs palist-map k) v])
+                                                      alist))]
                           (if (some (fn [[k v]] (r/aggregate? k)) new-alist)
                             (r/make-order alist (push-restrict oq))
                             (r/make-project palist
-                                            (push-restrict (r/make-order new-alist oq)))))
+                                            (push-restrict
+                                             (r/make-order new-alist
+                                                           (r/project-query oq))))))
         (r/order? oq) (let [pushed (push-restrict oq)
                             new (r/make-order alist pushed)]
                         (if (r/order? pushed)
