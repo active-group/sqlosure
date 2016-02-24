@@ -195,8 +195,8 @@
                                              tbl1))
                              (merge-project (make-project
                                              {"one" (make-attribute-ref "one")}
-                                             tbl1))))
-              (merge-project c3)))))
+                                             tbl1)))
+                 (merge-project c3))))))
     (testing "restrict-outer"
       (let [ro1 (make-restrict-outer (sql/=$ (make-attribute-ref "one")
                                              (make-const string% "foobar"))
