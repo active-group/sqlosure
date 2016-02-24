@@ -131,7 +131,7 @@
       (assertion-violation `group-by "not a relation" rel))
     (when-not (string? name)
       (assertion-violation `group-by "not a column name" name))
-    (when-not (contains? (rel/rel-scheme-alist (relation-scheme rel)) name)
+    (when-not (contains? (rel/rel-scheme-map (relation-scheme rel)) name)
       (assertion-violation `group-by "unknown attribute" rel name)))
   (monadic
    [old current-query]
@@ -157,7 +157,7 @@
   ;; check user args
   (when-not (relation? rel)
     (assertion-violation '! (str "not a relation: " rel)))
-  (when-not (contains? (rel/rel-scheme-alist (relation-scheme rel)) name)
+  (when-not (contains? (rel/rel-scheme-map (relation-scheme rel)) name)
     (assertion-violation '! "unkown attribute" rel name))
   (rel/make-attribute-ref (fresh-name name (relation-alias rel))))
 

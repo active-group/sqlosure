@@ -13,18 +13,24 @@ Replaced alist with hash-map."
             [active.clojure.lens :as lens]))
 
 (define-record-type rel-scheme
-  (^:private make-rel-scheme columns alist grouped) rel-scheme?
-  [^{:doc "Vector of the columns, i.e. the keys in the map, in order."}
+  (^:private really-make-rel-scheme columns map grouped) rel-scheme?
+  [^{:doc "Ordered sequence of the columns."}
    columns rel-scheme-columns
-   ^{:doc "maps labels to types"}
-   alist rel-scheme-alist
+   ^{:doc "Map of labels to types."}
+   map rel-scheme-map
    ^{:doc "`nil` or set of grouped column labels"}
    (grouped rel-scheme-grouped rel-scheme-grouped-lens)])
+
+(defn make-rel-scheme [columns map grouped]
+  (c/assert (not (set? columns)))
+  (c/assert (map? map) map)
+  (c/assert (or (nil? grouped) (set? grouped)) grouped)
+  (really-make-rel-scheme columns map grouped))
 
 (defn rel-scheme-types
   "Returns the types of a rel-scheme, in the order they were created."
   [rs]
-  (let [mp (into {} (rel-scheme-alist rs))]
+  (let [mp (rel-scheme-map rs)]
     (map #(get mp %)
          (rel-scheme-columns rs))))
 
@@ -57,8 +63,8 @@ Replaced alist with hash-map."
     :else
     (make-rel-scheme (concat (rel-scheme-columns s1)
                              (rel-scheme-columns s2))
-                     (merge (rel-scheme-alist s1)
-                            (rel-scheme-alist s2))
+                     (merge (rel-scheme-map s1)
+                            (rel-scheme-map s2))
                      (cond
                        (nil? (rel-scheme-grouped s1))
                        (rel-scheme-grouped s2)
@@ -77,7 +83,7 @@ Replaced alist with hash-map."
         cols (filter (complement cols2) (rel-scheme-columns s1))]
     (c/assert (not-empty cols))
     (make-rel-scheme cols
-                     (select-keys (rel-scheme-alist s1) cols)
+                     (select-keys (rel-scheme-map s1) cols)
                      (difference (rel-scheme-grouped s1) cols2))))
 
 
@@ -93,13 +99,13 @@ Replaced alist with hash-map."
                    (into {}
                          (map (fn [[name type]]
                                 [name (t/make-nullable-type type)])
-                              (rel-scheme-alist scheme)))
+                              (rel-scheme-map scheme)))
                    (rel-scheme-grouped scheme)))
 
 (defn rel-scheme->environment
   "Returns the relation table of a rel-scheme."
   [s]
-  (rel-scheme-alist s))
+  (rel-scheme-map s))
 
 (defn compose-environments
   "Combine two environments. e1 takes precedence over e2."
@@ -406,13 +412,13 @@ Replaced alist with hash-map."
                    t))
    ;; FIXME what should the result here really be?
    (fn [subquery] (let [scheme (query-scheme* subquery env fail)
-                        alist (rel-scheme-alist scheme)]
+                        alist (rel-scheme-map scheme)]
                     (when (and fail (or (empty? alist) (t/pair? (rest alist))))
                       (fail 'unary-relation subquery))
                     (key (first alist))))
    ;; FIXME what should the result here really be?
    (fn [subquery] (let [scheme (query-scheme* subquery env fail)
-                        alist (rel-scheme-alist scheme)]
+                        alist (rel-scheme-map scheme)]
                     (when (and fail (or (empty? alist) (t/pair? (rest alist))))
                       (fail 'unary-relation subquery))
                     (t/make-set-type (key (first alist)))))
@@ -529,8 +535,8 @@ Replaced alist with hash-map."
       (combine? q) (case (combine-rel-op q)
                      :product (let [r1 (next-step (combine-query-1 q))
                                     r2 (next-step (combine-query-2 q))]
-                                (let [a1 (rel-scheme-alist r1)
-                                      a2 (rel-scheme-alist r2)]
+                                (let [a1 (rel-scheme-map r1)
+                                      a2 (rel-scheme-map r2)]
                                   (when fail
                                     (doseq [[k _] a1]
                                       (when (contains? a2 k)
@@ -540,8 +546,8 @@ Replaced alist with hash-map."
                      :left-outer-product
                      (let [r1 (next-step (combine-query-1 q))
                            r2 (rel-scheme-nullable (next-step (combine-query-2 q)))]
-                       (let [a1 (rel-scheme-alist r1)
-                             a2 (rel-scheme-alist r2)]
+                       (let [a1 (rel-scheme-map r1)
+                             a2 (rel-scheme-map r2)]
                          (when fail
                            (doseq [[k _] a1]
                              (when (contains? a2 k)
@@ -552,8 +558,8 @@ Replaced alist with hash-map."
                                      s2 (next-step (combine-query-2 q))]
                                  (when fail
 
-                                   (let [a1 (rel-scheme-alist s1)
-                                         a2 (rel-scheme-alist s2)]
+                                   (let [a1 (rel-scheme-map s1)
+                                         a2 (rel-scheme-map s2)]
 
                                      (doseq [[k v] a2]
                                        (when-let [p2 (get v a1)]
@@ -830,10 +836,10 @@ Replaced alist with hash-map."
   "Takes an map and a 'underlying' query and returns a map of
   substitutions not already featured in `underlying`."
   [alist underlying]
-  (let [underlying-alist (rel-scheme-alist (query-scheme underlying))]
+  (let [underlying-map (rel-scheme-map (query-scheme underlying))]
     (into {}
           (filter (fn [[k v]]
-                    (not (contains? underlying-alist k)))
+                    (not (contains? underlying-map k)))
                   alist))))
 
 (defn query-substitute-attribute-refs

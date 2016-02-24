@@ -17,9 +17,9 @@
   (apply set/union (map r/expression-attribute-names (map first alist))))
 
 (defn query->alist
-  "Return the rel-scheme-alist of a query's query-scheme."
+  "Return the rel-scheme-map of a query's query-scheme."
   [q]
-  (-> q r/query-scheme r/rel-scheme-alist))
+  (-> q r/query-scheme r/rel-scheme-map))
 
 (defn query->columns
   "Return the rel-scheme-columns of a query's query-scheme."
@@ -28,7 +28,7 @@
 
 (defn intersect-live
   "Takes a sequence of 'live' values and a query and returns the intersection of
-  all refs in both the live-list and the rel-scheme-alist of the query."
+  all refs in both the live-list and the rel-scheme-map of the query."
   [live q]
   (set (filter #(contains? live %) (query->columns q))))
 

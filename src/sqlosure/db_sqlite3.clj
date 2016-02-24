@@ -79,13 +79,14 @@
   vector of vals to be inserted and inserts a new record into the connected
   database's table."
   [conn table scheme vals]
-  (let [alist (rel/rel-scheme-alist scheme)]
-    (insert! (sqlite3-db conn)
-             table
-             (into
-              {}
-              (map (fn [[k t] v]
-                     [k (value->sqlite3-value t v)]) alist vals)))))
+  (insert! (sqlite3-db conn)
+           table
+           (into
+            {}
+            (map (fn [[k t] v]
+                   [k (value->sqlite3-value t v)])
+                 (rel/rel-scheme-map scheme)
+                 vals))))
 
 (defn- sqlite3-delete
   "Takes a db-connection, a table name (string) and a sql-expr criterion and

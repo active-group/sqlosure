@@ -45,7 +45,7 @@
     (testing "with both alists not empty"
       (let [res (rel-scheme-concat a-scheme b-scheme)]
         (is (= ab-scheme res))
-        (is (= (into {} (concat a b)) (rel-scheme-alist res)))))
+        (is (= (into {} (concat a b)) (rel-scheme-map res)))))
     (testing "with groupings"
       (let [a-scheme-grouped (assoc a-scheme :grouped #{"one"})
             b-scheme-grouped (assoc b-scheme :grouped #{"three"})
@@ -394,8 +394,8 @@
                               ["count_twos" (make-aggregation :count (make-attribute-ref "two"))]]
                              tbl1)
             res (query-scheme p :typecheck? true)]
-        (is (= (rel-scheme-alist res) {"two" integer% "one" string%}))
-        (is (= {"two" integer% "count_twos" integer%} (rel-scheme-alist (query-scheme p2))))
+        (is (= (rel-scheme-map res) {"two" integer% "one" string%}))
+        (is (= {"two" integer% "count_twos" integer%} (rel-scheme-map (query-scheme p2))))
         (testing "aggregations and product-types should make it fail"
           (is (thrown? Exception
                        (query-scheme (make-project
@@ -413,7 +413,7 @@
                                                     SUBB))
                                      (make-attribute-ref "C"))
                              SUBA)]
-        (is (= {"C" string%} (rel-scheme-alist (query-scheme r))))
+        (is (= {"C" string%} (rel-scheme-map (query-scheme r))))
         (is (thrown? Exception (query-scheme r :typecheck? true)))
         (testing "should fail with typecheck on and non-boolean applications")
         (is (thrown? Exception (query-scheme (make-restrict (sql/plus$ (make-const integer% 41)
@@ -427,7 +427,7 @@
                                                           SUBB))
                                            (make-attribute-ref "C"))
                                    SUBA)]
-        (is (= {"C" string%} (rel-scheme-alist (query-scheme r))))
+        (is (= {"C" string%} (rel-scheme-map (query-scheme r))))
         (is (thrown? Exception (query-scheme r :typecheck? true)))
         (testing "should fail with typecheck on and non-boolean applications"
           (is (thrown? Exception (query-scheme (make-restrict-outer
@@ -503,7 +503,7 @@
                  (query-scheme l))))))
     (testing "order"
       (let [o (make-order {(make-attribute-ref "one") :ascending} tbl1)]
-        (is (= (rel-scheme-alist (query-scheme o))
+        (is (= (rel-scheme-map (query-scheme o))
                {"one" string% "two" integer%}))
         (is (thrown? Exception
                      (query-scheme (make-order {(make-attribute-ref "one") :ascending}
