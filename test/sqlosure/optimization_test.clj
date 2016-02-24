@@ -32,6 +32,21 @@
     (is (empty?
            (order-alist-attribute-names nil)))))
 
+(deftest query->alist-test
+  (let [p (make-project {"one" (make-attribute-ref "one")} tbl1)
+        p2 (make-project {"one" (make-attribute-ref "one")}
+                         (make-project {"one" (make-attribute-ref "one")
+                                        "two" (make-attribute-ref "two")}
+                                       tbl1))
+        p3 (make-project {"one" (make-attribute-ref "one")
+                          "two" (make-attribute-ref "two")}
+                         (make-project {"one" (make-attribute-ref "one")
+                                        "two" (make-attribute-ref "two")}
+                                       tbl1))]
+    (is (= {"one" string%} (query->alist p)))
+    (is (= {"one" string%} (query->alist p2)))
+    (is (= {"one" string% "two" integer%} (query->alist p3)))))
+
 (deftest intersect-live-test
   (let [tbl1 (make-base-relation "tbl1"
                                  (alist->rel-scheme [["one" string%]
