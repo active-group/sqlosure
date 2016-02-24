@@ -53,13 +53,14 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
   vector of vals to be inserted and inserts a new record into the connected
   database's table."
   [conn table scheme vals]
-  (let [alist (rel/rel-scheme-alist scheme)]
-    (insert! (postgresql-db conn)
-             table
-             (into
-              {}
-              (map (fn [[k t] v]
-                     [k v]) alist (time/coerce-time-values vals))))))
+  (insert! (postgresql-db conn)
+           table
+           (into
+            {}
+            (map (fn [[k t] v]
+                   [k v])
+                 (rel/rel-scheme-columns scheme)
+                 (time/coerce-time-values vals)))))
 
 (defn- postgresql-delete
   "Takes a db-connection, a table name (string) and a sql-expr criterion and

@@ -46,15 +46,15 @@
      conn name
      (rsql/expression->sql
       (apply criterion-proc
-             (map (fn [[k _]] (rel/make-attribute-ref k))
-                  (rel/rel-scheme-alist (rel/query-scheme sql-table))))))))
+             (map rel/make-attribute-ref
+                  (rel/rel-scheme-columns (rel/query-scheme sql-table))))))))
 
 (defn update!
   [conn sql-table criterion-proc alist-first & args]
   (let [name (sql/sql-table-name (rel/base-relation-handle sql-table))
         scheme (rel/query-scheme sql-table)
-        attr-exprs (map (fn [[k v]] (rel/make-attribute-ref k))
-                        (rel/rel-scheme-alist scheme))]
+        attr-exprs (map rel/make-attribute-ref
+                        (rel/rel-scheme-columns scheme))]
     (c/db-update conn name scheme
                  (rsql/expression->sql (apply criterion-proc attr-exprs))
                  (into {}
