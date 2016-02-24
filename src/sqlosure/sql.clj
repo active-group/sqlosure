@@ -44,8 +44,8 @@
   [;; [ string ]
    ;; DISTINCT, ALL, etc.
    options sql-select-options
-   ;; list {sql-column sql-expr}
-   ;; {} is for '*'
+   ;; list [sql-column sql-expr]
+   ;; [] is for '*'
    ;; result
    attributes sql-select-attributes
    ;; true if the select represents a nullary relation. In this case,
