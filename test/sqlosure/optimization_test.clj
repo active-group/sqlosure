@@ -245,3 +245,119 @@
                                              (make-group #{"one"}
                                                          tbl1))))]
       (is (= expr (merge-project expr))))))
+
+(deftest push-restrict-test
+  (let [r1 (make-restrict (=$ (make-attribute-ref "one")
+                              (make-const string% "foobar")) tbl1)
+        p1 (make-project {"one" (make-attribute-ref "one")
+                          "two" (make-attribute-ref "two")} tbl1)
+        p2 (make-project {"one" (make-attribute-ref "one")} r1)
+        r2 (make-restrict (=$ (make-attribute-ref "one")
+                              (make-const string% "foobar")) p2)
+        r* (fn [q] (make-restrict (=$ (make-attribute-ref "one")
+                                      (make-const string% "foobar")) q))
+        ro* (fn [q] (make-restrict-outer (=$ (make-attribute-ref "one")
+                                             (make-const string% "foobar")) q))
+        c1 (make-union p1 p2)
+        c2 (make-difference p1 r1)
+        r3 (r* c1)
+        r4 (r* c2)
+        r5 (r* (make-union (make-project {"two" (make-attribute-ref "two")}
+                                         tbl1)
+                           p2))
+        r6 (r* (make-union p2
+                           (make-project {"two" (make-attribute-ref "two")}
+                                         tbl1)))
+        r7 (r* (r* p1))
+        ro1 (make-restrict-outer (=$ (make-attribute-ref "one")
+                                     (make-const string% "foobar"))
+                                 tbl1)
+        ro2 (make-restrict-outer (=$ (make-attribute-ref "one")
+                                     (make-const string% "foobar"))
+                                 ro1)
+        o1 (make-order {(make-attribute-ref "one") :ascending} tbl1)
+        g1 (make-group #{"one"} tbl1)]
+    (testing "empty val"
+      (is (= the-empty (push-restrict the-empty))))
+    (testing "base-relation"
+      (is (= tbl1 (push-restrict tbl1))))
+    (testing "project"
+      (is (= p1 (push-restrict p1)))
+      (is (= p2 (push-restrict p2))))
+    (testing "restrict"
+      (is (= r1 (push-restrict r1)))
+      (is (= (make-project {"one" (make-attribute-ref "one")}
+                           (make-restrict (=$ (make-attribute-ref "one")
+                                              (make-const string% "foobar"))
+                                          r1))
+             (push-restrict r2)))
+      (testing "with underlying restrict"
+        (is (= (make-project (project-alist p1)
+                             (make-restrict (=$ (make-attribute-ref "one")
+                                                (make-const string% "foobar"))
+                                            (make-restrict (=$ (make-attribute-ref "one")
+                                                               (make-const string% "foobar"))
+                                                           tbl1)))
+               (push-restrict r7))))
+      (testing "with underlying restrict-outer"
+        (is (= (make-restrict (=$ (make-attribute-ref "one") (make-const string% "foobar"))
+                              (push-restrict ro2))
+               (push-restrict (r* ro2))))
+        (is (= (push-restrict (make-restrict (=$ (make-attribute-ref "one")
+                                                 (make-const string% "foobar"))
+                                             (push-restrict ro1)))
+               (push-restrict (r* ro1)))))
+      (testing "with underlying order"
+        (is (= (make-order (order-alist o1)
+                           (make-restrict (=$ (make-attribute-ref "one")
+                                              (make-const string% "foobar"))
+                                          (order-query o1)))
+               (push-restrict (r* o1)))))
+      (testing "with underlying group"
+        (is (= (make-group #{"one"}
+                           (make-restrict (=$ (make-attribute-ref "one")
+                                              (make-const string% "foobar"))
+                                          tbl1))
+               (push-restrict (r* g1)))))
+      (testing "with underlying combine"
+        (testing ":union"
+          (is (= r3 (push-restrict r3)))
+          (is (= (make-union
+                  (make-project {"two" (make-attribute-ref "two")} tbl1)
+                  (push-restrict (make-restrict (restrict-exp r5)
+                                                (push-restrict p2))))
+                 (push-restrict r5)))
+          (is (= (make-union
+                  (push-restrict (make-restrict (restrict-exp r5)
+                                                (push-restrict p2)))
+                  (make-project {"two" (make-attribute-ref "two")} tbl1))
+                 (push-restrict r6))))
+        (testing ":difference"
+          (is (= r4 (push-restrict r4))))))
+    (testing "restrict-outer"
+      (testing "with underlying project"
+        (is (= (make-project (project-alist p1)
+                             (make-restrict-outer (=$ (make-attribute-ref "one")
+                                                      (make-const string% "foobar"))
+                                                  tbl1))
+               (push-restrict (ro* p1)))))
+      (testing "with underlying combine"
+        (testing "with left outer product"
+          (is (= (make-restrict-outer (=$ (make-attribute-ref "one")
+                                          (make-const string% "foobar"))
+                                      (make-combine :left-outer-product
+                                                    p1 p2))
+               (push-restrict (ro* (make-combine :left-outer-product
+                                                 p1 p2))))))
+        (testing "with union"
+          (let [c (make-union p1 p1)
+                p (make-project {"two" (make-attribute-ref "two")} tbl1)]
+            (is (= (make-union p1
+                               (push-restrict
+                                (make-restrict-outer (=$ (make-attribute-ref "one")
+                                                         (make-const string% "foobar")) p1)))
+                   (push-restrict (ro* c))))
+            (is (= (make-union (push-restrict (ro* p)) p1)
+                   (push-restrict (ro* (make-union p p1)))))))))
+    (testing "combine"
+      (is (= c1 (push-restrict c1))))))

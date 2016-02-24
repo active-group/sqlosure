@@ -217,7 +217,7 @@
 
         (r/group? rq) (r/make-group (r/group-columns rq)
                                     (push-restrict
-                                     (r/group-query rq)))
+                                     (r/make-restrict re (r/group-query rq))))
 
         :else (r/make-restrict re (push-restrict rq))))
 
@@ -242,16 +242,17 @@
             (= :left-outer-product op)
             (r/make-restrict-outer re (push-restrict rq))
 
-            (and (not (= :difference op))
-                 (not (= :quotient op))
+            (and (not= :difference op)
+                 (not= :quotient op)
                  (not-empty
                   (filter (fn [[k v]]
-                            (contains? attrs k)) (query->alist q1))))
+                            (contains? attrs k))
+                          (query->alist q1))))
             (r/make-combine op q1 (push-restrict (r/make-restrict-outer re q2)))
 
             (not-empty (filter (fn [[k v]] (contains? attrs k))
                                (query->alist q2)))
-            (r/make-combine op (push-restrict (r/make-restrict-outer re q1) q2))
+            (r/make-combine op (push-restrict (r/make-restrict-outer re q1)) q2)
 
             :else (r/make-restrict-outer re (push-restrict rq))))
 
