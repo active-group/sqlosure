@@ -153,14 +153,10 @@ Replaced alist with hash-map."
   "Return the query scheme of query `q` as a `rel-scheme`.
   If :typecheck is provided, perform basic validation of types."
   [q & {:keys [typecheck?]}]
-  (if-let [cache (get (meta q) ::rel-scheme-cache)]
-    (rel-scheme-cache-scheme cache the-empty-environment)
-    (query-scheme* q the-empty-environment
-                   (and typecheck?
-                        (fn [expected thing]
-                          (assertion-violation `query-scheme "type violation"
-                                               expected thing))))))
+  (query-scheme* q the-empty-environment nil))
 
+(defn- query-scheme* [q env fail]
+  (rel-scheme-cache-scheme (get (meta q) ::rel-scheme-cache) env))
 
 (defn compose-environments
   "Combine two environments. e1 takes precedence over e2."
@@ -676,107 +672,6 @@ Replaced alist with hash-map."
     (scalar-subquery? expr) nil
     (set-subquery? expr) nil
     :else (assertion-violation `check-grouped "invalid expression" expr)))
-
-(defn- query-scheme* [q env fail]
-  (letfn [(to-env [scheme]
-            (compose-environments (rel-scheme->environment scheme) env))
-          (next-step [q*]
-            (query-scheme* q* env fail))]
-    (cond
-      (empty-val? q) the-empty-rel-scheme
-      (base-relation? q) (base-relation-scheme q)
-      (project? q) (let [base-scheme (next-step (project-query q))
-                         grouped (rel-scheme-grouped base-scheme)
-                         m (project-alist q)]
-                     
-                     (when (and fail
-                                (or (some (comp aggregate? second) m)
-                                    (set? grouped)))
-                       ;; we're doing aggregation
-                       (doseq [[_ e] m]
-                         (check-grouped fail grouped e)))
-                     
-                     (alist->rel-scheme (map (fn [[k v]]
-                                                (let [typ (expression-type* (to-env base-scheme)
-                                                                            v fail)]
-                                                  (when (and fail (t/product-type? typ))
-                                                    (fail ": non-product type " typ))
-                                                  [k typ]))
-                                              m)))
-      (restrict? q) (let [scheme (next-step (restrict-query q))]
-                      (when (and fail
-                                 (not= t/boolean% (expression-type*
-                                                   (to-env scheme)
-                                                   (restrict-exp q) fail)))
-                        (fail t/boolean% (restrict-exp q)))
-                      scheme)
-
-      (restrict-outer? q) (let [scheme (next-step (restrict-outer-query q))]
-                            (when (and fail
-                                       (not= t/boolean% (expression-type*
-                                                         (to-env scheme)
-                                                         (restrict-outer-exp q) fail)))
-                              (fail t/boolean% (restrict-outer-exp q)))
-                            scheme)
-      
-      (combine? q) (case (combine-rel-op q)
-                     :product (let [r1 (next-step (combine-query-1 q))
-                                    r2 (next-step (combine-query-2 q))]
-                                (let [a1 (rel-scheme-map r1)
-                                      a2 (rel-scheme-map r2)]
-                                  (when fail
-                                    (doseq [[k _] a1]
-                                      (when (contains? a2 k)
-                                        (fail (list 'not a1) a2)))))
-                                (rel-scheme-concat r1 r2))
-
-                     :left-outer-product
-                     (let [r1 (next-step (combine-query-1 q))
-                           r2 (rel-scheme-nullable (next-step (combine-query-2 q)))]
-                       (let [a1 (rel-scheme-map r1)
-                             a2 (rel-scheme-map r2)]
-                         (when fail
-                           (doseq [[k _] a1]
-                             (when (contains? a2 k)
-                               (fail (list 'not a1) a2)))))
-                       (rel-scheme-concat r1 r2))
-
-                     :quotient (let [s1 (next-step (combine-query-1 q))
-                                     s2 (next-step (combine-query-2 q))]
-                                 (when fail
-
-                                   (let [a1 (rel-scheme-map s1)
-                                         a2 (rel-scheme-map s2)]
-
-                                     (doseq [[k v] a2]
-                                       (when-let [p2 (get v a1)]
-                                         (when-not (t/type=? v p2)
-                                           (fail v p2))))))
-                                 (rel-scheme-difference s1 s2))
-                     (:union :intersection :difference)
-                     (let [s1 (next-step (combine-query-1 q))]
-                       (when (and fail
-                                  (not (rel-scheme=? s1
-                                                     (next-step (combine-query-2 q)))))
-                         (fail s1 q))
-                       s1))
-      
-      (order? q) (let [scheme (next-step (order-query q))
-                       env (to-env scheme)]
-                   (when fail
-                     (doseq [p (order-alist q)]
-                       (let [exp (first p)
-                             t (expression-type* env exp fail)]
-                         (when-not (t/ordered-type? t)
-                           (fail ": not an ordered type " t)))))
-                   scheme)
-      
-      (group? q) (lens/overhaul (next-step (group-query q))
-                                rel-scheme-grouped-lens
-                                union (group-columns q))
-                   
-      (top? q) (next-step (top-query q))
-      :else (assertion-violation `query-scheme "unknown query" q))))
 
 (defn query?
   "Returns true if the `obj` is a query."

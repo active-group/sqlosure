@@ -76,7 +76,7 @@
         o1 (make-order [[(make-attribute-ref "one") :ascending]]
                        tbl1)]
     (testing "empty-val"
-      (is (= (make-empty-val) (remove-dead (make-empty-val)))))
+      (is (= (make-empty-val) (remove-dead the-empty))))
     (testing "base-relation"
       (is (= tbl1 (remove-dead tbl1))))
     (testing "project"
@@ -164,7 +164,7 @@
                                   (make-const string% "foo"))
                           p1)]
     (testing "empty-value"
-      (is (= (make-empty-val) (merge-project (make-empty-val)))))
+      (is (= (make-empty-val) (merge-project the-empty))))
     (testing "base-relation"
       (is (= tbl1 (merge-project tbl1))))
     (testing "project"

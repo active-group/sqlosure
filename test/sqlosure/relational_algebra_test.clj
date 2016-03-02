@@ -384,7 +384,7 @@
                                  :universe test-universe
                                  :handle "SUBA")]
     (testing "empty val"
-      (is (= the-empty-rel-scheme (query-scheme (make-empty-val)))))
+      (is (= the-empty-rel-scheme (query-scheme the-empty))))
 
     (testing "base relation"
       (is (= (alist->rel-scheme [["one" string%]
@@ -578,7 +578,7 @@
                                                                   (make-const integer% 2)]))))))
 
 (deftest query->datum-test
-  (is (= (list 'empty-val) (query->datum (make-empty-val))))
+  (is (= (list 'empty-val) (query->datum the-empty)))
   (is (= (list 'base-relation 'tbl1) (query->datum tbl1)))
   (is (= (list 'project (list (list "two" 'attribute-ref "two")
                               (list "one" 'attribute-ref "one"))
