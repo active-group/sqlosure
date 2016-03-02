@@ -124,8 +124,9 @@
                (-> t2 remove-dead top-query project-query query-scheme)))))
     (testing "combine"
       (testing ":product"
-        (let [c1 (make-combine :product p1 o1)
-              c2 (make-combine :product p2 o1)]
+        (let [o2 (make-project [["three" (make-attribute-ref "one")]] o1)
+              c1 (make-combine :product p1 o2)
+              c2 (make-combine :product p2 o2)]
           (is (= c1 (remove-dead c1)))
           (is (= (alist->rel-scheme {"one" string%})
                  (-> c2 remove-dead combine-query-1 query-scheme)))))
@@ -136,8 +137,8 @@
           (is (= (alist->rel-scheme {"one" string%})
                  (-> c2 remove-dead combine-query-2 query-scheme)))))
       (testing ":difference"
-        (let [c1 (make-difference o1 p1)
-              c2 (make-difference o1 p2)]
+        (let [c1 (make-difference (make-project [["one" (make-attribute-ref "one")] ["two" (make-attribute-ref "two")]] o1) p1)
+              c2 (make-difference (make-project [["one" (make-attribute-ref "one")]] o1) p2)]
           (is (= c1 (remove-dead c1)))
           (is (= (alist->rel-scheme {"one" string%})
                  (-> c2 remove-dead combine-query-2 query-scheme)))))
@@ -155,16 +156,13 @@
         p1 (make-project [["one" (make-attribute-ref "one")]
                           ["two" (make-attribute-ref "two")]]
                          tbl1)
-        p2 (make-project [["one" (make-attribute-ref "one")]]
-                         (make-project [["one" (make-attribute-ref "one")]
-                                        ["two" (make-attribute-ref "two")]]
-                                       tbl1))
-        p3 (make-project [["one" (make-attribute-ref "one")]
-                          ["two" (make-attribute-ref "two")]]
+        p2 (make-project [["one" (make-attribute-ref "one")]] p1)
+        p3 (make-project [["three" (make-attribute-ref "one")]
+                          ["four" (make-attribute-ref "two")]]
                          p1)
         r1 (make-restrict (sql/=$ (make-attribute-ref "one")
                                   (make-const string% "foo"))
-                          tbl1)]
+                          p1)]
     (testing "empty-value"
       (is (= (make-empty-val) (merge-project (make-empty-val)))))
     (testing "base-relation"
@@ -174,48 +172,39 @@
         (is (= p1 (merge-project p1)))
         (is (= (make-project [["one" (make-attribute-ref "one")]] tbl1)
                (merge-project p2)))
-        (is (= (make-project [["one" (make-attribute-ref "one")]
-                              ["two" (make-attribute-ref "two")]] tbl1)
+        (is (= (make-project [["three" (make-attribute-ref "one")]
+                              ["four" (make-attribute-ref "two")]] tbl1)
                (merge-project p3))))
       (testing "with underlying combine"
         (let [c1 (make-project {"one" (make-attribute-ref "one")}
-                               (make-product p1 p2))
+                               (make-product p1 p3))
               c2 (make-project {"one" (make-attribute-ref "one")}
-                               (make-union p1 r1))
-              c3 (make-project {"one" (make-attribute-ref "one")}
-                               (make-union p1 p2))]
+                               (make-union p1 r1))]
           (is (= (make-project (project-alist c1)
                                (merge-project (project-query c1)))
                  (merge-project c1)))
           (is (= (make-project (project-alist c2)
                                (merge-project (project-query c2)))
-                 (merge-project c2)))
-          (is (= (make-union (merge-project (make-project
-                                             {"one" (make-attribute-ref "one")}
-                                             tbl1))
-                             (merge-project (make-project
-                                             {"one" (make-attribute-ref "one")}
-                                             tbl1)))
-                 (merge-project c3))))))
+                 (merge-project c2))))))
     (testing "restrict-outer"
       (let [ro1 (make-restrict-outer (sql/=$ (make-attribute-ref "one")
                                              (make-const string% "foobar"))
                                      tbl1)
-            ro2 (make-restrict-outer (sql/=$ (make-attribute-ref "one")
+            ro2 (make-restrict-outer (sql/=$ (make-attribute-ref "three")
                                              (make-const string% "foobar"))
                                      p3)]
         (is (= ro1 (merge-project ro1)))
-        (is (= (make-restrict-outer (sql/=$ (make-attribute-ref "one")
+        (is (= (make-restrict-outer (sql/=$ (make-attribute-ref "three")
                                             (make-const string% "foobar"))
                                     (merge-project p3))
                (merge-project ro2)))))
     (testing "order"
       (let [o1 (make-order {(make-attribute-ref "one") :ascending}
                            tbl1)
-            o2 (make-order {(make-attribute-ref "one") :descending}
+            o2 (make-order {(make-attribute-ref "three") :descending}
                            p3)]
         (is (= o1 (merge-project o1)))
-        (is (= (make-order {(make-attribute-ref "one") :descending}
+        (is (= (make-order {(make-attribute-ref "three") :descending}
                            (merge-project p3))
                (merge-project o2)))))
     (testing "optimization should not merge aggregates"

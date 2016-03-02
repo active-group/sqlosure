@@ -49,6 +49,11 @@ Replaced alist with hash-map."
   [t1 t2]
   (= t1 t2))
 
+(defn rel-scheme-unary=?
+  "Does rel scheme have only 1 column?"
+  [rs]
+  (= 1 (count (rel-scheme-columns rs))))
+
 (defn rel-scheme-concat
   "Takes two rel-schemes and concatenates them. This means:
   - concatenate columns
@@ -107,6 +112,56 @@ Replaced alist with hash-map."
   [s]
   (rel-scheme-map s))
 
+(define-record-type ^{:doc "Cache for the relational scheme of a query."}
+  RelSchemeCache
+  (really-make-rel-scheme-cache fun map-atom)
+  rel-scheme-cache?
+  [^{:doc "Function accepting an environment, producing a rel scheme."}
+   fun rel-scheme-cache-fun
+
+   ^{:doc "Atom containing map `environment |-> scheme`"}
+   map-atom rel-scheme-cache-map-atom])
+
+(defn make-rel-scheme-cache
+  "Make a rel-scheme cache.
+
+  - `fun` is a function accepting an environment, producing the scheme"
+  [fun]
+  (really-make-rel-scheme-cache fun (atom {})))
+
+(defn rel-scheme-cache-scheme
+  "Compute a relational scheme from a cache, using the cached version if possible."
+  [cache env]
+  (let [atom (rel-scheme-cache-map-atom cache)]
+    (or (get @atom env)
+        (let [scheme ((rel-scheme-cache-fun cache) env)]
+          (swap! atom assoc env scheme)
+          scheme))))
+
+(defn attach-rel-scheme-cache
+  "Attach a rel-scheme cache to query.
+
+  - `query` is the query
+  - `fun` is a function accepting an environment, yielding the scheme of the query"
+  [query fun]
+  (with-meta query {::rel-scheme-cache (make-rel-scheme-cache fun)}))
+
+
+(declare query-scheme*)
+
+(defn query-scheme
+  "Return the query scheme of query `q` as a `rel-scheme`.
+  If :typecheck is provided, perform basic validation of types."
+  [q & {:keys [typecheck?]}]
+  (if-let [cache (get (meta q) ::rel-scheme-cache)]
+    (rel-scheme-cache-scheme cache the-empty-environment)
+    (query-scheme* q the-empty-environment
+                   (and typecheck?
+                        (fn [expected thing]
+                          (assertion-violation `query-scheme "type violation"
+                                               expected thing))))))
+
+
 (defn compose-environments
   "Combine two environments. e1 takes precedence over e2."
   [e1 e2]
@@ -136,7 +191,9 @@ Replaced alist with hash-map."
   [name scheme & {:keys [universe handle]
                   :or {universe nil
                        handle nil}}]
-  (let [rel (really-make-base-relation name scheme handle)]
+  (let [rel (attach-rel-scheme-cache
+             (really-make-base-relation name scheme handle)
+             (fn [_] scheme))]
     (when universe
       (u/register-base-relation! universe name rel))
     rel))
@@ -182,14 +239,55 @@ Replaced alist with hash-map."
     r))
 
 ;;; ----------------------------------------------------------------------------
-;;; --- QUERYS
+;;; --- QUERIES
 ;;; ----------------------------------------------------------------------------
+
+(define-record-type empty-val
+  ^{:doc "Represents an empty relational algebra value."}
+  (make-empty-val) empty-val? [])
+
+(def the-empty
+  (attach-rel-scheme-cache
+   (make-empty-val)
+   (fn [_] the-empty-rel-scheme)))
 
 (define-record-type project
   ^{:doc "List of pairs."}
-  (really-make-project alist query) project?
-  [alist project-alist  ;; Maps newly bound attribute names to expressions.
+  (really-really-make-project alist query)
+  project?
+  [^{:doc "Maps newly bound attribute names to expressions.alist project-alist"}
+   alist project-alist
    query project-query])
+
+;; FIXME: temporary default for the query-scheme fail function
+(defn query-scheme-fail
+  [expected thing]
+  (assertion-violation `query-scheme "type violation"
+                       expected thing))
+
+(declare aggregate? check-grouped expression-type*)
+
+(defn really-make-project
+  [alist query]
+  (let [base-scheme (query-scheme query)
+        grouped (rel-scheme-grouped base-scheme)]
+    
+    (when (or (some (comp aggregate? second) alist)
+              (set? grouped))
+      ;; we're doing aggregation
+      (doseq [[_ e] alist]
+        (check-grouped query-scheme-fail grouped e)))
+
+    (attach-rel-scheme-cache
+     (really-really-make-project alist query)
+     (fn [env]
+       (alist->rel-scheme (map (fn [[k v]]
+                                 (let [typ (expression-type* (compose-environments (rel-scheme->environment base-scheme) env)
+                                                             v query-scheme-fail)]
+                                   (when (and query-scheme-fail (t/product-type? typ))
+                                     (assertion-violation `really-make-project "non-product type" k v typ))
+                                   [k typ]))
+                               alist))))))
 
 (defn make-project
   [alist query]
@@ -205,7 +303,7 @@ Replaced alist with hash-map."
           (really-make-project alist query)))
       (really-make-project alist query))))
 
-(declare query-scheme project-alist-aggregate?)
+(declare project-alist-aggregate?)
 
 (defn make-extend
   "Creates a projection of some attributes while keeping all other attributes in
@@ -226,18 +324,46 @@ Replaced alist with hash-map."
      query)))
 
 (define-record-type restrict
-  (make-restrict exp query) restrict?
+  (really-make-restrict exp query) restrict?
   [exp restrict-exp  ;; :expression[boolean%]
    query restrict-query])
+
+(defn make-restrict
+  "Create a restriction:
+
+  - `exp` is a boolean expression, acting as a filter
+  - `query` is the underlying query"
+  [exp query]
+  (attach-rel-scheme-cache
+    (really-make-restrict exp query)
+    (fn [env]
+      (let [scheme (query-scheme* query env query-scheme-fail)]
+        (when (not= t/boolean% (expression-type* (compose-environments (rel-scheme->environment scheme) env)
+                                                 exp query-scheme-fail))
+          (assertion-violation `make-restrict "not a boolean condition" exp query env))
+        scheme))))
 
 (define-record-type ^{:doc "Restrict a left outer product.
   This will restrict all the right-hand sides of left outer products.
   If it doesn't hold, these right-hand sides will have all-null
   columns."}
   restrict-outer
-  (make-restrict-outer exp query) restrict-outer?
+  (really-make-restrict-outer exp query) restrict-outer?
   [exp restrict-outer-exp
    query restrict-outer-query])
+
+(defn make-restrict-outer
+  "Restrict a right-hand side of a left-outer product."
+  [exp query]
+  (attach-rel-scheme-cache
+   (really-make-restrict-outer exp query)
+   (fn [env]
+     (let [scheme (query-scheme* query env query-scheme-fail)]
+       (when (not= t/boolean% (expression-type*
+                               (compose-environments (rel-scheme->environment scheme) env)
+                               exp query-scheme-fail))
+            (assertion-violation `make-restrict-outer "not a boolean condition" exp query env))
+       scheme))))
 
 (define-record-type combine
   (really-make-combine rel-op query-1 query-2) combine?
@@ -245,27 +371,63 @@ Replaced alist with hash-map."
    query-1 combine-query-1
    query-2 combine-query-2])
 
-(def ^{:private true} relational-ops #{:product :left-outer-product :union
-:intersection :quotient :difference})
+(def ^{:private true} relational-ops
+  #{:product :left-outer-product :union :intersection :quotient :difference})
 
 (defn relational-op? [k] (contains? relational-ops k))
 
-(define-record-type empty-val
-  ^{:doc "Represents an empty relational algebra value."}
-  (make-empty-val) empty-val? [])
-
 (defn make-combine [rel-op query-1 query-2]
-  (if-not (relational-op? rel-op)
-    (assertion-violation `make-combine "not a relational operator" rel-op)
-    (case rel-op
-      :product (cond
-                 (empty-val? query-1) query-2
-                 (empty-val? query-2) query-1
-                 :else (really-make-combine rel-op query-1 query-2))
-      (really-make-combine rel-op query-1 query-2))))
+  (when-not (relational-op? rel-op)
+    (assertion-violation `make-combine "not a relational operator" rel-op))
 
-(defn make-left-outer-product [query-1 query-2] (make-combine
-  :left-outer-product query-1 query-2))
+  (attach-rel-scheme-cache
+   (case rel-op
+     :product (cond
+                (empty-val? query-1) query-2
+                (empty-val? query-2) query-1
+                :else (really-make-combine rel-op query-1 query-2))
+     (really-make-combine rel-op query-1 query-2))
+   (fn [env]
+     (case rel-op
+       :product (let [r1 (query-scheme* query-1 env query-scheme-fail)
+                      r2 (query-scheme* query-2 env query-scheme-fail)
+                      a1 (rel-scheme-map r1)
+                      a2 (rel-scheme-map r2)]
+                  (doseq [[k _] a1]
+                    (when (contains? a2 k)
+                      (assertion-violation `make-combine "duplicate column name" rel-op query-1 query-2)))
+                  (rel-scheme-concat r1 r2))
+       
+       :left-outer-product
+       (let [r1 (query-scheme* query-1 env query-scheme-fail)
+             r2 (rel-scheme-nullable (query-scheme* query-2 env query-scheme-fail))
+             a1 (rel-scheme-map r1)
+             a2 (rel-scheme-map r2)]
+         (doseq [[k _] a1]
+           (when (contains? a2 k)
+             (assertion-violation `make-combine "duplicate column name" rel-op query-1 query-2)))
+         (rel-scheme-concat r1 r2))
+
+       :quotient (let [s1 (query-scheme* query-1 env query-scheme-fail)
+                       s2 (query-scheme* query-2 env query-scheme-fail)
+                       a1 (rel-scheme-map s1)
+                       a2 (rel-scheme-map s2)]
+
+                   (doseq [[k v] a2]
+                     (when-let [p2 (get a1 v)]
+                       (when-not (t/type=? v p2)
+                         (assertion-violation "types don't match" rel-op k v p2 query-1 query-2))))
+                   (rel-scheme-difference s1 s2))
+
+       (:union :intersection :difference)
+       (let [s1 (query-scheme* query-1 env query-scheme-fail)]
+         (when-not (rel-scheme=? s1
+                                 (query-scheme* query-2 env query-scheme-fail))
+           (assertion-violation `make-combine "scheme mismatch" rel-op s1 query-2))
+         s1)))))
+               
+(defn make-left-outer-product [query-1 query-2]
+  (make-combine :left-outer-product query-1 query-2))
 
 (defn make-product [query-1 query-2] (make-combine :product query-1 query-2))
 
@@ -279,25 +441,45 @@ Replaced alist with hash-map."
 (defn make-difference [query-1 query-2] (make-combine :difference query-1
   query-2))
 
-(def the-empty (make-empty-val))
-
 (def ^{:private true} order-op #{:ascending :descending})
 
 (defn order-op? [k]
   (contains? order-op k))
 
 (define-record-type order
-  (make-order alist query) order?
+  (really-make-order alist query) order?
   [alist order-alist  ;; (order -> hash-map)
    query order-query])
+
+(defn make-order
+  [alist query]
+  (attach-rel-scheme-cache
+   (really-make-order alist query)
+   (fn [env]
+     (let [scheme (query-scheme* query env query-scheme-fail)
+           env (compose-environments (rel-scheme->environment scheme) env)]
+       (doseq [p alist]
+         (let [exp (first p)
+               t (expression-type* env exp query-scheme-fail)]
+           (when-not (t/ordered-type? t)
+             (assertion-violation `make-order "not an ordered type " t exp))))
+       scheme))))
 
 ;; Top n entries.
 (define-record-type top
   ^{:doc "The top `count` entries, optionally starting at `offset`, defaulting to 0."}
-  (make-top offset count query) top?
+  (really-make-top offset count query) top?
   [offset top-offset
    count top-count
    query top-query])
+
+(defn make-top
+  "The top `count` entries, optionally starting at `offset`, defaulting to 0."
+  [offset count query]
+  (attach-rel-scheme-cache
+   (really-make-top offset count query)
+   (fn [env]
+     (query-scheme* query env query-scheme-fail))))
 
 (define-record-type group
   (really-make-group columns query)
@@ -313,7 +495,13 @@ Replaced alist with hash-map."
   - `columns` is a seq of columns to be grouped by
   - `query` is the underlying query"
   [columns query]
-  (really-make-group (set columns) query))
+  (let [columns (set columns)]
+    (attach-rel-scheme-cache
+     (really-make-group columns query)
+     (fn [env]
+       (lens/overhaul (query-scheme* query env query-scheme-fail)
+                      rel-scheme-grouped-lens
+                      union columns)))))
 
 (define-record-type tuple
   (make-tuple expressions) tuple?
@@ -410,12 +598,11 @@ Replaced alist with hash-map."
                      (when-not (t/type=? t/boolean% p) (fail 'boolean p))
                      (when-not (t/type=? t r) (fail t r)))
                    t))
-   ;; FIXME what should the result here really be?
    (fn [subquery] (let [scheme (query-scheme* subquery env fail)
                         alist (rel-scheme-map scheme)]
-                    (when (and fail (or (empty? alist) (t/pair? (rest alist))))
+                    (when (and fail (not (rel-scheme-unary? scheme)))
                       (fail 'unary-relation subquery))
-                    (key (first alist))))
+                    (val (first alist))))
    ;; FIXME what should the result here really be?
    (fn [subquery] (let [scheme (query-scheme* subquery env fail)
                         alist (rel-scheme-map scheme)]
@@ -590,16 +777,6 @@ Replaced alist with hash-map."
                    
       (top? q) (next-step (top-query q))
       :else (assertion-violation `query-scheme "unknown query" q))))
-
-(defn query-scheme
-  "Return the query scheme of query `q` as a `rel-scheme`.
-  If :typecheck is provided, perform basic validation of types."
-  [q & {:keys [typecheck?]}]
-  (query-scheme* q the-empty-environment
-                 (and typecheck?
-                      (fn [expected thing]
-                        (assertion-violation `query-scheme "type violation"
-                                             expected thing)))))
 
 (defn query?
   "Returns true if the `obj` is a query."

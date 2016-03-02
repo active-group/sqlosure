@@ -151,7 +151,12 @@
                                 (alist->rel-scheme [["one" integer%]
                                                     ["two" string%]])
                                 :universe test-universe
-                                :handle "tbl2")))
+                                :handle "tbl2"))
+  (def tbl3 (make-base-relation 'tbl3
+                                (alist->rel-scheme [["three" integer%]
+                                                    ["four" string%]])
+                                :universe test-universe
+                                :handle "tbl3")))
 
 (deftest make-project-test
   (let [p (make-project [["two" (make-attribute-ref "two")]
@@ -390,22 +395,21 @@
       (let [p (make-project [["two" (make-attribute-ref "two")]
                              ["one" (make-attribute-ref "one")]]
                             tbl1)
-            p2 (make-project [["two" (make-attribute-ref "two")]
-                              ["count_twos" (make-aggregation :count (make-attribute-ref "two"))]]
-                             tbl1)
             res (query-scheme p :typecheck? true)]
-        (is (= (rel-scheme-map res) {"two" integer% "one" string%}))
-        (is (= {"two" integer% "count_twos" integer%} (rel-scheme-map (query-scheme p2))))
-        (testing "aggregations and product-types should make it fail"
-          (is (thrown? Exception
-                       (query-scheme (make-project
-                                      [["two" (make-attribute-ref "two")]
-                                       ["one" (make-aggregation
-                                               :min
-                                               (make-tuple [(make-const integer% 42)
-                                                            (make-const integer% 23)]))]]
-                                      tbl1)
-                                     :typecheck? true))))))
+        (is (= (rel-scheme-map res) {"two" integer% "one" string%})))
+      (let [p2 (make-project [["count_twos" (make-aggregation :count (make-attribute-ref "two"))]]
+                             tbl1)]
+        (is (= {"count_twos" integer%} (rel-scheme-map (query-scheme p2))))))
+    (testing "aggregations and product-types should make it fail"
+      (is (thrown? Exception
+                   (query-scheme (make-project
+                                  [["two" (make-attribute-ref "two")]
+                                   ["one" (make-aggregation
+                                           :min
+                                           (make-tuple [(make-const integer% 42)
+                                                        (make-const integer% 23)]))]]
+                                  tbl1)
+                                 :typecheck? true))))
 
     (testing "restriction"
       (let [r (make-restrict (sql/=$ (make-scalar-subquery
@@ -413,13 +417,23 @@
                                                     SUBB))
                                      (make-attribute-ref "C"))
                              SUBA)]
-        (is (= {"C" string%} (rel-scheme-map (query-scheme r))))
-        (is (thrown? Exception (query-scheme r :typecheck? true)))
-        (testing "should fail with typecheck on and non-boolean applications")
-        (is (thrown? Exception (query-scheme (make-restrict (sql/plus$ (make-const integer% 41)
-                                                                       (make-const integer% 1))
-                                                            tbl1)
-                                             :typecheck? true)))))
+        (is (= {"C" string%} (rel-scheme-map (query-scheme r)))))
+      (testing "should fail with typecheck on and non-boolean applications")
+      (is (thrown? Exception (query-scheme (make-restrict (sql/plus$ (make-const integer% 41)
+                                                                     (make-const integer% 1))
+                                                          tbl1)
+                                           :typecheck? true))))
+
+    (testing "subquery"
+      (let [r (make-project [["X" (make-scalar-subquery
+                                   (make-restrict
+                                    (sql/=$ (make-attribute-ref "D")
+                                            (make-attribute-ref "C"))
+                                    SUBB))]]
+                            (make-project [["D" (make-attribute-ref "C")]]
+                                          SUBA))]
+        (is (= {"X" string%} (rel-scheme-map (query-scheme r))))))
+        
 
     (testing "outer restriction"
       (let [r (make-restrict-outer (sql/=$ (make-scalar-subquery
@@ -427,14 +441,13 @@
                                                           SUBB))
                                            (make-attribute-ref "C"))
                                    SUBA)]
-        (is (= {"C" string%} (rel-scheme-map (query-scheme r))))
-        (is (thrown? Exception (query-scheme r :typecheck? true)))
-        (testing "should fail with typecheck on and non-boolean applications"
-          (is (thrown? Exception (query-scheme (make-restrict-outer
-                                                (sql/plus$ (make-const integer% 41)
-                                                           (make-const integer% 1))
-                                                tbl1)
-                                               :typecheck? true))))))
+        (is (= {"C" string%} (rel-scheme-map (query-scheme r)))))
+      (testing "should fail with typecheck on and non-boolean applications"
+        (is (thrown? Exception (query-scheme (make-restrict-outer
+                                              (sql/plus$ (make-const integer% 41)
+                                                         (make-const integer% 1))
+                                              tbl1)
+                                             :typecheck? true)))))
 
     (testing "grouping"
       (is (= (lens/shove (alist->rel-scheme [["one" string%]
@@ -827,28 +840,33 @@
   (testing "restrict"
     (let [test-universe (make-universe)
           SUBB (make-base-relation 'SUBB
-                                   (alist->rel-scheme [["C" string%]])
+                                   (alist->rel-scheme [["B" string%]])
                                    :universe test-universe
                                    :handle "SUBB")
           SUBA (make-base-relation 'SUBA
-                                   (alist->rel-scheme [["C" string%]])
+                                   (alist->rel-scheme [["A" string%]])
                                    :universe test-universe
                                    :handle "SUBA")
+          SUBC (make-base-relation 'SUBC
+                                   (alist->rel-scheme [["C" string%]
+                                                       ["D" string%]])
+                                   :universe test-universe
+                                   :handle "SUBC")
           r1 (make-restrict (sql/=$ (make-scalar-subquery
                                      (make-project [["C" (make-attribute-ref "C")]
                                                     ["D" (make-attribute-ref "D")]]
-                                                   SUBB))
-                                    (make-attribute-ref "C"))
+                                                   SUBC))
+                                    (make-attribute-ref "A"))
                             SUBA)
-          r2 (make-restrict (sql/=$ (make-attribute-ref "C")
-                                    (make-attribute-ref "C"))
+          r2 (make-restrict (sql/=$ (make-attribute-ref "A")
+                                    (make-attribute-ref "B"))
                             (make-left-outer-product SUBB SUBA))
-          r3 (make-restrict-outer (sql/=$ (make-attribute-ref "C")
-                                          (make-attribute-ref "C"))
+          r3 (make-restrict-outer (sql/=$ (make-attribute-ref "A")
+                                          (make-attribute-ref "B"))
                                   (make-left-outer-product SUBB SUBA))]
-      (is (= #{"C" "D"} (query-attribute-names r1)))
-      (is (= #{"C"} (query-attribute-names r2)))
-      (is (= #{"C"} (query-attribute-names r3)))))
+      (is (= #{"C" "D" "A"} (query-attribute-names r1)))
+      (is (= #{"A" "B"} (query-attribute-names r2)))
+      (is (= #{"A" "B"} (query-attribute-names r3)))))
   (let [test-universe (make-universe)
         rel1 (make-base-relation 'tbl1
                                  (alist->rel-scheme [["one" string%]
@@ -865,7 +883,7 @@
                          tbl1)
         p2 (make-project [["three" (make-attribute-ref "three")]
                           ["four" (make-attribute-ref "four")]]
-                         tbl1) ; FIXME: doesn't typecheck
+                         tbl3)
         c (make-product rel1 p1)
         q (make-quotient p1 rel1)
         u (make-union p1 p2)

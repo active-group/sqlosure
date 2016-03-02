@@ -3,7 +3,8 @@
     sqlosure.sql
   (:require [sqlosure.relational-algebra :refer :all]
             [sqlosure.universe :refer [make-universe make-derived-universe]]
-            [sqlosure.type :refer [boolean% numeric-type? type=? make-set-type null% any%]]
+            [sqlosure.type :refer [boolean% numeric-type? type=? make-set-type null% any%
+                                   nullable-type? nullable-type-underlying]]
             [active.clojure.record :refer [define-record-type]]
             [active.clojure.condition :refer [assertion-violation]]
             [clojure.string :as string]))
@@ -383,7 +384,11 @@
 (def =$
   (let [rator (make-rator '=
                           (fn [fail t1 t2]
-                            (when (and fail (not (type=? t1 t2)))
+                            (when (and fail (not (or (type=? t1 t2)
+                                                     (and (nullable-type? t1)
+                                                          (type=? (nullable-type-underlying t1) t2))
+                                                     (and (nullable-type? t2)
+                                                          (type=? t1 (nullable-type-underlying t2))))))
                               (fail t1 t2))
                             boolean%)
                           =
