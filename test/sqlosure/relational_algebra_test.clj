@@ -172,8 +172,8 @@
                               "one" (make-attribute-ref "one")} tbl1)]
         (is (= p p1))))
     (testing "with nested projects"
-      (let [pp (make-project nil p)]
-        (is (= (make-project nil tbl1) pp))
+      (let [pp (make-project [] p)]
+        (is (= (make-project [] tbl1) pp))
         (is (= tbl1 (project-query pp)))))))
 
 (deftest make-extend-test
