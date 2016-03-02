@@ -149,13 +149,15 @@ Replaced alist with hash-map."
 
 (declare query-scheme*)
 
+; FIXME: get rid of typecheck? parameter, then unifty query-scheme and query-scheme*
+
 (defn query-scheme
   "Return the query scheme of query `q` as a `rel-scheme`.
   If :typecheck is provided, perform basic validation of types."
   [q & {:keys [typecheck?]}]
-  (query-scheme* q the-empty-environment nil))
+  (query-scheme* q the-empty-environment))
 
-(defn- query-scheme* [q env fail]
+(defn- query-scheme* [q env]
   (rel-scheme-cache-scheme (get (meta q) ::rel-scheme-cache) env))
 
 (defn compose-environments
@@ -333,7 +335,7 @@ Replaced alist with hash-map."
   (attach-rel-scheme-cache
     (really-make-restrict exp query)
     (fn [env]
-      (let [scheme (query-scheme* query env query-scheme-fail)]
+      (let [scheme (query-scheme* query env)]
         (when (not= t/boolean% (expression-type* (compose-environments (rel-scheme->environment scheme) env)
                                                  exp query-scheme-fail))
           (assertion-violation `make-restrict "not a boolean condition" exp query env))
@@ -354,7 +356,7 @@ Replaced alist with hash-map."
   (attach-rel-scheme-cache
    (really-make-restrict-outer exp query)
    (fn [env]
-     (let [scheme (query-scheme* query env query-scheme-fail)]
+     (let [scheme (query-scheme* query env)]
        (when (not= t/boolean% (expression-type*
                                (compose-environments (rel-scheme->environment scheme) env)
                                exp query-scheme-fail))
@@ -385,8 +387,8 @@ Replaced alist with hash-map."
      (really-make-combine rel-op query-1 query-2))
    (fn [env]
      (case rel-op
-       :product (let [r1 (query-scheme* query-1 env query-scheme-fail)
-                      r2 (query-scheme* query-2 env query-scheme-fail)
+       :product (let [r1 (query-scheme* query-1 env)
+                      r2 (query-scheme* query-2 env)
                       a1 (rel-scheme-map r1)
                       a2 (rel-scheme-map r2)]
                   (doseq [[k _] a1]
@@ -395,8 +397,8 @@ Replaced alist with hash-map."
                   (rel-scheme-concat r1 r2))
        
        :left-outer-product
-       (let [r1 (query-scheme* query-1 env query-scheme-fail)
-             r2 (rel-scheme-nullable (query-scheme* query-2 env query-scheme-fail))
+       (let [r1 (query-scheme* query-1 env)
+             r2 (rel-scheme-nullable (query-scheme* query-2 env))
              a1 (rel-scheme-map r1)
              a2 (rel-scheme-map r2)]
          (doseq [[k _] a1]
@@ -404,8 +406,8 @@ Replaced alist with hash-map."
              (assertion-violation `make-combine "duplicate column name" rel-op query-1 query-2)))
          (rel-scheme-concat r1 r2))
 
-       :quotient (let [s1 (query-scheme* query-1 env query-scheme-fail)
-                       s2 (query-scheme* query-2 env query-scheme-fail)
+       :quotient (let [s1 (query-scheme* query-1 env)
+                       s2 (query-scheme* query-2 env)
                        a1 (rel-scheme-map s1)
                        a2 (rel-scheme-map s2)]
 
@@ -416,9 +418,9 @@ Replaced alist with hash-map."
                    (rel-scheme-difference s1 s2))
 
        (:union :intersection :difference)
-       (let [s1 (query-scheme* query-1 env query-scheme-fail)]
+       (let [s1 (query-scheme* query-1 env)]
          (when-not (rel-scheme=? s1
-                                 (query-scheme* query-2 env query-scheme-fail))
+                                 (query-scheme* query-2 env))
            (assertion-violation `make-combine "scheme mismatch" rel-op s1 query-2))
          s1)))))
                
@@ -452,7 +454,7 @@ Replaced alist with hash-map."
   (attach-rel-scheme-cache
    (really-make-order alist query)
    (fn [env]
-     (let [scheme (query-scheme* query env query-scheme-fail)
+     (let [scheme (query-scheme* query env)
            env (compose-environments (rel-scheme->environment scheme) env)]
        (doseq [p alist]
          (let [exp (first p)
@@ -475,7 +477,7 @@ Replaced alist with hash-map."
   (attach-rel-scheme-cache
    (really-make-top offset count query)
    (fn [env]
-     (query-scheme* query env query-scheme-fail))))
+     (query-scheme* query env))))
 
 (define-record-type group
   (really-make-group columns query)
@@ -495,7 +497,7 @@ Replaced alist with hash-map."
     (attach-rel-scheme-cache
      (really-make-group columns query)
      (fn [env]
-       (lens/overhaul (query-scheme* query env query-scheme-fail)
+       (lens/overhaul (query-scheme* query env)
                       rel-scheme-grouped-lens
                       union columns)))))
 
@@ -594,13 +596,13 @@ Replaced alist with hash-map."
                      (when-not (t/type=? t/boolean% p) (fail 'boolean p))
                      (when-not (t/type=? t r) (fail t r)))
                    t))
-   (fn [subquery] (let [scheme (query-scheme* subquery env fail)
+   (fn [subquery] (let [scheme (query-scheme* subquery env)
                         alist (rel-scheme-map scheme)]
                     (when (and fail (not (rel-scheme-unary? scheme)))
                       (fail 'unary-relation subquery))
                     (val (first alist))))
    ;; FIXME what should the result here really be?
-   (fn [subquery] (let [scheme (query-scheme* subquery env fail)
+   (fn [subquery] (let [scheme (query-scheme* subquery env)
                         alist (rel-scheme-map scheme)]
                     (when (and fail (or (empty? alist) (t/pair? (rest alist))))
                       (fail 'unary-relation subquery))
