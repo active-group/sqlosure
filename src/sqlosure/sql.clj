@@ -3,7 +3,7 @@
     sqlosure.sql
   (:require [sqlosure.relational-algebra :refer :all]
             [sqlosure.universe :refer [make-universe make-derived-universe]]
-            [sqlosure.type :refer [boolean% numeric-type? type=? make-set-type null% any%
+            [sqlosure.type :refer [boolean% numeric-type? ordered-type? type=? make-set-type null% any%
                                    non-nullable-type]]
             [active.clojure.record :refer [define-record-type]]
             [active.clojure.condition :refer [assertion-violation]]
@@ -267,6 +267,11 @@
     true
     (fail 'numerical-type t)))
 
+(defn check-ordered [t fail]
+  (if (ordered-type? t)
+    true
+    (fail 'ordered-type t)))
+
 (def not$ (make-monomorphic-combinator 'not [boolean%] boolean%
                                        not
                                        :universe sql-universe
@@ -305,8 +310,8 @@
                           (fn [fail t1 t2]
                             (when fail
                               (do
-                                (check-numerical t1 fail)
-                                (check-numerical t2 fail)
+                                (check-ordered t1 fail)
+                                (check-ordered t2 fail)
                                 (when-not (type=? t1 t2) (fail t1 t2))))
                             boolean%)
                           (null-lift-binary-predicate clj)
