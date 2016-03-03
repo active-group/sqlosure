@@ -9,10 +9,6 @@
         string-type (make-base-type 'string string? identity identity
                                     :universe test-universe)]
     (is (and (= (base-type-name string-type) 'string)
-             (= (base-type-predicate string-type) string?)
-             (= (base-type-const->datum-proc string-type) identity)
-             (= (base-type-datum->const-proc string-type) identity)
-             (nil? (base-type-data string-type))
              (u/universe-lookup-type test-universe 'string)))))
 
 
@@ -48,12 +44,11 @@
     (is (not (byte-array? (range 0 10))))))
 
 (deftest make-nullable-type-test
-  (let [really-nullable (really-make-nullable-type 'string)]
+  (let [really-nullable (make-nullable-type string%)]
     (is (not (nullable-type? string%)))
-    (is (nullable-type? (make-nullable-type really-nullable)))
-    (is (nullable-type? (make-nullable-type 'boolean)))
-    (is (= (nullable-type-underlying (make-nullable-type 'boolean)) 'boolean))
-    (is (not= (nullable-type-underlying (make-nullable-type 'string)) nil))))
+    (is (nullable-type? really-nullable))
+    (is (= really-nullable (make-nullable-type really-nullable)))
+    (is (= (non-nullable-type (make-nullable-type boolean%)) boolean%))))
 
 (deftest null?-test
   (is (null? []))
@@ -131,15 +126,15 @@
     (is (not (type=? my-set1% string%)))))
 
 (deftest type->datum-test
-  (is (= (type->datum string%) (list 'string)))
-  (is (= (type->datum integer%) (list 'integer)))
-  (is (= (type->datum string%-nullable) (list 'nullable (list 'string))))
+  (is (= (type->datum string%) 'string))
+  (is (= (type->datum integer%) 'integer))
+  (is (= (type->datum string%-nullable) '(nullable string)))
   (is (= (type->datum (make-product-type [string% integer%]))
-         (list 'product [(list 'string) (list 'integer)])))
+         '(product [string integer])))
   (is (= (type->datum (make-set-type string%))
-         (list 'set (list 'string))))
+         '(set string)))
   (is (= (type->datum (make-bounded-string-type 5))
-         (list 'bounded-string 5)))
+         '(bounded-string 5)))
   (testing "anything else should return an assertion"
     (is (thrown? Exception (type->datum nil)))))
 
@@ -148,27 +143,27 @@
         my-bounded-string% (make-bounded-string-type 6)
         my-product% (make-product-type [string% integer%])
         my-set% (make-set-type double%)]
-    (is (= (datum->type (list 'string) test-universe) string%))
-    (is (= (datum->type (list 'integer) test-universe) integer%))
-    (is (= (datum->type (list 'double) test-universe) double%))
-    (is (= (datum->type (list 'boolean) test-universe) boolean%))
-    (is (= (datum->type (list 'blob) test-universe) blob%))
-    (is (= (datum->type (list 'date) test-universe) date%))
-    (is (= (datum->type (list 'timestamp) test-universe) timestamp%))
-    (is (= (datum->type (list 'bounded-string 6) test-universe)
+    (is (= (datum->type 'string test-universe) string%))
+    (is (= (datum->type 'integer test-universe) integer%))
+    (is (= (datum->type 'double test-universe) double%))
+    (is (= (datum->type 'boolean test-universe) boolean%))
+    (is (= (datum->type 'blob test-universe) blob%))
+    (is (= (datum->type 'date test-universe) date%))
+    (is (= (datum->type 'timestamp test-universe) timestamp%))
+    (is (= (datum->type '(bounded-string 6) test-universe)
            my-bounded-string%))
-    (is (= (datum->type (list 'nullable (list 'string)) test-universe)
+    (is (= (datum->type '(nullable string) test-universe)
            (make-nullable-type string%)
            string%-nullable))
-    (is (= (datum->type (list 'product [(list 'string) (list 'integer)])
+    (is (= (datum->type '(product [string integer])
                         test-universe)
            my-product%))
-    (is (= (datum->type (list 'set (list 'double)) test-universe)
+    (is (= (datum->type '(set double) test-universe)
            my-set%))
     (do
-      (is (thrown? Exception (datum->type (list 'long) test-universe)))
+      (is (thrown? Exception (datum->type 'long) test-universe))
       (u/register-type! test-universe 'long double%)
-      (is (= (datum->type (list 'long) test-universe)
+      (is (= (datum->type 'long test-universe)
              double%)))))
 
 (deftest const->datum-test
@@ -199,9 +194,8 @@
     (is (= (datum->const my-product% [42 "foobar"]) [42 "foobar"]))
     (is (= (datum->const my-set% ["foo" "bar"]) ["foo" "bar"]))
     (testing "nullable"
-      (is (= (datum->const my-nullable% 42) 42))
-      (is (= (datum->const my-nullable% nil) nil))
-      (is (= (datum->const my-nullable% []) nil))
+      (is (= (datum->const my-nullable% "foo") "foo"))
+      (is (= (datum->const my-nullable% nil) nil)))
     (is (thrown? Exception (datum->const my-product% 42)))
     (is (thrown? Exception (datum->const my-set% 42)))
-    (is (thrown? Exception (datum->const String "foobar"))))))
+    (is (thrown? Exception (datum->const String "foobar")))))

@@ -7,44 +7,100 @@
             [active.clojure.condition :refer [assertion-violation]])
   (:import [java.time LocalDate LocalDateTime]))
 
-;;; ----------------------------------------------------------------------------
-;;; --- TYPES
-;;; ----------------------------------------------------------------------------
-(define-record-type base-type
-  (really-make-base-type name predicate const->datum-proc datum->const-proc data)
-  base-type?
-  [name base-type-name
-   predicate base-type-predicate
-   const->datum-proc base-type-const->datum-proc
-   datum->const-proc base-type-datum->const-proc
-   data base-type-data  ;; Domain-specific date, for outside use.
-   ])
+(defprotocol base-type-protocol
+  "Protocol for base types."
+  (-name [this] "Get name of the type.")
+  (-contains? [this val] "Does non-null value belong to this base type?")
+  (-nullable? [this] "Is this type nullable?")
+  (-nullable [this] "Get us nullable version of this type.")
+  (-non-nullable [this] "Get us non-nullable version of this type.")
+  (-numeric? [this] "Is this type numeric?")
+  (-ordered? [this] "Is this type ordered?")
+  (-const->datum [this val] "Convert value to datum.")
+  (-datum->const [this datum] "Convert datum to value."))
+
+(defn nullable-type?
+  "Is type nullable?"
+  [ty]
+  (and (satisfies? base-type-protocol ty)
+       (-nullable? ty)))
+
+(defn base-type-name
+  "Yield name of base type."
+  [t]
+  (-name t))
+
+(declare make-atomic-type)
+
+(define-record-type atomic-type
+  (make-atomic-type name nullable? numeric? ordered? predicate const->datum-fn datum->const-fn)
+  atomic-type?
+  [name atomic-type-name
+   nullable? atomic-type-nullable?
+   numeric? atomic-type-numeric?
+   ordered? atomic-type-ordered?
+   predicate atomic-type-predicate
+   const->datum-fn atomic-type-const->datum-fn
+   datum->const-fn atomic-type-datum->const-fn]
+  base-type-protocol
+  (-name [_] name)
+  (-contains? [_ val] (predicate val))
+  (-nullable? [_] nullable?)
+  (-nullable [_] (make-atomic-type name true numeric? ordered? predicate const->datum-fn datum->const-fn))
+  (-non-nullable [_] (make-atomic-type name false numeric? ordered? predicate const->datum-fn datum->const-fn))
+  (-numeric? [_] numeric?)
+  (-ordered? [_] ordered?)
+  (-const->datum [_ val] (const->datum-fn val))
+  (-datum->const [_ datum] (datum->const-fn datum)))
+
+;; FIXME: custom printer
 
 (defn make-base-type
   "Returns a new base type as specified.
   If :universe is supplied, the new type will be registered in the universe and
   this function returns a vector containing `[type universe]`."
-  [name predicate const->datum-proc datum->const-proc & {:keys [universe data]}]
-  (let [t (really-make-base-type name predicate const->datum-proc
-                                 datum->const-proc data)]
+  [name predicate const->datum-proc datum->const-proc & {:keys [universe numeric? ordered?]}]
+  (let [t (make-atomic-type name false
+                            (boolean numeric?) (boolean ordered?)
+                            predicate
+                            const->datum-proc datum->const-proc)]
     (when universe
       (register-type! universe name t))
     t))
 
-(define-record-type bounded-string-type
-  (make-bounded-string-type max-size) bounded-string-type?
-  [max-size bounded-string-type-max-size])
+(declare really-make-bounded-string-type)
 
-(define-record-type nullable-type
-  (really-make-nullable-type underlying) nullable-type?
-  [underlying nullable-type-underlying])
+(define-record-type bounded-string-type
+  (really-make-bounded-string-type max-size nullable?) bounded-string-type?
+  [max-size bounded-string-type-max-size
+   nullable? bounded-string-type-nullable?]
+  base-type-protocol
+  (-name [_] (list 'bounded-string max-size))
+  (-contains? [_ val] (and (string? val) (<= (count val) max-size)))
+  (-nullable? [_] nullable?)
+  (-nullable [_] (really-make-bounded-string-type max-size true))
+  (-non-nullable [_] (really-make-bounded-string-type max-size false))
+  (-numeric? [_] false)
+  (-ordered? [_] true)
+  (-const->datum [_ val] val)
+  (-datum->const [_ datum] datum))
+
+(defn make-bounded-string-type
+  "Create string type with given maximum number of chars."
+  [max-size]
+  (really-make-bounded-string-type max-size false))
 
 (defn make-nullable-type
-  "if base is a nullable-type, return it. otherwise wrap it in nullable-type."
+  "Make type nullable."
   [base]
-  (if (nullable-type? base)
-    base
-    (really-make-nullable-type base)))
+  (-nullable base))
+
+(defn non-nullable-type
+  "Yield non-nullable version of type."
+  [base]
+  (if (satisfies? base-type-protocol base)
+    (-non-nullable base)
+    base))
 
 (define-record-type product-type
   (make-product-type components) product-type?
@@ -73,41 +129,33 @@
 (defn type-member?
   "Checks if `thing` is a member of a type."
   [thing ty]
-  (cond
-    (nullable-type? ty) (or (null? thing)
-                            (type-member? thing
-                                          (nullable-type-underlying ty)))
-    (base-type? ty) ((base-type-predicate ty) thing)
-    (bounded-string-type? ty) (and (string? thing)
-                                   (<= (count thing)
-                                       (bounded-string-type-max-size ty)))
-    (product-type? ty) (let [cs (product-type-components ty)]
-                         (and (vector? thing)
-                              (= (count thing) (count cs))
-                              (reduce
-                               (fn [acc [k v]] (and acc (type-member? k v)))
-                               (zip thing cs))))
-    (set-type? ty) (let [mem (set-type-member-type ty)]
-                     (and (or (vector? thing) (seq? thing))
-                          (every? #(type-member? % mem) thing)))
-    :else (assertion-violation `type-member? "unhandled type" thing)))
+  (if (satisfies? base-type-protocol ty)
+    (if (nil? thing)
+      (-nullable? ty)
+      (-contains? ty thing))
+    (cond
+      (product-type? ty) (let [cs (product-type-components ty)]
+                           (and (vector? thing)
+                                (= (count thing) (count cs))
+                                (reduce
+                                 (fn [acc [k v]] (and acc (type-member? k v)))
+                                 (zip thing cs))))
+      (set-type? ty) (let [mem (set-type-member-type ty)]
+                       (and (or (vector? thing) (seq? thing))
+                            (every? #(type-member? % mem) thing)))
+      :else (assertion-violation `type-member? "unhandled type" thing))))
 
-(defmulti numeric-type? "Defines if a base-type is numeric, in the sense of the server's capability to call standard operations like MAX and AVG on them."
-  (fn [t] (base-type-name t))
-  :default ::default)
+(defn numeric-type?
+  "Is type numeric, in the sense of the server's capability to call standard operations like MAX and AVG on them."
+  [ty]
+  (and (satisfies? base-type-protocol ty)
+       (-numeric? ty)))
 
-(defmethod numeric-type? ::default
-  ;; per default, types are not numeric.
-  [t] false)
-
-(defmulti ordered-type? "Defines if a base-type is ordered, in the sense of the servers' capability to make an 'order by' on them."
-  (fn [t] (base-type-name t))
-  :default ::default)
-
-(defmethod ordered-type? ::default
-  ;; per default, all numeric types are ordered.
-  [t] (numeric-type? t))
-
+(defn ordered-type?
+  "Is type ordered, in the sense of the servers' capability to make an 'order by' on them."
+  [ty]
+  (and (satisfies? base-type-protocol ty)
+       (-ordered? ty)))
 
 ;; Checks if two types are the same.
 ;; Verbose definition unnecessary because of Clojures sensible equality (?).
@@ -145,17 +193,22 @@
   (instance? LocalDateTime d))
 
 ;; Some base types
-(def string% (make-base-type 'string string? identity identity))
-(def integer% (make-base-type 'integer integer? identity identity))
-(def double% (make-base-type 'double double? identity identity))
+(def string% (make-base-type 'string string? identity identity
+                             :ordered? true))
+(def integer% (make-base-type 'integer integer? identity identity
+                              :numeric? true :ordered? true))
+(def double% (make-base-type 'double double? identity identity
+                              :numeric? true :ordered? true))
 (def boolean% (make-base-type 'boolean boolean? identity identity))
 
 ;; Used to represent the type of sql NULL. Corresponds to nil in Clojure.
 (def null% (make-base-type 'unknown nil? identity identity))
 (def any% (make-base-type 'any (constantly true) identity identity))
 
-(def date% (make-base-type 'date date? identity identity))
-(def timestamp% (make-base-type 'timestamp timestamp? identity identity))
+(def date% (make-base-type 'date date? identity identity
+                           :ordered true))
+(def timestamp% (make-base-type 'timestamp timestamp? identity identity
+                                :ordered true))
 
 (def blob% (make-base-type 'blob byte-array? 'lose 'lose))
 
@@ -166,12 +219,7 @@
 (def double%-nullable (make-nullable-type double%))
 (def blob%-nullable (make-nullable-type blob%))
 
-(defmethod numeric-type? 'integer [_] true)
-(defmethod numeric-type? 'double [_] true)
-
-(defmethod ordered-type? 'string [_] true)
-
-;; Serialization
+ ;; Serialization
 
 (defn type->datum
   "`type->datum` takes a type and returns it into a recursive list of it's
@@ -181,15 +229,16 @@
   * `(type->datum (make-product-type [string% double%])) => (product (string) (double)`"
   [t]
   (cond
-    (nullable-type? t) (list 'nullable
-                             (type->datum (nullable-type-underlying t)))
+    (satisfies? base-type-protocol t)
+    (if (-nullable? t)
+      (list 'nullable
+            (type->datum (-non-nullable t)))
+      (-name t))
+    
     (product-type? t) (list 'product (mapv type->datum
                                            (product-type-components t)))
     (set-type? t) (list 'set
                         (type->datum (set-type-member-type t)))
-    (bounded-string-type? t) (list 'bounded-string
-                                   (bounded-string-type-max-size t))
-    (base-type? t) (list (base-type-name t))
     :else (assertion-violation `type->datum "unknown type" t)))
 
 (defn datum->type
@@ -202,21 +251,35 @@
   * `(datum->type (product (string) (double))) => (make-product-type [string% double%])`"
   [d universe]
   ;; TODO: Make this a multimethod to support externally defined types or something?
-  (case (first d)
-    nullable (really-make-nullable-type (datum->type (second d) universe))
-    product (make-product-type (map #(datum->type % universe)
-                                    (second d)))
-    set (make-set-type (datum->type (second d) universe))
-    string string%
-    integer integer%
-    double double%
-    boolean boolean%
-    date date%
-    timestamp timestamp%
-    blob blob%
-    bounded-string (make-bounded-string-type (second d))
-    (or (universe-lookup-type universe (first d))
+  (cond
+    (symbol? d)
+    ;; FIXME: aren't these types registered with the universe, too?
+    (case d
+      string string%
+      integer integer%
+      double double%
+      boolean boolean%
+      date date%
+      timestamp timestamp%
+      blob blob%
+
+      (or (universe-lookup-type universe d)
+          (assertion-violation `datum->type "unknown type" (first d))))
+
+    (and (coll? d) (not-empty d))
+    (case (first d)
+      nullable (-nullable (datum->type (second d) universe))
+      product (make-product-type (map #(datum->type % universe)
+                                      (second d)))
+      set (make-set-type (datum->type (second d) universe))
+      bounded-string (make-bounded-string-type (second d))
+      (or (universe-lookup-type universe d)
+          (assertion-violation `datum->type "unknown type" (first d))))
+
+    :else
+    (or (universe-lookup-type universe d)
         (assertion-violation `datum->type "unknown type" (first d)))))
+
 
 (defn pair?
   "Returns true if v is a sequence not empty (like schemes pair? function)."
@@ -235,10 +298,11 @@
      => [\"foo\" 42]`"
   [t val]
   (cond
-    (base-type? t) ((base-type-const->datum-proc t) val)
-    (nullable-type? t) (when-not (null? val)
-                         (const->datum (nullable-type-underlying t) val))
-    (bounded-string-type? t) val  ;; Maybe check here for correct value again?
+    (satisfies? base-type-protocol t)
+    (if (and (-nullable? t) (nil? val))
+      nil
+      (-const->datum t val))
+
     (product-type? t) (cond
                         (or (null? val) (sequential? val))
                         (map const->datum (product-type-components t) val)
@@ -258,10 +322,11 @@
   * `(datum->const (make-set-type integer%) [42 23]) => [42 23]`"
   [t d]
   (cond
-    (base-type? t) ((base-type-datum->const-proc t) d)
-    (nullable-type? t) (when-not (null? d)
-                         (datum->const (nullable-type-underlying t) d))
-    (bounded-string-type? t) d
+    (satisfies? base-type-protocol t)
+    (if (and (-nullable? t) (nil? d))
+      nil
+      (-datum->const t d))
+             
     (product-type? t) (cond
                         (or (pair? d) (nil? d))
                         ;; Maybe add type check here?

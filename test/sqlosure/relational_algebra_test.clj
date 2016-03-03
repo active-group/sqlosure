@@ -259,7 +259,6 @@
                       (rel-scheme->environment (base-relation-scheme tbl1))
                       one-ref))))
     (testing "const and const-null"
-      (is (base-type? (expression-type the-empty-environment string-const)))
       (is (= string% (expression-type the-empty-environment string-const)))
       (is (= string% (expression-type the-empty-environment string-null))))
     (testing "application"
@@ -535,25 +534,22 @@
 (deftest expression->datum-test
   (is (= (list 'attribute-ref "two") (expression->datum
                                       (make-attribute-ref "two"))))
-  (is (= (list 'const (list 'string) "foobar")
+  (is (= '(const string "foobar")
          (expression->datum
           (make-const string% "foobar"))))
-  (is (= (list 'null-type (list 'string))
+  (is (= '(null-type string)
          (expression->datum
           (make-null string%))))
-  (is (= (list 'application '>= (list (list 'const '(integer) 42)
-                                      (list 'const '(integer) 23)))
+  (is (= '(application >= ((const integer 42) (const integer 23)))
          (expression->datum (sql/>=$ (make-const integer% 42)
                                      (make-const integer% 23)))))
-  (is (= (list 'tuple
-               (list 'const '(string) "foobar")
-               (list 'const '(integer) 42))
+  (is (= '(tuple (const string "foobar") (const integer 42))
          (expression->datum (make-tuple [(make-const string% "foobar")
                                          (make-const integer% 42)]))))
-  (is (= (list 'aggregation :count
-               (list 'tuple
-                     (list 'const '(integer) 40)
-                     (list 'const '(integer) 2)))
+  (is (= '(aggregation :count
+                       (tuple
+                        (const integer 40)
+                        (const integer 2)))
          (expression->datum (make-aggregation :count (make-tuple [(make-const integer% 40)
                                                                   (make-const integer% 2)]))))))
 
