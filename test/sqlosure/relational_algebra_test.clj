@@ -272,8 +272,7 @@
       (is (thrown? Exception (expression-type
                               (rel-scheme->environment (base-relation-scheme tbl1))
                               (sql/>=$ (make-const integer% 1)
-                                       (make-attribute-ref "one"))
-                              :typecheck? true))))
+                                       (make-attribute-ref "one"))))))
     (testing "tuple"
       (is (= (make-product-type [integer% string%])
              (expression-type the-empty-environment
@@ -294,16 +293,13 @@
                                       (make-aggregation
                                        :min
                                        (make-tuple [(make-const integer% 42)
-                                                    (make-const integer% 23)]))
-                                      :typecheck? true)))
+                                                    (make-const integer% 23)])))))
         (is (thrown? Exception (expression-type
                                 {"one" string%}
-                                (make-aggregation :sum (make-attribute-ref "one"))
-                                :typecheck? true)))
+                                (make-aggregation :sum (make-attribute-ref "one")))))
         (is (thrown? Exception (expression-type
                                 {"one" date%}  ;; FIXME actually, dates should be orderable
-                                (make-aggregation :min (make-attribute-ref "one"))
-                                :typecheck? true))))
+                                (make-aggregation :min (make-attribute-ref "one"))))))
       (testing "should fail with anything but :count-all"
         (is (thrown? Exception (expression-type the-empty-environment
                                                 (make-aggregation :count-something))))))
@@ -324,8 +320,7 @@
                        {(sql/plus$ (make-const string% "foobar")
                                    (make-const integer% 42))
                         (make-const boolean% true)}
-                       (make-const boolean% false))
-                      :typecheck? true)))))))
+                       (make-const boolean% false)))))))))
 
 (deftest aggregate?-test
   (is (not (aggregate? (make-attribute-ref "one"))))
@@ -383,13 +378,13 @@
     (testing "base relation"
       (is (= (alist->rel-scheme [["one" string%]
                                  ["two" integer%]])
-             (query-scheme tbl1 :typecheck? true))))
+             (query-scheme tbl1))))
 
     (testing "projection"
       (let [p (make-project [["two" (make-attribute-ref "two")]
                              ["one" (make-attribute-ref "one")]]
                             tbl1)
-            res (query-scheme p :typecheck? true)]
+            res (query-scheme p)]
         (is (= (rel-scheme-map res) {"two" integer% "one" string%})))
       (let [p2 (make-project [["count_twos" (make-aggregation :count (make-attribute-ref "two"))]]
                              tbl1)]
@@ -402,8 +397,7 @@
                                            :min
                                            (make-tuple [(make-const integer% 42)
                                                         (make-const integer% 23)]))]]
-                                  tbl1)
-                                 :typecheck? true))))
+                                  tbl1)))))
 
     (testing "restriction"
       (let [r (make-restrict (sql/=$ (make-scalar-subquery
@@ -415,8 +409,7 @@
       (testing "should fail with typecheck on and non-boolean applications")
       (is (thrown? Exception (query-scheme (make-restrict (sql/plus$ (make-const integer% 41)
                                                                      (make-const integer% 1))
-                                                          tbl1)
-                                           :typecheck? true))))
+                                                          tbl1)))))
 
     (testing "subquery"
       (let [r (make-project [["X" (make-scalar-subquery
@@ -440,8 +433,7 @@
         (is (thrown? Exception (query-scheme (make-restrict-outer
                                               (sql/plus$ (make-const integer% 41)
                                                          (make-const integer% 1))
-                                              tbl1)
-                                             :typecheck? true)))))
+                                              tbl1))))))
 
     (testing "grouping"
       (is (= (lens/shove (alist->rel-scheme [["one" string%]
@@ -463,23 +455,20 @@
                                  ["two" integer%]])
              (query-scheme  (make-extend [["one*" (make-attribute-ref "one")]
                                           ["cnt" (make-aggregation :count-all)]]
-                                         (make-group #{"one" "two"} tbl1))
-                           :typecheck? true)))
+                                         (make-group #{"one" "two"} tbl1)))))
       (is (thrown-with-msg?
            Throwable
            #"type violation"
            (query-scheme (make-project [["x" (make-attribute-ref "one")]
                                         ["y" (make-aggregation :max
                                                                (make-attribute-ref "two"))]]
-                                       tbl1)
-                         :typecheck? true)))
+                                       tbl1))))
 
       (is (thrown-with-msg?
            Throwable
            #"type violation"
            (query-scheme (make-project [["x" (make-attribute-ref "one")]]
-                                       (make-group #{"two"} tbl1))
-                         :typecheck? true))))
+                                       (make-group #{"two"} tbl1))))))
 
     (testing "scheme for various combinations"
       (let [test-universe (make-universe)
@@ -517,8 +506,7 @@
                                                (make-base-relation 'rel
                                                                    (alist->rel-scheme [["one" date%]])
                                                                    :universe (make-universe)
-                                                                   :handle "rel"))
-                                   :typecheck? true)))))
+                                                                   :handle "rel")))))))
     (testing "combine"
       (let [p (make-project {"one" (make-attribute-ref "one")} tbl1)
             p2 (make-project {"one" (make-attribute-ref "one")} tbl2)
@@ -528,10 +516,10 @@
             cp (make-product p p)
             clop (make-left-outer-product p p)
             cu (make-union p p2)]
-        (is (thrown? Exception (query-scheme clop :typecheck? true)))
-        (is (thrown? Exception (query-scheme cp :typecheck? true)))
-        (is (thrown? Exception (query-scheme clop :typecheck? true)))
-        (is (thrown? Exception (query-scheme cu :typecheck? true))))))
+        (is (thrown? Exception (query-scheme clop)))
+        (is (thrown? Exception (query-scheme cp)))
+        (is (thrown? Exception (query-scheme clop)))
+        (is (thrown? Exception (query-scheme cu))))))
   (testing "anything else should fail"
     (is (thrown? Exception (query-scheme nil)))))
 

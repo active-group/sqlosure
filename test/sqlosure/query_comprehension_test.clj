@@ -52,8 +52,7 @@
        (query-scheme
         (get-query (monadic [t1 (embed tbl1)]
                             (group [t1 "one"])
-                            (project [["foo" (make-aggregation :max (! t1 "two"))]])))
-        :typecheck? true)))) ; this checks that the two column doesn get propagated upwards
+                            (project [["foo" (make-aggregation :max (! t1 "two"))]])))))))
 
 
 (deftest trivial

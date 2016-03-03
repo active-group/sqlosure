@@ -149,12 +149,11 @@ Replaced alist with hash-map."
 
 (declare query-scheme*)
 
-; FIXME: get rid of typecheck? parameter, then unifty query-scheme and query-scheme*
+; FIXME: unify query-scheme and query-scheme*
 
 (defn query-scheme
-  "Return the query scheme of query `q` as a `rel-scheme`.
-  If :typecheck is provided, perform basic validation of types."
-  [q & {:keys [typecheck?]}]
+  "Return the query scheme of query `q` as a `rel-scheme`."
+  [q]
   (query-scheme* q the-empty-environment))
 
 (defn- query-scheme* [q env]
@@ -613,7 +612,7 @@ Replaced alist with hash-map."
   "`expression-type` takes an environment map and an expression and tries to
   find the expressions type (either based on expr itself or on the
   mappings of the env)."
-  [env expr & {:keys [typecheck?]}]
+  [env expr]
   (expression-type* env expr))
 
 (defn aggregate?
