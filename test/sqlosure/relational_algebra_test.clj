@@ -285,14 +285,8 @@
       (is (not= (make-product-type [string%])
                 (expression-type the-empty-environment
                                  (make-tuple [(make-const integer% 42)])))))
-    (testing "aggregation + aggregation*"
+    (testing "aggregation"
       (is (= integer% (expression-type the-empty-environment my-aggregation)))
-      (is (= (make-product-type [integer% integer%])
-             (expression-type the-empty-environment
-                              (make-aggregation
-                               :min
-                               (make-tuple [(make-const integer% 42)
-                                            (make-const integer% 23)])))))
       (testing "should fail with non matching operators and field references \\
                 with typechecking set to true"
         (is (thrown? Exception  ;; With typechecking, this expression should fail.

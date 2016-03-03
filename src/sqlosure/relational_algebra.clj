@@ -281,7 +281,7 @@ Replaced alist with hash-map."
      (fn [env]
        (alist->rel-scheme (map (fn [[k v]]
                                  (let [typ (expression-type* (compose-environments (rel-scheme->environment base-scheme) env)
-                                                             v query-scheme-fail)]
+                                                             v)]
                                    (when (and query-scheme-fail (t/product-type? typ))
                                      (assertion-violation `really-make-project "non-product type" k v typ))
                                    [k typ]))
@@ -337,7 +337,7 @@ Replaced alist with hash-map."
     (fn [env]
       (let [scheme (query-scheme* query env)]
         (when (not= t/boolean% (expression-type* (compose-environments (rel-scheme->environment scheme) env)
-                                                 exp query-scheme-fail))
+                                                 exp))
           (assertion-violation `make-restrict "not a boolean condition" exp query env))
         scheme))))
 
@@ -359,7 +359,7 @@ Replaced alist with hash-map."
      (let [scheme (query-scheme* query env)]
        (when (not= t/boolean% (expression-type*
                                (compose-environments (rel-scheme->environment scheme) env)
-                               exp query-scheme-fail))
+                               exp))
             (assertion-violation `make-restrict-outer "not a boolean condition" exp query env))
        scheme))))
 
@@ -458,7 +458,7 @@ Replaced alist with hash-map."
            env (compose-environments (rel-scheme->environment scheme) env)]
        (doseq [p alist]
          (let [exp (first p)
-               t (expression-type* env exp query-scheme-fail)]
+               t (expression-type* env exp)]
            (when-not (t/ordered-type? t)
              (assertion-violation `make-order "not an ordered type " t exp))))
        scheme))))
@@ -567,45 +567,45 @@ Replaced alist with hash-map."
 (declare query-scheme*)
 
 (defn- expression-type*
-  [env expr fail]
+  [env expr]
   (fold-expression
    (fn [name] (or (lookup-env name env)
                   (assertion-violation `expression-type "unknown attribute" name env)))
    (fn [ty val] ty)
    identity
-   (fn [rator rands] (apply (rator-range-type-proc rator) fail rands))
+   (fn [rator rands] (apply (rator-range-type-proc rator) query-scheme-fail rands))
    t/make-product-type
    ;; aggregation
    (fn [op t] (if (= :count op)
                 t/integer%
                 (do
-                  (when fail
-                    (cond
-                      (contains? #{:sum :avg :std-dev :std-dev-p :var :var-p} op)
-                      (when-not (t/numeric-type? t) (fail 'numeric-type t))
-                      (contains? #{:min :max} op)
-                      (when-not (t/ordered-type? t) (fail 'ordered-type t))))
+                  (cond
+                    (contains? #{:sum :avg :std-dev :std-dev-p :var :var-p} op)
+                    (when-not (t/numeric-type? t) (assertion-violation `expression-type* "not a numeric type" op t))
+                    
+                    (contains? #{:min :max} op)
+                    (when-not (t/ordered-type? t) (assertion-violation `expression-type* "not an ordered type" op t)))
                   t)))
    ;; aggregation*
    (fn [op] (if (= :count-all op)
               t/integer%
               (assertion-violation `expression-type* "unknown aggregation" op)))
    ;; case-expr
-   (fn [alist t] (if fail
-                   (doseq [[p r] alist]
-                     (when-not (t/type=? t/boolean% p) (fail 'boolean p))
-                     (when-not (t/type=? t r) (fail t r)))
-                   t))
+   (fn [alist t]
+     (doseq [[p r] alist]
+       (when-not (t/type=? t/boolean% p) (assertion-violation `expression-type* "non-boolean test in case" p r))
+       (when-not (t/type=? t r) (assertion-violation `expression-type* "type mismatch in case" p r)))
+     t)
    (fn [subquery] (let [scheme (query-scheme* subquery env)
                         alist (rel-scheme-map scheme)]
-                    (when (and fail (not (rel-scheme-unary? scheme)))
-                      (fail 'unary-relation subquery))
+                    (when-not (rel-scheme-unary? scheme)
+                      (assertion-violation `expression-type* "must be a unary relation" subquery))
                     (val (first alist))))
    ;; FIXME what should the result here really be?
    (fn [subquery] (let [scheme (query-scheme* subquery env)
                         alist (rel-scheme-map scheme)]
-                    (when (and fail (or (empty? alist) (t/pair? (rest alist))))
-                      (fail 'unary-relation subquery))
+                    (when-not (rel-scheme-unary? scheme)
+                      (assertion-violation `expression-type* "must be a unary relation" subquery))
                     (t/make-set-type (key (first alist)))))
    expr))
 
@@ -614,12 +614,7 @@ Replaced alist with hash-map."
   find the expressions type (either based on expr itself or on the
   mappings of the env)."
   [env expr & {:keys [typecheck?]}]
-  (expression-type* env expr
-                    (and typecheck?
-                         (fn [expected thing]
-                           (assertion-violation `expression-type
-                                                "type-violation (expected/found)"
-                                                expected thing)))))
+  (expression-type* env expr))
 
 (defn aggregate?
   "Returns true if `expr` is or contains an aggregation."
