@@ -267,7 +267,7 @@ Replaced alist with hash-map."
               (set? grouped))
       ;; we're doing aggregation
       (doseq [[_ e] alist]
-        (check-grouped query-scheme-fail grouped e)))
+        (check-grouped grouped e)))
 
     (attach-rel-scheme-cache
      (really-really-make-project alist query)
@@ -275,7 +275,7 @@ Replaced alist with hash-map."
        (alist->rel-scheme (map (fn [[k v]]
                                  (let [typ (expression-type (compose-environments (rel-scheme->environment base-scheme) env)
                                                              v)]
-                                   (when (and query-scheme-fail (t/product-type? typ))
+                                   (when (t/product-type? typ)
                                      (assertion-violation `really-make-project "non-product type" k v typ))
                                    [k typ]))
                                alist))))))
@@ -637,22 +637,22 @@ Replaced alist with hash-map."
 (defn- check-grouped
   "Check whether all attribute refs in an expression 
   that are not inside an application of an aggregate occur in `grouped`."
-  [fail grouped expr]
+  [grouped expr]
   (cond
     (attribute-ref? expr) (when-not (contains? grouped (attribute-ref-name expr))
-                            (fail "non-aggregate" expr))
+                            (assertion-violation `check-grouped "non-aggregate expression" expr))
     (const? expr) nil
     (const-null? expr) nil
     (application? expr) (doseq [r (application-rands expr)]
-                          (check-grouped fail grouped r))
+                          (check-grouped grouped r))
     (tuple? expr) (doseq [e (tuple-expressions expr)]
-                    (check-grouped fail grouped e))
+                    (check-grouped grouped e))
     (aggregation? expr) nil
     (aggregation*? expr) nil
     (case-expr? expr) (doseq [[k v] (case-expr-alist expr)]
-                        (check-grouped fail grouped k)
-                        (check-grouped fail grouped v)
-                        (check-grouped fail grouped (case-expr-default expr)))
+                        (check-grouped grouped k)
+                        (check-grouped grouped v)
+                        (check-grouped grouped (case-expr-default expr)))
     (scalar-subquery? expr) nil
     (set-subquery? expr) nil
     :else (assertion-violation `check-grouped "invalid expression" expr)))

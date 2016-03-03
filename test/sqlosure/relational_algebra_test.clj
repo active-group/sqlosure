@@ -456,17 +456,15 @@
              (query-scheme  (make-extend [["one*" (make-attribute-ref "one")]
                                           ["cnt" (make-aggregation :count-all)]]
                                          (make-group #{"one" "two"} tbl1)))))
-      (is (thrown-with-msg?
-           Throwable
-           #"type violation"
+      (is (thrown?
+           Exception
            (query-scheme (make-project [["x" (make-attribute-ref "one")]
                                         ["y" (make-aggregation :max
                                                                (make-attribute-ref "two"))]]
                                        tbl1))))
 
-      (is (thrown-with-msg?
-           Throwable
-           #"type violation"
+      (is (thrown?
+           Exception
            (query-scheme (make-project [["x" (make-attribute-ref "one")]]
                                        (make-group #{"two"} tbl1))))))
 
