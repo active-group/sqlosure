@@ -312,7 +312,8 @@
                               (do
                                 (check-ordered t1 fail)
                                 (check-ordered t2 fail)
-                                (when-not (type=? t1 t2) (fail t1 t2))))
+                                (when-not (type=? (non-nullable-type t1) (non-nullable-type t2))
+                                  (fail t1 t2))))
                             boolean%)
                           (null-lift-binary-predicate clj)
                           :universe sql-universe
