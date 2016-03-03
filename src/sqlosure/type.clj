@@ -5,7 +5,8 @@
             [sqlosure.utils :refer [zip]]
             [active.clojure.record :refer [define-record-type]]
             [active.clojure.condition :refer [assertion-violation]])
-  (:import [java.time LocalDate LocalDateTime]))
+  (:import [java.time LocalDate LocalDateTime]
+           [java.io Writer]))
 
 (defprotocol base-type-protocol
   "Protocol for base types."
@@ -53,7 +54,21 @@
   (-const->datum [_ val] (const->datum-fn val))
   (-datum->const [_ datum] (datum->const-fn datum)))
 
-;; FIXME: custom printer
+(defmethod print-method atomic-type [r, ^Writer w]
+  (.write w "#")
+  (.write w (.getName (class r)))
+  (print-method {:name (atomic-type-name r)
+                 :nullable? (atomic-type-nullable? r)}
+                w))
+
+(defmethod print-dup atomic-type [r, ^Writer w]
+  (.write w "#")
+  (.write w (.getName (class r)))
+  (let [mp {:name (atomic-type-name r)
+            :nullable? (atomic-type-nullable? r)}]
+    (if *verbose-defrecords*
+      (print-dup mp w)
+      (print-dup (vec (vals mp)) w))))
 
 (defn make-base-type
   "Returns a new base type as specified.
