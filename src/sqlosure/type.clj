@@ -221,9 +221,9 @@
 (def any% (make-base-type 'any (constantly true) identity identity))
 
 (def date% (make-base-type 'date date? identity identity
-                           :ordered true))
+                           :ordered? true))
 (def timestamp% (make-base-type 'timestamp timestamp? identity identity
-                                :ordered true))
+                                :ordered? true))
 
 (def blob% (make-base-type 'blob byte-array? 'lose 'lose))
 
