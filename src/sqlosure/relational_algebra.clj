@@ -780,7 +780,9 @@ Replaced alist with hash-map."
                     (when-not (= (count domain-types) (count arg-types))
                       (fail domain-types arg-types))
                     (doseq [dd domain-types ad arg-types]
-                      (when-not (t/type=? dd ad)
+                      ;; allow anything for any% (used in is-null?) - TODO: right way?
+                      (when (and (not= t/any% dd)
+                                 (not (t/type=? dd ad)))
                         (fail dd ad)))))
                 range-type)
               proc
