@@ -285,6 +285,9 @@
                                  (make-tuple [(make-const integer% 42)])))))
     (testing "aggregation"
       (is (= integer% (expression-type the-empty-environment my-aggregation)))
+      (is (= date% (expression-type
+                    {"one" date%}
+                    (make-aggregation :min (make-attribute-ref "one")))))
       (testing "should fail with non matching operators and field references \\
                 with typechecking set to true"
         (is (thrown? Exception  ;; With typechecking, this expression should fail.
@@ -295,10 +298,7 @@
                                                     (make-const integer% 23)])))))
         (is (thrown? Exception (expression-type
                                 {"one" string%}
-                                (make-aggregation :sum (make-attribute-ref "one")))))
-        (is (thrown? Exception (expression-type
-                                {"one" date%}  ;; FIXME actually, dates should be orderable
-                                (make-aggregation :min (make-attribute-ref "one"))))))
+                                (make-aggregation :sum (make-attribute-ref "one"))))))
       (testing "should fail with anything but :count-all"
         (is (thrown? Exception (expression-type the-empty-environment
                                                 (make-aggregation :count-something))))))
@@ -498,12 +498,12 @@
       (let [o (make-order {(make-attribute-ref "one") :ascending} tbl1)]
         (is (= (rel-scheme-map (query-scheme o))
                {"one" string% "two" integer%}))
-        (is (thrown? Exception
-                     (query-scheme (make-order {(make-attribute-ref "one") :ascending}
-                                               (make-base-relation 'rel
-                                                                   (alist->rel-scheme [["one" date%]])
-                                                                   :universe (make-universe)
-                                                                   :handle "rel")))))))
+        (is (= (alist->rel-scheme [["one" date%]])
+               (query-scheme (make-order {(make-attribute-ref "one") :ascending}
+                                         (make-base-relation 'rel
+                                                             (alist->rel-scheme [["one" date%]])
+                                                             :universe (make-universe)
+                                                             :handle "rel")))))))
     (testing "combine"
       (let [p (make-project {"one" (make-attribute-ref "one")} tbl1)
             p2 (make-project {"one" (make-attribute-ref "one")} tbl2)
