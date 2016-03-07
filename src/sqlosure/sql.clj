@@ -278,18 +278,22 @@
                                        :data op-not))
 
 (def is-null?$
-  (make-rator "IS NULL"
-              (fn [fail arg-type] boolean%)
-              nil?
-              :universe sql-universe
-              :data op-null?))
+  (let [rator (make-rator "IS NULL"
+                          (fn [fail arg-type] boolean%)
+                          nil?
+                          :universe sql-universe
+                          :data op-null?)]
+    (fn is-null?$ [rand]
+      (make-application rator rand))))
 
 (def is-not-null?$
-  (make-rator "IS NOT NULL"
-              (fn [fail arg-type] boolean%)
-              some?
-              :universe sql-universe
-              :data op-not-null?))
+  (let [rator (make-rator "IS NOT NULL"
+                          (fn [fail arg-type] boolean%)
+                          some?
+                          :universe sql-universe
+                          :data op-not-null?)]
+    (fn is-not-null?$ [rand]
+      (make-application rator rand))))
 
 (def or$ (make-monomorphic-combinator 'or
                                       [boolean% boolean%]
