@@ -277,15 +277,19 @@
                                        :universe sql-universe
                                        :data op-not))
 
-(def is-null?$ (make-monomorphic-combinator "IS NULL" [any%] boolean%
-                                            nil?
-                                            :universe sql-universe
-                                            :data op-null?))
+(def is-null?$
+  (make-rator "IS NULL"
+              (fn [fail arg-type] boolean%)
+              nil?
+              :universe sql-universe
+              :data op-null?))
 
-(def is-not-null?$ (make-monomorphic-combinator "IS NOT NULL" [any%] boolean%
-                                                #(not (nil? %))
-                                                :universe sql-universe
-                                                :data op-not-null?))
+(def is-not-null?$
+  (make-rator "IS NOT NULL"
+              (fn [fail arg-type] boolean%)
+              some?
+              :universe sql-universe
+              :data op-not-null?))
 
 (def or$ (make-monomorphic-combinator 'or
                                       [boolean% boolean%]
