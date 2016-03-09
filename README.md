@@ -65,3 +65,10 @@ We can now execute queries against this table as follows
     (delete conn movies-table (fn [title director year any-good?]
                                 (=$ title (make-const t/string% "Changed title"))))))
 ```
+
+## License
+
+Copyright © 2016 Active Group GmbH
+
+Distributed under the Eclipse Public License either version 1.0 or (at
+your option) any later version.

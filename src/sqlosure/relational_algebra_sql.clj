@@ -104,12 +104,6 @@
   (sql/set-sql-select-tables sql
                              (conj (sql/sql-select-tables sql) [nil q])))
 
-(defn add-left-outer-table
-  "Takes an sql-select statement and adds an outer (join) table to its select-tables list."
-  [sql q]
-  (sql/set-sql-select-outer-tables sql
-                                   (conj (sql/sql-select-outer-tables sql) [nil q])))
-
 (defn project->sql
   "Takes a project query and returns the abstract Sql representation."
   [q]
@@ -171,11 +165,13 @@
         :left-outer-product
         (let [sql1 (query->sql q1)
               sql2 (query->sql q2)]
-          (if (sql/sql-select? sql1)
-            (add-left-outer-table sql1 sql2)
-            (-> (sql/new-sql-select)
-                (sql/set-sql-select-tables [[nil sql1]])
-                (sql/set-sql-select-outer-tables [[nil sql2]]))))
+          ;; we must not simply add sql2 to sql1's outer tables,
+          ;; as this might trigger x->sql (called in the surrounding
+          ;; make-restrict-outer) to wrap another SQL query around the
+          ;; whole thing, thus moving the ON to a place where it's invalid
+          (-> (sql/new-sql-select)
+              (sql/set-sql-select-tables [[nil sql1]])
+              (sql/set-sql-select-outer-tables [[nil sql2]])))
 
         :quotient
         (let [scheme-1 (rel/query-scheme q1)
