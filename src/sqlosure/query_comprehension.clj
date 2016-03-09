@@ -145,7 +145,7 @@
   [& refs]
   (doseq [ref refs]
     (when-not (rel/attribute-ref? ref)
-      (assertion-violation `group-by "not a column name" name)))
+      (assertion-violation `group-by "not an attribute ref" ref)))
   (monadic
    [old current-query]
    (set-query! (rel/make-group (map rel/attribute-ref-name
