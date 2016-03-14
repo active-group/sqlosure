@@ -7,7 +7,6 @@
                  [org.clojure/core.match "0.3.0-alpha4"]
                  [org.clojure/java.jdbc "0.4.2"]
                  ;; uncomment only one
-                 ;; [org.xerial/sqlite-jdbc "3.8.11"]
                  [org.postgresql/postgresql "9.4-1206-jdbc41"]
                  [active-clojure "0.12.0"]]
   :plugins [[lein-cloverage "1.0.6"]
@@ -20,7 +19,14 @@
                     :injections [(require 'pjstadig.humane-test-output)
                                  (pjstadig.humane-test-output/activate!)
                                  (require 'active.clojure.condition-hooks)
-                                 (active.clojure.condition-hooks/activate-clojure-test!)]}}
+                                 (active.clojure.condition-hooks/activate-clojure-test!)]}
+             :dev {:dependencies [[pjstadig/humane-test-output "0.7.1"]
+                                  [org.xerial/sqlite-jdbc "3.8.11.2"]
+                                  [org.clojure/tools.nrepl "0.2.11"]]
+                   :injections [(require 'pjstadig.humane-test-output)
+                                (pjstadig.humane-test-output/activate!)
+                                (require 'active.clojure.condition-hooks)
+                                (active.clojure.condition-hooks/activate-clojure-test!)]}}
 
   :repl-options {:caught active.clojure.condition-hooks/repl-caught}
 
