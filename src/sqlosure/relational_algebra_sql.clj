@@ -14,16 +14,14 @@
     (sql/set-sql-select-tables (sql/new-sql-select) [[nil sql]])
 
     (sql/sql-select-combine? sql)
-    (-> (sql/new-sql-select)
-        (sql/set-sql-select-tables [[nil sql]]))
+    (sql/set-sql-select-tables (sql/new-sql-select) [[nil sql]])
     
     (sql/sql-select? sql)
     (cond
       (nil? (sql/sql-select-attributes sql)) sql
     
       (some? (sql/sql-select-group-by sql))
-      (-> (sql/new-sql-select)
-          (sql/set-sql-select-tables [[nil sql]]))
+      (sql/set-sql-select-tables (sql/new-sql-select) [[nil sql]])
 
        :else
       (-> (sql/new-sql-select)
@@ -108,9 +106,10 @@
   "Takes a project query and returns the abstract Sql representation."
   [q]
   (let [alist (rel/project-alist q)]
-    (-> (sql/set-sql-select-attributes (x->sql-select (query->sql (rel/project-query q)))
-                                       (project-alist->sql alist))
-        (sql/set-sql-select-nullary? (empty? alist)))))
+    (sql/set-sql-select-nullary?
+     (sql/set-sql-select-attributes (x->sql-select (query->sql (rel/project-query q)))
+                                    (project-alist->sql alist))
+     (empty? alist))))
 
 (defn query->sql
   "Takes a query in abstract relational algegbra and returns the corresponding
@@ -138,10 +137,10 @@
                                  (sql/sql-select-criteria sql)))))
     (rel/restrict-outer? q) (let [sql (x->sql-select (query->sql
                                                       (rel/restrict-outer-query q)))]
-                              (-> sql
-                                  (sql/set-sql-select-outer-criteria
-                                   (cons (expression->sql (rel/restrict-outer-exp q))
-                                         (sql/sql-select-outer-criteria sql)))))
+                              (sql/set-sql-select-outer-criteria
+                               sql
+                               (cons (expression->sql (rel/restrict-outer-exp q))
+                                     (sql/sql-select-outer-criteria sql))))
     (rel/combine? q)
     (let [q1 (rel/combine-query-1 q)
           q2 (rel/combine-query-2 q)
