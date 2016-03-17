@@ -300,7 +300,7 @@
   "Returns true if v is a sequence not empty (like schemes pair? function)."
   [v]
   (if (or (list? v) (vector? v))
-    (not (empty? v))
+    (seq v)
     false))
 
 (defn const->datum
@@ -314,8 +314,7 @@
   [t val]
   (cond
     (satisfies? base-type-protocol t)
-    (if (and (-nullable? t) (nil? val))
-      nil
+    (when-not (and (-nullable? t) (nil? val))
       (-const->datum t val))
 
     (product-type? t) (cond
@@ -338,10 +337,8 @@
   [t d]
   (cond
     (satisfies? base-type-protocol t)
-    (if (and (-nullable? t) (nil? d))
-      nil
+    (when-not (and (-nullable? t) (nil? d))
       (-datum->const t d))
-             
     (product-type? t) (cond
                         (or (pair? d) (nil? d))
                         ;; Maybe add type check here?

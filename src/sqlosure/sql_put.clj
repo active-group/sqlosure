@@ -35,7 +35,7 @@
 (defn put-padding-if-non-null
   "When lis is not empty, prepend a space to (proc lis)."
   [lis proc]
-  (when-not (empty? lis)
+  (when (seq lis)
     (put-space)
     (proc lis)))
 
@@ -82,7 +82,7 @@
 (defn put-joining-infix
   "Intersperse `between` between `lis`'s elements and print via `proc`."
   [lis between proc]
-  (when-not (empty? lis)
+  (when (seq lis)
     (doall (concat (proc (first lis))
                    (mapcat (fn [x]
                              (print between)
@@ -220,38 +220,37 @@
   [param sel]
   (cond
     (sql/sql-select? sel)
-    (do
-      (let [_ (print "SELECT")
-            v1 (put-padding-if-non-null (sql/sql-select-options sel)
-                                        #(print (s/join " " %)))
-            _ (put-space)
-            v2 (put-attributes param (sql/sql-select-attributes sel))
+    (let [_ (print "SELECT")
+          v1 (put-padding-if-non-null (sql/sql-select-options sel)
+                                      #(print (s/join " " %)))
+          _ (put-space)
+          v2 (put-attributes param (sql/sql-select-attributes sel))
 
-            v3 (put-sql-join param
-                             (sql/sql-select-tables sel)
-                             (sql/sql-select-outer-tables sel))
+          v3 (put-sql-join param
+                           (sql/sql-select-tables sel)
+                           (sql/sql-select-outer-tables sel))
 
-            v5 (put-padding-if-non-null (sql/sql-select-outer-criteria sel)
-                                        #(put-on param %))
+          v5 (put-padding-if-non-null (sql/sql-select-outer-criteria sel)
+                                      #(put-on param %))
 
-            v6 (put-padding-if-non-null (sql/sql-select-criteria sel)
-                                        #(put-where param %))
+          v6 (put-padding-if-non-null (sql/sql-select-criteria sel)
+                                      #(put-where param %))
 
-            v7 (put-padding-if-non-null (sql/sql-select-group-by sel)
-                                        #(put-group-by param %))
-            
-            v8 (if-let [h (sql/sql-select-having sel)]
-                 (do
-                   (put-space)
-                   (put-having param h))
-                 [])
-            v9 (put-padding-if-non-null (sql/sql-select-order-by sel)
-                                     #(put-order-by param %))
-            _ (let [extra (sql/sql-select-extra sel)]
-                (when-not (empty? extra)
-                  (do (put-space)
-                      (print (s/join " " extra)))))]
-        (concat v1 v2 v3 v5 v6 v7 v8 v9)))
+          v7 (put-padding-if-non-null (sql/sql-select-group-by sel)
+                                      #(put-group-by param %))
+          
+          v8 (if-let [h (sql/sql-select-having sel)]
+               (do
+                 (put-space)
+                 (put-having param h))
+               [])
+          v9 (put-padding-if-non-null (sql/sql-select-order-by sel)
+                                      #(put-order-by param %))
+          _ (let [extra (sql/sql-select-extra sel)]
+              (when-not (empty? extra)
+                (put-space)
+                (print (s/join " " extra))))]
+      (concat v1 v2 v3 v5 v6 v7 v8 v9))
       
     (sql/sql-select-combine? sel) ((sql-put-parameterization-combine-proc param)
                                    param

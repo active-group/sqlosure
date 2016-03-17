@@ -9,9 +9,7 @@
             [clojure.string :as s]))
 
 (defn- sqlite3-db [conn]
-  {:classname "org.sqlite.JDBC"
-   :subprotocol "sqlite"
-   :subname (db/db-connection-handle conn)})
+  (:data conn))
 
 (defn- put-expr [conn select]
   (put/sql-expression->string (db/db-connection-sql-put-parameterization conn) select))
@@ -47,7 +45,7 @@
   (cond
     (or (= tt t/string%) (= tt t/integer%) (= tt t/double%) (= tt t/blob%)) val
     (= tt t/boolean%) (not= val 0)
-    :else (throw (Exception. (str 'sqlite3-value->value ": unkown type " tt val)))))
+    :else val))
 
 (defn- value->sqlite3-value
   "Takes a sqlosure.type and a value and converts it to it's corresponding
@@ -118,27 +116,22 @@
 (defn- sqlite3->db-connection
   "Takes the filename of a sqlite3 database-file and returns a new sqlite3
   db-connection."
-  [filename]
+  [db-spec]
   (db/make-db-connection "sqlite3"  ;; type
-                         filename  ;; name
-                         filename  ;; data
-                         filename   ;; handle
+                         db-spec  ;; name
+                         db-spec          ;; data
+                         db-spec               ;; handle
                          sqlite3-sql-put-parameterization
                          nil ;; As long as we're not explicitly keeping the
                          ;; connection alive, we don't have to close. Solution?
-                         (fn [conn query scheme opts]
-                           (sqlite3-query conn query scheme opts))
-                         (fn [conn table scheme vals]
-                           (sqlite3-insert conn table scheme vals))
-                         (fn [conn table criterion]
-                           (sqlite3-delete conn table criterion))
-                         (fn [conn table scheme criterion alist]
-                           (sqlite3-update conn table scheme criterion alist))
-                         (fn [conn sql]
-                           (query conn sql))))
+                         sqlite3-query
+                         sqlite3-insert
+                         sqlite3-delete
+                         sqlite3-update
+                         query))
 
 (defn open-db-connection-sqlite3
   "Takes the filename of a sqlite3 database-file and returns a new sqlite3
   db-connection."
-  [filename]
-  (sqlite3->db-connection filename))
+  [db-spec]
+  (sqlite3->db-connection db-spec))

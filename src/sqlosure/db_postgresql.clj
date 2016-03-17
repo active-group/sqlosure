@@ -104,16 +104,11 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
                          db-name  ;; handle
                          postgresql-sql-put-parameterization
                          nil
-                         (fn [conn query scheme opts]
-                           (postgresql-query conn query scheme opts))
-                         (fn [conn table scheme vals]
-                           (postgresql-insert conn table scheme vals))
-                         (fn [conn table criterion]
-                           (postgresql-delete conn table criterion))
-                         (fn [conn table scheme criterion alist]
-                           (postgresql-update conn table scheme criterion alist))
-                         (fn [conn sql]
-                           (query conn sql))))
+                         postgresql-query
+                         postgresql-insert
+                         postgresql-delete
+                         postgresql-update
+                         query))
 
 (defn open-db-connection-postgresql
   [db-host db-port db-name db-user db-password]

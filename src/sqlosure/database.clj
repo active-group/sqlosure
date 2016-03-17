@@ -70,7 +70,7 @@
 (defn call-with-database
   [conn thunk]
   (do
-    (when (not conn)
+    (when-not conn
       (throw (Exception. (str 'call-with-database
                               " re-entered call-with-database"))))
     thunk

@@ -85,7 +85,7 @@ Replaced alist with hash-map."
   alist."
   [s1 s2]
   (let [cols2 (set (rel-scheme-columns s2))
-        cols (filter (complement cols2) (rel-scheme-columns s1))]
+        cols (remove cols2 (rel-scheme-columns s1))]
     (c/assert (not-empty cols))
     (make-rel-scheme cols
                      (select-keys (rel-scheme-map s1) cols)
@@ -776,12 +776,11 @@ Replaced alist with hash-map."
   (make-rator name
               (fn [fail & arg-types]
                 (when fail
-                  (do
-                    (when-not (= (count domain-types) (count arg-types))
-                      (fail domain-types arg-types))
-                    (doseq [dd domain-types ad arg-types]
-                      (when-not (t/type=? dd ad)
-                        (fail dd ad)))))
+                  (when-not (= (count domain-types) (count arg-types))
+                    (fail domain-types arg-types))
+                  (doseq [dd domain-types ad arg-types]
+                    (when-not (t/type=? dd ad)
+                      (fail dd ad))))
                 range-type)
               proc
               :universe universe
@@ -807,7 +806,7 @@ Replaced alist with hash-map."
 
 (defn- filter-and-non-nil [s]
   (let [non-nils (filter some? s)]
-    (when-not (empty? non-nils) (set non-nils))))
+    (when (seq non-nils) (set non-nils))))
 
 (defn expression-attribute-names
   "Takes an expression and returns a seq all attribute-ref's names."
@@ -823,7 +822,7 @@ Replaced alist with hash-map."
     (fn [_] "*")
     (fn [alist default]
       (vec (concat default
-                   (distinct (flatten (into [] alist))))))  ;; case
+                   (distinct (flatten (vec alist))))))  ;; case
     query-attribute-names
     query-attribute-names
     expr)))
