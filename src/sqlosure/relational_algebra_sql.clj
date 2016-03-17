@@ -117,7 +117,7 @@
   abstract sql."
   [q]
   (cond
-    (rel/empty-val? q) (sql/the-sql-select-empty)
+    (rel/empty-query? q) (sql/the-sql-select-empty)
     (rel/base-relation? q)
     (if-not (sql/sql-table? (rel/base-relation-handle q))
       (c/assertion-violation 'query->sql "base relation not a SQL table" q)
@@ -248,5 +248,5 @@
                                             ;; no offset should be the same as offset 0 though:
                                             (str "LIMIT " (rel/top-count q)))
                                           (sql/sql-select-extra sql))))
-    (rel/empty-val? q) sql/the-sql-select-empty
+    (rel/empty-query? q) sql/the-sql-select-empty
     :else (c/assertion-violation 'query->sql "unknown query" (pr-str q))))

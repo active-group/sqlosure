@@ -233,13 +233,13 @@ Replaced alist with hash-map."
 ;;; --- QUERIES
 ;;; ----------------------------------------------------------------------------
 
-(define-record-type empty-val
+(define-record-type empty-query
   ^{:doc "Represents an empty relational algebra value."}
-  (make-empty-val) empty-val? [])
+  (make-empty-query) empty-query? [])
 
 (def the-empty
   (attach-rel-scheme-cache
-   (make-empty-val)
+   (make-empty-query)
    (fn [_] the-empty-rel-scheme)))
 
 (define-record-type project
@@ -374,8 +374,8 @@ Replaced alist with hash-map."
   (attach-rel-scheme-cache
    (case rel-op
      :product (cond
-                (empty-val? query-1) query-2
-                (empty-val? query-2) query-1
+                (empty-query? query-1) query-2
+                (empty-query? query-2) query-1
                 :else (really-make-combine rel-op query-1 query-2))
      (really-make-combine rel-op query-1 query-2))
    (fn [env]
@@ -660,7 +660,7 @@ Replaced alist with hash-map."
 (defn query?
   "Returns true if the `obj` is a query."
   [obj]
-  (or (empty-val? obj) (base-relation? obj) (project? obj) (restrict? obj) (restrict-outer? obj)
+  (or (empty-query? obj) (base-relation? obj) (project? obj) (restrict? obj) (restrict-outer? obj)
       (combine? obj) (order? obj) (group? obj) (top? obj)))
 
 (declare query->datum)
@@ -686,7 +686,7 @@ Replaced alist with hash-map."
 (defn query->datum
   [q]
   (cond
-    (empty-val? q) (list 'empty-val)
+    (empty-query? q) (list 'empty-query)
     (base-relation? q) (list 'base-relation (symbol (base-relation-name q)))
     (project? q) (list 'project (map (fn [[k v]]
                                        (cons k (expression->datum v)))
@@ -715,7 +715,7 @@ Replaced alist with hash-map."
   [d universe]
   (letfn [(next-step [d*] (datum->query d* universe))]
     (case (first d)
-      empty-val the-empty
+      empty-query the-empty
       base-relation (or (u/universe-lookup-base-relation universe (second d))
                         (assertion-violation `datum->query
                                              "unknown base relation"
@@ -832,7 +832,7 @@ Replaced alist with hash-map."
   "Takes a query and returns a set of all attribute-ref's names."
   [q]
   (cond
-    (empty-val? q) nil
+    (empty-query? q) nil
     (base-relation? q) nil
     (project? q)
     (let [subq (project-query q)
@@ -902,7 +902,7 @@ Replaced alist with hash-map."
   [alist q]
   (letfn [(next-step [qq] (query-substitute-attribute-refs alist qq))]
     (cond
-      (empty-val? q) q
+      (empty-query? q) q
       (base-relation? q) q
       (project? q) (let [sub (project-query q)
                          culled (cull-substitution-alist alist sub)]

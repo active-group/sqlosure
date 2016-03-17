@@ -554,7 +554,7 @@
                                                                   (make-const integer% 2)]))))))
 
 (deftest query->datum-test
-  (is (= (list 'empty-val) (query->datum the-empty)))
+  (is (= (list 'empty-query) (query->datum the-empty)))
   (is (= (list 'base-relation 'tbl1) (query->datum tbl1)))
   (is (= (list 'project (list (list "two" 'attribute-ref "two")
                               (list "one" 'attribute-ref "one"))
@@ -619,7 +619,7 @@
   (let [test-universe (register-base-relation! (make-universe)
                                                'tbl1 tbl1)
         query->datum->query #(-> % query->datum (datum->query test-universe))]
-    (is (= the-empty (datum->query '(empty-val) test-universe)))
+    (is (= the-empty (datum->query '(empty-query) test-universe)))
     (is (= tbl1 (datum->query '(base-relation tbl1) test-universe)))
     (is (thrown? Exception  ;; Should throw because universe does not contain
                  ;; the relation.
