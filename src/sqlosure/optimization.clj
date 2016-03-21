@@ -40,7 +40,7 @@
       [(worker [live q]
          (assert (set? live))
          (cond
-           (r/empty-val? q) q
+           (r/empty-query? q) q
            (r/base-relation? q) q
            (r/project? q)
            (let [new-alist (filter (fn [[k _]] (contains? live k))
@@ -100,7 +100,7 @@
 (defn merge-project
   [q]
   (cond
-    (r/empty-val? q) q
+    (r/empty-query? q) q
     (r/base-relation? q) q
     (r/project? q)
     (let [pq (merge-project (r/project-query q))
@@ -159,7 +159,7 @@
   [q]
   {:post [(some? %)]}
   (cond
-    (r/empty-val? q) q
+    (r/empty-query? q) q
     (r/base-relation? q) q
     (r/project? q) (r/make-project (r/project-alist q)
                                    (push-restrict (r/project-query q)))
