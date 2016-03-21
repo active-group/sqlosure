@@ -9,18 +9,17 @@
             [active.clojure.monad :refer :all]
             [active.clojure.condition :refer [assertion-violation]]))
 
-(defmacro deftable
+(defn table
   "`deftable` can be used to define tables for sqlosure. It will define a
   (Clojure) value named `?name`. `?sql-name` ist the name of the table in the
   DBMS, `?map` is a map of column-name -> sqlosure.type-type. `opts` may contain
   a :universe key and a universe (defaults to `nil`)."
-  [?name ?sql-name ?map & ?opts]
-  (let [?opts-m (apply hash-map ?opts)
-        universe? (get ?opts-m :universe)]
-    `(def ~?name
-       (sql/make-sql-table ~?sql-name
-                           ~(rel/alist->rel-scheme ?map)
-                           :universe ~universe?))))
+  [sql-name map & opts]
+  (let [opts-m (apply hash-map opts)
+        universe? (get opts-m :universe)]
+    (sql/make-sql-table sql-name
+                        (rel/alist->rel-scheme map)
+                        :universe universe?)))
 
 (defmacro query
   "`query` takes a series of relational algebra statements (projection,
@@ -38,8 +37,10 @@
 (def <- qc/embed)
 (def ! qc/!)
 (def restrict qc/restrict)
+(def restrict-outer qc/restrict-outer)
 (def group qc/group)
 (def project qc/project)
+(def order qc/order)
 (def top qc/top)
 
 
@@ -70,7 +71,7 @@
 (defn $var-p [aref] (aggregate :var-p aref))
 
 ;; Aggregations on relations (count(*) etc.).
-(def $count* (aggregate :count))
+(def $count* (aggregate :count-all))
 (def $sum* (aggregate :sum))
 (def $avg* (aggregate :avg))
 (def $min* (aggregate :min))
