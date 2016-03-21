@@ -89,7 +89,7 @@
                                  (query->sql (rel/scalar-subquery-query expr)))
     (rel/set-subquery? expr) (sql/make-sql-expr-subquery
                               (query->sql (rel/set-subquery-query expr)))
-    :else (c/assertion-violation 'expression->sql": unknown expression " expr)))
+    :else (c/assertion-violation `expression->sql": unknown expression " expr)))
 
 (defn project-alist->sql
   "Takes a projection alist and returns a corresponding sql statement."
@@ -119,7 +119,7 @@
     (rel/empty-query? q) (sql/the-sql-select-empty)
     (rel/base-relation? q)
     (if-not (sql/sql-table? (rel/base-relation-handle q))
-      (c/assertion-violation 'query->sql "base relation not a SQL table" q)
+      (c/assertion-violation `query->sql "base relation not a SQL table" q)
       ;; FIXME: results in select * from, but should select in the order of column in rel:
       (sql/make-sql-select-table (sql/sql-table-name (rel/base-relation-handle q))))
     (rel/project? q) (project->sql q)
@@ -248,4 +248,4 @@
                                             (str "LIMIT " (rel/top-count q)))
                                           (sql/sql-select-extra sql))))
     (rel/empty-query? q) sql/the-sql-select-empty
-    :else (c/assertion-violation 'query->sql "unknown query" (pr-str q))))
+    :else (c/assertion-violation `query->sql "unknown query" (pr-str q))))

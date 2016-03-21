@@ -77,7 +77,7 @@
       (print (sql/sql-select-table-name sel))
       [])
     :else
-    (assertion-violation 'put-sql-select (str "unhandled query " (pr-str sel)))))
+    (assertion-violation `put-sql-select (str "unhandled query " (pr-str sel)))))
 
 (defn put-joining-infix
   "Intersperse `between` between `lis`'s elements and print via `proc`."
@@ -111,7 +111,7 @@
     (do
       (print "?")
       [[type val]])
-    (assertion-violation 'default-put-literal (str "unhandeled literal " (pr-str val)))))
+    (assertion-violation `default-put-literal (str "unhandeled literal " (pr-str val)))))
 
 (defn default-put-combine
   [param op left right]
@@ -261,7 +261,7 @@
     (sql/sql-select-table? sel) (print (sql/sql-select-table-name sel))
     
     (sql/sql-select-empty? sel) (print "")  ;; woot woot
-    :else (assertion-violation 'put-sql-select-1 (str "unknown select " (pr-str sel)))))
+    :else (assertion-violation `put-sql-select-1 (str "unknown select " (pr-str sel)))))
 
 (defn put-sql-expression
   [param expr]
@@ -317,7 +317,7 @@
                 v2 (put-sql-expression param (third rands))
                 _ (print ")")]
             (concat v1 v2))
-        (assertion-violation 'put-sql-expression
+        (assertion-violation `put-sql-expression
                              (str "unhandled operator arity " (pr-str op)))))
     (sql/sql-expr-const? expr)
     (put-literal param (sql/sql-expr-const-type expr)
@@ -346,7 +346,7 @@
           v (put-sql-select param (sql/sql-expr-subquery-query expr))
           _ (print ")")]
       v)
-    :else (assertion-violation 'put-sql-expression (str "unhandled expression" (pr-str expr)))))
+    :else (assertion-violation `put-sql-expression (str "unhandled expression" (pr-str expr)))))
 
 (defn sql-expression->string
   [param expr]

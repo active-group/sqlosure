@@ -183,7 +183,7 @@
   (if (= (Math/abs (sql-operator-arity rator))
          (count rands))
     (really-make-sql-expr-app rator rands)
-    (assertion-violation 'make-sql-expr-app
+    (assertion-violation `make-sql-expr-app
                          "number of arguments does not match arity of"
                          rator)))
 

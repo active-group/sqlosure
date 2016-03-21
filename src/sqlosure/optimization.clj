@@ -94,7 +94,7 @@
                                  (worker live1 q1)
                                  (worker live1 q2)))))))]
     (if-not (r/query? q)
-      (c/assertion-violation 'remove-dead "unknown query" q)
+      (c/assertion-violation `remove-dead "unknown query" q)
       (worker (set (query->columns q)) q))))
 
 (defn merge-project
@@ -153,7 +153,7 @@
     (r/combine? q) (r/make-combine (r/combine-rel-op q)
                                    (merge-project (r/combine-query-1 q))
                                    (merge-project (r/combine-query-2 q)))
-    :else (c/assertion-violation 'merge-project "unknown query" q)))
+    :else (c/assertion-violation `merge-project "unknown query" q)))
 
 (defn push-restrict
   [q]
@@ -323,7 +323,7 @@
     (r/combine? q) (r/make-combine (r/combine-rel-op q)
                                    (push-restrict (r/combine-query-1 q))
                                    (push-restrict (r/combine-query-2 q)))
-    :else (c/assertion-violation 'push-restrict "unknown query" q)))
+    :else (c/assertion-violation `push-restrict "unknown query" q)))
 
 (defn optimize-query
   "Takes a query and performs some optimizations."

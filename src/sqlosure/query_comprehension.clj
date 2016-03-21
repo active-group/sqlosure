@@ -178,9 +178,9 @@ running the query monad."}
   [rel name]
   ;; check user args
   (when-not (relation? rel)
-    (assertion-violation '! (str "not a relation: " rel)))
+    (assertion-violation `! (str "not a relation: " rel)))
   (when-not (contains? (rel/rel-scheme-map (relation-scheme rel)) name)
-    (assertion-violation '! "unkown attribute" rel name))
+    (assertion-violation `! "unkown attribute" rel name))
   (rel/make-attribute-ref (fresh-name name (relation-alias rel))))
 
 ;; A map representing the empty state for building up the query.
