@@ -51,7 +51,7 @@
     [:id :int]
     [:first "VARCHAR(32)"]
     [:last "VARCHAR(32)"]
-    [:birthday "DATE"]
+    [:birthday "DATETIME"]
     [:sex :boolean])))
 
 (def person-table

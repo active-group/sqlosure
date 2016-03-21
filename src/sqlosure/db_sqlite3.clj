@@ -2,6 +2,7 @@
   (:require [sqlosure.db-connection :as db]
             [sqlosure.sql-put :as put]
             [sqlosure.sql :as sql]
+            [sqlosure.time :as time]
             [sqlosure.type :as t]
             [sqlosure.relational-algebra :as rel]
             [sqlosure.jdbc-utils :as jdbc-utils]
@@ -44,6 +45,8 @@
   [tt val]
   (cond
     (= tt t/boolean%) (not= val 0)
+    (= tt t/date%) (time/from-sql-time-string val)
+    (= tt t/timestamp%) (time/from-sql-timestamp-string val)
     :else val))
 
 (defn- value->sqlite3-value
@@ -52,6 +55,8 @@
   [tt val]
   (cond
     (= tt t/boolean%) (if val 1 0)
+    (= tt t/date%) (time/to-sql-time-string val)
+    (= tt t/timestamp%) (time/to-sql-time-string val)
     :else val))
 
 (defn- sqlite3-close

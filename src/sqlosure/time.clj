@@ -1,8 +1,9 @@
 (ns sqlosure.time
   (:require [sqlosure.type :refer [date? timestamp?]]
             [active.clojure.condition :refer [assertion-violation]])
-  (:import [java.time LocalDate LocalDateTime]
-           [java.sql Date Timestamp]))
+  (:import [java.time Instant LocalDate LocalDateTime ZoneId]
+           [java.sql Date Timestamp]
+           [java.text SimpleDateFormat]))
 
 (defn make-date
   "Wrapper around some common 'constructor' calls of LocalDate."
@@ -69,3 +70,32 @@
               (timestamp? v) (to-sql-timestamp v)
               :else v))]
     (map coerce vs)))
+
+
+;; NOTE: since sqlite3 does not support real dates, those must be represented as
+;; a string. Use these functions for coercion.
+(defn to-sql-time-string
+  "Takes a java.time.LocalDate(Time) and returns it's string representation."
+  [d]
+  (.toString d))
+
+(defn from-sql-time-string
+  "Takes the string representation of a date (yyyy-MM-dd) and returns a
+  `java.time.LocalDate` object."
+  [ts]
+  (as-> ts t
+       (.parse (SimpleDateFormat. "yyyy-MM-dd") t)
+       (.getTime t)
+       (Instant/ofEpochMilli t)
+       (LocalDateTime/ofInstant t (ZoneId/systemDefault))
+       (.toLocalDate t)))
+
+(defn from-sql-timestamp-string
+  "Takes the string representation of a date (yyyy-MM-dd'T'HH:mm:ss.SSS) and
+  returns a `java.time.LocalDateTime` object."
+  [tss]
+  (as-> tss t
+    (.parse (SimpleDateFormat. "yyyy-MM-dd'T'HH:mm:ss.SSS") t)
+    (.getTime t)
+    (Instant/ofEpochMilli t)
+    (LocalDateTime/ofInstant t (ZoneId/systemDefault))))
