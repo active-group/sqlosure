@@ -127,9 +127,87 @@
       (reset! current-person-id 0)
       res)))
 
+(defn jdbc-out
+  [db q]
+  (set (stringify-keys (jdbc/query db [q]))))
+
+(defn sqlosure-out
+  [db q]
+  (set (dbs/run-query db q)))
 
 ;; A set of example tests to illustrate one possible way to test with an
 ;; in-memory instance of sqlite3.
 (deftest simple-test
   (with-actor-db db-spec
     (fn [db]
+      (let [conn (sql/open-db-connection-sqlite3 db)]
+        (testing "order"
+          (is (= (jdbc-out db (str "SELECT title, release "
+                                   "FROM movie "
+                                   "ORDER BY release DESC"))
+                 (sqlosure-out conn (query [movie (<- movie-table)]
+                                           (order {(! movie "release") :descending})
+                                           (project {"title" (! movie "title")
+                                                     "release" (! movie "release")})))))
+          (is (= (jdbc-out db "SELECT release FROM movie ORDER BY release ASC")
+                 (sqlosure-out conn (query [movie (<- movie-table)]
+                                           (order {(! movie "release") :ascending})
+                                           (project {"release" (! movie "release")}))))))
+        (testing "top"
+          (let [row-fn (fn [row] (assoc row :good (= 1 (:good row))))]
+            ;; NOTE: sqlite3 represents booleans a 0 and 1 -> need to convert to boolean manually.
+            (is (= (set (stringify-keys (map row-fn
+                                         (jdbc/query db [(str "SELECT * FROM movie LIMIT 5")]))))
+                   (sqlosure-out conn (query [movie (<- movie-table)]
+                                             (top 5)
+                                             (return movie)))))
+            ;; TODO: This seems to work for now but we need to investigate wheter the same query against
+            ;; the same database state will always return the same order of elements.
+            (is (= (set (stringify-keys (map row-fn
+                                             (jdbc/query db [(str "SELECT * FROM movie LIMIT 5 OFFSET 2")]))))
+                   (sqlosure-out conn (query [movie (<- movie-table)]
+                                             (top 2 5)
+                                             (return movie)))))))
+        (testing "count(*)"
+          (is (= (jdbc-out db "SELECT count(*) AS count FROM movie")
+                 (sqlosure-out conn (query [movie (<- movie-table)]
+                                           (project {"count" $count*})))))
+          (is (= (jdbc-out db "SELECT count(*) AS count FROM movie, person")
+                 (sqlosure-out conn (query [movie (<- movie-table)
+                                            person (<- person-table)]
+                                           (project {"count" $count*})))))
+          (testing "with nested SELECTs"
+            (is (= (jdbc-out db "SELECT count(*) AS count FROM movie, (SELECT * FROM person WHERE id < 10)")
+                   (sqlosure-out conn (query [movie (<- movie-table)]
+                                             [person (<- (query [people (<- person-table)]
+                                                                (restrict ($< (! people "id") ($integer 10)))
+                                                                (return people)))]
+                                             (project {"count" $count*})))))))
+        (testing "group"
+          (testing "statement can be moved"
+            (let [qstring (str "SELECT p.id, count(m.id) AS movies "
+                               "FROM person AS p, movie AS m, actor_movie AS am "
+                               "WHERE am.movie_id = m.id AND p.id = am.actor_id "
+                               "GROUP BY p.id")]
+              (is (jdbc-out db qstring)
+                  (sqlosure-out conn (query [p  (<- person-table)
+                                             m  (<- movie-table)
+                                             am (<- actor-movie-table)]
+                                            (restrict ($and ($= (! am "movie_id")
+                                                                (! m "id"))
+                                                            ($= (! p "id")
+                                                                (! am "actor_id"))))
+                                            (group [p "id"])  ;; Note the order of the statements.
+                                            (project {"id" (! p "id")
+                                                      "movies" ($count (! m "id"))}))))
+              (is (jdbc-out db qstring)
+                  (sqlosure-out conn (query [p  (<- person-table)
+                                             m  (<- movie-table)
+                                             am (<- actor-movie-table)]
+                                            (group [p "id"])  ;; Note the order of the statements.
+                                            (restrict ($and ($= (! am "movie_id")
+                                                                (! m "id"))
+                                                            ($= (! p "id")
+                                                                (! am "actor_id"))))
+                                            (project {"id" (! p "id")
+                                                      "movies" ($count (! m "id"))})))))))))))
