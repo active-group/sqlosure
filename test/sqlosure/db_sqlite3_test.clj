@@ -49,12 +49,13 @@
     [:birthday "DATE"]
     [:sex :boolean])))
 
-(deftable person-table "person"
-  {"id" $integer-t
-   "first" $string-t
-   "last" $string-t
-   "birthday" $date-t
-   "sex" $boolean-t})
+(def person-table
+  (table "person"
+         {"id" $integer-t
+          "first" $string-t
+          "last" $string-t
+          "birthday" $date-t
+          "sex" $boolean-t}))
 
 (defn create-people
   [db]
@@ -76,11 +77,12 @@
                         [:release "DATE"]
                         [:good :boolean])))
 
-(deftable movie-table "movie"
-  {"id" $integer-t
-   "title" $string-t
-   "release" $date-t
-   "good" $boolean-t})
+(def movie-table
+  (table "movie"
+         {"id" $integer-t
+          "title" $string-t
+          "release" $date-t
+          "good" $boolean-t}))
 
 (defn create-movies
   [db]
@@ -99,9 +101,10 @@
                         [:actor_id :int]
                         [:movie_id :int])))
 
-(deftable actor-movie-table "actor_movie"
-  {"actor_id" $integer-t
-   "movie_id" $integer-t})
+(def actor-movie-table
+  (table "actor_movie"
+         {"actor_id" $integer-t
+          "movie_id" $integer-t}))
 
 (defn create-actors
   [db]
