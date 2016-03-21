@@ -127,25 +127,9 @@
       (reset! current-person-id 0)
       res)))
 
-(def actors-per-movie
-  (query [movie (<- movie-table)
-          actor (<- actor-movie-table)]
-         (restrict ($= (! movie "id")
-                       (! actor "movie_id")))
-         (group [movie "title"])
-         (project {"title" (! movie "title")
-                   "actors" ($count (! actor "actor_id"))})))
 
 ;; A set of example tests to illustrate one possible way to test with an
 ;; in-memory instance of sqlite3.
 (deftest simple-test
   (with-actor-db db-spec
     (fn [db]
-      (let [conn (sql/open-db-connection-sqlite3 db)
-            run #(dbs/run-query conn %)]
-        (is (= (set (stringify-keys
-                     (jdbc/query db [(str "SELECT m.title, count(a.actor_id) AS actors "
-                                          "FROM movie AS m, actor_movie AS a "
-                                          "WHERE a.movie_id = m.id "
-                                          "GROUP BY m.title")])))
-               (set (dbs/run-query conn actors-per-movie))))))))
