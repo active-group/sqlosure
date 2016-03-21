@@ -8,31 +8,38 @@
             [clojure.pprint :refer [pprint]]))
 
 (define-record-type relation
+  ^{:doc "`relation` is used as the state of the query monad. This is used to
+track the current state and later rebuild the resulting, correct references when
+running the query monad."}
   (make-relation alias scheme) relation?
-  [alias relation-alias
+  [^{:doc "The current alias."}
+   alias relation-alias
+   ^{:doc "The current relation-scheme."}
    scheme relation-scheme])
 
-(defn fresh-name
+(defn- fresh-name
   [name alias]
   (str name "_" alias))
 
-(defn set-alias!
+(defn- set-alias!
+  "Takes a new alias and puts it in the current state."
   [a]
   (put-state-component! ::alias a))
 
-(def current-alias
+(def ^{:private true} current-alias
   (get-state-component ::alias))
 
-(def new-alias
+(def ^{:private true} new-alias
   (monadic
    [a current-alias]
    (set-alias! (inc a))
    (return a)))
 
-(def current-query
+(def ^{:private true} current-query
   (get-state-component ::query))
 
-(defn set-query!
+(defn- set-query!
+  "Takes a query and puts it in the current state."
   [new]
   (put-state-component! ::query new))
 
@@ -55,7 +62,7 @@
   "Embed a RA query into the current query."
   [q]
   (add-to-product rel/make-product identity q))
- 
+
 (defn outer
   "Embed a RA query as an outer query into the current query."
   [q]
@@ -82,7 +89,13 @@
                     alist)))))))
 
 (defn project
-  "Project the some columns of the current query."
+  "Project some columns of the current query. Returns the resulting state.
+
+  Example: (monadic [t (<- embed t-table)]
+                    (project {\"foo\" (! t \"foo\")
+                              \"bar\" (! t \"bar\"))
+
+  The corresponding SQL statemant would be \"SELECT foo, bar FROM t\"."
   [alist]
   (project0 alist true))
 
@@ -108,14 +121,20 @@
 
   expr -> query(nil)
 
-  Note this doesn't return anything."
+  Note: this is a monadic action that doesn't return anything."
   [expr]
   (monadic
    [old current-query]
    (set-query! (rel/make-restrict-outer expr old))))
 
 (defn restricted
-  "Convenienc: Return a restricted version of a relation.
+  "Restrict the current query by a condition. Returns the resulting state.
+
+  Example: (monadic [t (<- embed t-table)]
+                    (restricted t ($<= (! t \"id\")
+                                       ($integer 1))
+
+  The corresponding SQL statement would be \"SELECT <all cols of t> FROM t WHERE id <= 1\"
 
   relation expr -> query(relation)."
   [rel expr]
@@ -153,6 +172,9 @@
                                old))))
 
 (defn !
+  "`!` selects an attribute from a relation.
+
+  Example: (! t \"id\") corresponds to SQL \"t.id\"."
   [rel name]
   ;; check user args
   (when-not (relation? rel)
@@ -162,19 +184,18 @@
   (rel/make-attribute-ref (fresh-name name (relation-alias rel))))
 
 ;; A map representing the empty state for building up the query.
-
-(defn make-state
+(defn- make-state
   [query alias]
   {:pre [(integer? alias)]}
   {::query query
    ::alias alias})
 
-(def the-empty-state (make-state rel/the-empty 0))
+(def ^{:private true} the-empty-state (make-state rel/the-empty 0))
 
-(def query-comprehension-monad-command-config
+(def ^{:private true} query-comprehension-monad-command-config
   (null-monad-command-config nil the-empty-state))
 
-(defn run-query-comprehension*
+(defn- run-query-comprehension*
   "Returns `[retval state]`."
   [prod state]
   (run-free-reader-state-exception
@@ -182,7 +203,7 @@
    prod
    state))
 
-(defn run-query-comprehension
+(defn- run-query-comprehension
   "Run the query comprehension against an empty state, and return the
   result. To actually create an executable query use [[build-query!]]
   or [[get-query]]."
@@ -190,12 +211,12 @@
   (let [[res state] (run-query-comprehension* prod nil)]
     res))
 
-(defn generate-query
+(defn- generate-query
   "Returns `[retval state]`."
   [prod state]
   (run-query-comprehension* prod state))
 
-(defn build-query+scheme!
+(defn- build-query+scheme!
   "Monadic command to create the final query from the given relation and the current monad
   state, and return it and the scheme. Also resets the state."
   [rel]
@@ -210,7 +231,7 @@
    (put-state! (merge state the-empty-state))
    (return [(rel/make-project alist query) scheme])))
 
-(defn build-query!
+(defn- build-query!
   "Monadic command to create the final query from the given relation and the current monad
   state, and return it and the scheme."
   [rel]
@@ -218,20 +239,20 @@
    [[query scheme] (build-query+scheme! rel)]
    (return query)))
 
-(defn get-query+scheme
+(defn- get-query+scheme
   [prod]
   (let [query+scheme (run-query-comprehension
                       (monadic
                        [rel prod]
                        (build-query+scheme! rel)))]
     query+scheme))
-   
+
 (defn get-query
   [prod]
   (let [[query _] (get-query+scheme prod)]
     query))
 
-(defn combination*
+(defn- combination*
   [op old-query rel1 q1 rel2 q2 compute-scheme alias]
   (let [a1 (relation-alias rel1)
         a2 (relation-alias rel2)
@@ -253,7 +274,7 @@
                                    old-query))
      (return (make-relation alias (compute-scheme scheme1 scheme2))))))
 
-(defn combination
+(defn- combination
   [rel-op compute-scheme prod1 prod2]
   (monadic
    [query0 current-query
@@ -265,7 +286,8 @@
                   compute-scheme
                   alias0)))
 
-(defn first-scheme
+(defn- first-scheme
+  "Takes two schemes and returns the first one."
   [s1 s2]
   s1)
 
@@ -289,12 +311,25 @@
   (combination :difference first-scheme prod1 prod2))
 
 (defn order
+  "`order` takes an alist of [[attribute-ref] :descending/:ascending] to order
+  the result by this attribute.
+
+  Example: (monadic [t (embed t-table)]
+                    (order {(! t \"foo\") :ascending})
+                    (project {\"foo\" (! t \"foo\")}))
+
+  The corresponding SQL statemant would be \"SELECT foo FROM t ORDER BY foo ASC\"."
   [alist]
   (monadic
    [old current-query]
    (set-query! (rel/make-order alist old))))
 
 (defn top
+  "`top` is used to define queries that return a cerain number of entries.
+  When called with one argument `n`, top constructs a query that only returns
+  the first `n` elements.
+  Whan called with two arguments `offset` and `n`, top constructs a query that
+  returns the first `n` elements with an offset of `offset`."
   ([n]
    (top nil n))
   ([offset n]
