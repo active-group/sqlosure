@@ -210,4 +210,25 @@
                                                             ($= (! p "id")
                                                                 (! am "actor_id"))))
                                             (project {"id" (! p "id")
-                                                      "movies" ($count (! m "id"))})))))))))))
+                                                      "movies" ($count (! m "id"))})))))
+            (testing "with grouping in nested table"
+              (is (= (jdbc-out db (str "SELECT p.first, p.last, m.count "
+                                       "FROM person AS p, (SELECT a.id, count(m.id) AS count "
+                                       "                   FROM person AS a, movie AS m, actor_movie AS am "
+                                       "                   WHERE a.id = am.actor_id AND m.id = am.movie_id "
+                                       "                   GROUP BY a.id) AS m "
+                                       "WHERE m.count >= 2 AND p.id = m.id"))
+                     (sqlosure-out conn (query [p (<- person-table)
+                                                m (<- (query [a  (<- person-table)
+                                                              m  (<- movie-table)
+                                                              am (<- actor-movie-table)]
+                                                             (restrict ($and ($= (! a "id") (! am "actor_id"))
+                                                                             ($= (! m "id") (! am "movie_id"))))
+                                                             (group [a "id"])
+                                                             (project {"id"    (! a "id")
+                                                                       "count" ($count (! m "id"))})))]
+                                               (restrict ($and ($>= (! m "count") ($integer 2))
+                                                               ($=  (! m "id") (! p "id"))))
+                                               (project {"first" (! p "first")
+                                                         "last"  (! p "last")
+                                                         "count" (! m "count")}))))))))))))
