@@ -38,6 +38,7 @@
 (def ! qc/!)
 (def restrict qc/restrict)
 (def restrict-outer qc/restrict-outer)
+(def restricted qc/restricted)
 (def group qc/group)
 (def project qc/project)
 (def order qc/order)
