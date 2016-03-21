@@ -43,7 +43,6 @@
   to the corresponding Clojure value."
   [tt val]
   (cond
-    (or (= tt t/string%) (= tt t/integer%) (= tt t/double%) (= tt t/blob%)) val
     (= tt t/boolean%) (not= val 0)
     :else val))
 
@@ -52,10 +51,8 @@
   sqlite3 value."
   [tt val]
   (cond
-    (or (= tt t/string%) (= tt t/integer%) (= tt t/double%) (= tt t/blob%)) val
     (= tt t/boolean%) (if val 1 0)
-    :else (throw (Exception.
-                  (str 'value->sqlite3-value ": unknown type " tt val)))))
+    :else val))
 
 (defn- sqlite3-close
   "Takes the sqlite3 connection and closes it."
