@@ -17,19 +17,26 @@
     (fn [db]
       (let [conn (sql/open-db-connection-sqlite3 db)]
         (testing "order"
-          (is (= (jdbc-out db (str "SELECT title, release "
-                                   "FROM movie "
-                                   "ORDER BY release DESC"))
-                 (sqlosure-out conn (query [movie (<- movie-table)]
-                                           (order {(! movie "release") :descending})
-                                           (project {"title" (! movie "title")
-                                                     "release" (! movie "release")})))))
-          (is (= (jdbc-out db "SELECT release FROM movie ORDER BY release ASC")
-                 (sqlosure-out conn (query [movie (<- movie-table)]
-                                           (order {(! movie "release") :ascending})
-                                           (project {"release" (! movie "release")}))))))
+          (let [row-fn (fn [row] (assoc row :release (time/from-sql-time-string (:release row))))]
+            (is (= (set (stringify-keys
+                         (map row-fn
+                              (jdbc/query db (str "SELECT title, release "
+                                                  "FROM movie "
+                                                  "ORDER BY release DESC")))))
+                   (sqlosure-out conn (query [movie (<- movie-table)]
+                                             (order {(! movie "release") :descending})
+                                             (project {"title" (! movie "title")
+                                                       "release" (! movie "release")})))))
+            (is (= (set (stringify-keys
+                         (map row-fn
+                              (jdbc/query db ["SELECT release FROM movie ORDER BY release ASC"]))))
+                   (sqlosure-out conn (query [movie (<- movie-table)]
+                                             (order {(! movie "release") :ascending})
+                                             (project {"release" (! movie "release")})))))))
         (testing "top"
-          (let [row-fn (fn [row] (assoc row :good (= 1 (:good row))))]
+          (let [row-fn (fn [row] (assoc row
+                                        :good (= 1 (:good row))
+                                        :release (time/from-sql-time-string (:release row))))]
             ;; NOTE: sqlite3 represents booleans a 0 and 1 -> need to convert to boolean manually.
             (is (= (set (stringify-keys (map row-fn
                                          (jdbc/query db [(str "SELECT * FROM movie LIMIT 5")]))))
