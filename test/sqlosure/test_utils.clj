@@ -16,6 +16,7 @@
   [db q]
   (set (dbs/run-query db q)))
 
+;; This is just kept here as a reminder.
 ;; http://blog.find-method.de/index.php?/archives/210-In-memory-database-fixtures-with-Clojure-and-sqlite.html
 ;; https://github.com/clojure/java.jdbc/blob/master/src/test/clojure/clojure/java/test_jdbc.clj
 
@@ -122,6 +123,10 @@
                    :movie_id (rand-int @current-movie-id)})))
 
 (defn with-actor-db
+  "`with-actor-db` takes a db-spec and a function which takes the 'conneted' db
+  as an argument. Use to run tests against an in-memory instance of sqlite3.
+  This function creates three tables: 'person', 'movie' and 'actor_movie' and
+  inserts some default records with random values and unique ids per table."
   [spec func]
   (jdbc/with-db-connection [db spec]
     (make-person-table db)
