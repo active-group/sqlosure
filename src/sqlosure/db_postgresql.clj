@@ -100,8 +100,7 @@ See also: [HaskellDB.SQl.PostgreSQL](https://hackage.haskell.org/package/haskell
   (db/make-db-connection "postgresql"  ;; type
                          db-name       ;; name
                          db-spec       ;; data
-                         
-                         db-name  ;; handle
+                         db-name       ;; handle
                          postgresql-sql-put-parameterization
                          nil
                          postgresql-query
