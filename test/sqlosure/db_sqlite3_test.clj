@@ -18,18 +18,15 @@
       (let [conn (sql/open-db-connection-sqlite3 db)]
         (testing "order"
           (let [row-fn (fn [row] (assoc row :release (time/from-sql-time-string (:release row))))]
-            (is (= (set (stringify-keys
-                         (map row-fn
-                              (jdbc/query db (str "SELECT title, release "
-                                                  "FROM movie "
-                                                  "ORDER BY release DESC")))))
+            (is (= (jdbc-out db [(str "SELECT title, release "
+                                       "FROM movie "
+                                       "ORDER BY release DESC")]
+                             row-fn)
                    (sqlosure-out conn (query [movie (<- movie-table)]
                                              (order {(! movie "release") :descending})
                                              (project {"title" (! movie "title")
                                                        "release" (! movie "release")})))))
-            (is (= (set (stringify-keys
-                         (map row-fn
-                              (jdbc/query db ["SELECT release FROM movie ORDER BY release ASC"]))))
+            (is (= (jdbc-out db ["SELECT release FROM movie ORDER BY release ASC"] row-fn)
                    (sqlosure-out conn (query [movie (<- movie-table)]
                                              (order {(! movie "release") :ascending})
                                              (project {"release" (! movie "release")})))))))
@@ -38,15 +35,13 @@
                                         :good (= 1 (:good row))
                                         :release (time/from-sql-time-string (:release row))))]
             ;; NOTE: sqlite3 represents booleans a 0 and 1 -> need to convert to boolean manually.
-            (is (= (set (stringify-keys (map row-fn
-                                         (jdbc/query db [(str "SELECT * FROM movie LIMIT 5")]))))
+            (is (= (jdbc-out db [(str "SELECT * FROM movie LIMIT 5")] row-fn)
                    (sqlosure-out conn (query [movie (<- movie-table)]
                                              (top 5)
                                              (return movie)))))
             ;; TODO: This seems to work for now but we need to investigate wheter the same query against
             ;; the same database state will always return the same order of elements.
-            (is (= (set (stringify-keys (map row-fn
-                                             (jdbc/query db [(str "SELECT * FROM movie LIMIT 5 OFFSET 2")]))))
+            (is (= (jdbc-out db [(str "SELECT * FROM movie LIMIT 5 OFFSET 2")] row-fn)
                    (sqlosure-out conn (query [movie (<- movie-table)]
                                              (top 2 5)
                                              (return movie)))))))

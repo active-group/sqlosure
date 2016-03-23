@@ -6,8 +6,11 @@
             [clojure.walk :refer [stringify-keys]]))
 
 (defn jdbc-out
-  [db q]
-  (set (stringify-keys (jdbc/query db [q]))))
+  [db q & row-fns]
+  (let [res-seq (jdbc/query db q)]
+    (if row-fns
+      (set (stringify-keys (map (apply comp row-fns) res-seq)))
+      (set (stringify-keys res-seq)))))
 
 (defn sqlosure-out
   [db q]
