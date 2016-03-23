@@ -32,6 +32,7 @@
 (defn insert!
   "Takes a database connection"
   [conn sql-table & args]
+  ;; FIXME: doesn't work as expected when called with explicit rel-scheme.
   (let [[scheme vals] (if (and (t/pair? args) (rel/rel-scheme? (first args)))
                         [(first args) (rest args)]
                         [(rel/query-scheme sql-table) args])]
