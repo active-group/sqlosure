@@ -1,11 +1,9 @@
 (ns sqlosure.jdbc-utils
   "Utilities for using clojure.java.jdbc as a backend."
-  (:require [sqlosure.relational-algebra :as rel]
-            [sqlosure.db-connection :as db]
-            [sqlosure.sql-put :as put]
-            [sqlosure.time :as time]
-            [active.clojure.condition :as c]
-            [clojure.java.jdbc :as jdbc]))
+  (:require [clojure.java.jdbc :as jdbc]
+            [sqlosure
+             [relational-algebra :as rel]
+             [sql-put :as put]]))
 
 (defn query-row-fn
   "Takes the types of a  relational scheme and a row returned by a query, then

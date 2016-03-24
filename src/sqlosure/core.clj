@@ -1,13 +1,31 @@
 (ns sqlosure.core
-  (:require [sqlosure.relational-algebra :as rel]
-            [sqlosure.sql :as sql]
-            [sqlosure.query-comprehension :as qc]
-            [sqlosure.sql-put :as put]
-            [sqlosure.relational-algebra-sql :as rsql]
-            [sqlosure.optimization :as opt]
-            [sqlosure.type :as t]
-            [active.clojure.monad :refer :all]
-            [active.clojure.condition :refer [assertion-violation]]))
+  (:require [active.clojure
+             [condition :refer [assertion-violation]]
+             [monad :refer :all]]
+            [sqlosure
+             [db-connection :as db]
+             [optimization :as opt]
+             [query-comprehension :as qc]
+             [relational-algebra :as rel]
+             [relational-algebra-sql :as rsql]
+             [sql :as sql]
+             [sql-put :as put]
+             [type :as t]]))
+
+(defn db-connect
+  "`db-connect` takes a connection map and returns a `db-connection`-record for
+  that backend. Dispatches on the `:classname` key in `db-spec`."
+  [db-spec]
+  (case (:classname db-spec)
+    "org.postgresql.Driver"
+    (db/make-db-connection db-spec
+                           db/postgresql-sql-put-parameterization
+                           db/postgresql-type-converter)
+    "org.sqlite.JDBC"
+    (db/make-db-connection db-spec
+                           db/sqlite3-sql-put-parameterization
+                           db/sqlite3-type-converter)
+    (assertion-violation `db-connect "unsupported db-spec" db-spec)))
 
 (defn table
   "`deftable` can be used to define tables for sqlosure. It will define a

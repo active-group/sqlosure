@@ -1,11 +1,14 @@
 (ns sqlosure.database
-  (:require [sqlosure.optimization :as o]
-            [sqlosure.db-connection :as c]
-            [sqlosure.db-sqlite3 :as sqlite]
-            [sqlosure.relational-algebra :as rel]
-            [sqlosure.relational-algebra-sql :as rsql]
-            [sqlosure.type :as t]
-            [sqlosure.sql :as sql]))
+  (:require [clojure.java.jdbc :as jdbc]
+            [sqlosure
+             [db-connection :as db]
+             [jdbc-utils :as jdbc-utils]
+             [optimization :as o]
+             [relational-algebra :as rel]
+             [relational-algebra-sql :as rsql]
+             [sql :as sql]
+             [sql-put :as put]
+             [type :as t]]))
 
 (defn run-query
   "Takes a database connection and a query and runs it against the database.
@@ -25,54 +28,61 @@
         qq (if (or (not (contains? opts-map :optimize?))
                    (:optimize? opts-map)) ;; optimize? on by default
              (o/optimize-query q)
-             q)]
-    (c/db-query conn (rsql/query->sql qq) (rel/query-scheme qq)
-                (dissoc opts-map :optimize?))))
+             q)
+        c (db/db-connection-type-converter conn)]
+    (jdbc-utils/query (db/db-connection-conn conn) (rsql/query->sql qq)
+                      (rel/query-scheme qq)
+                      (db/type-converter-db-value->value c)
+                      (db/type-converter-value->db-value c)
+                      (db/db-connection-paramaterization conn)
+                      (dissoc opts-map :optimize?))))
 
 (defn insert!
-  "Takes a database connection"
   [conn sql-table & args]
   ;; FIXME: doesn't work as expected when called with explicit rel-scheme.
   (let [[scheme vals] (if (and (t/pair? args) (rel/rel-scheme? (first args)))
                         [(first args) (rest args)]
-                        [(rel/query-scheme sql-table) args])]
-    (c/db-insert conn (sql/sql-table-name (rel/base-relation-handle sql-table))
-                 scheme
-                 vals)))
+                        [(rel/query-scheme sql-table) args])
+        c (db/db-connection-type-converter conn)]
+    (jdbc/insert!
+     (db/db-connection-conn conn)
+     (sql/sql-table-name (rel/base-relation-handle sql-table))
+     (into {}
+           (map (fn [[k t] v]
+                  [k ((db/type-converter-value->db-value c) t v)])
+                (rel/rel-scheme-map scheme)
+                vals)))))
 
 (defn delete!
   [conn sql-table criterion-proc]
   (let [name (sql/sql-table-name (rel/base-relation-handle sql-table))]
-    (c/db-delete
-     conn name
-     (rsql/expression->sql
-      (apply criterion-proc
-             (map rel/make-attribute-ref
-                  (rel/rel-scheme-columns (rel/query-scheme sql-table))))))))
+    (jdbc/delete! (db/db-connection-conn conn)
+                  name
+                  (put/sql-expression->string
+                   (db/db-connection-paramaterization conn)
+                   (apply criterion-proc
+                          (map rel/make-attribute-ref
+                               (rel/rel-scheme-columns (rel/query-scheme sql-table))))))))
 
 (defn update!
   [conn sql-table criterion-proc alist-first & args]
   (let [name (sql/sql-table-name (rel/base-relation-handle sql-table))
         scheme (rel/query-scheme sql-table)
         attr-exprs (map rel/make-attribute-ref
-                        (rel/rel-scheme-columns scheme))]
-    (c/db-update conn name scheme
-                 (rsql/expression->sql (apply criterion-proc attr-exprs))
-                 (into {}
-                       (map (fn [[k v]]
-                              [k (rsql/expression->sql v)])
-                            (if (fn? alist-first)
-                              (apply alist-first attr-exprs)
-                              (cons alist-first args)))))))
+                        (rel/rel-scheme-columns scheme))
+        alist (into {}
+                    (map (fn [[k v]]
+                           [k (rsql/expression->sql v)])
+                         (if (fn? alist-first)
+                           (apply alist-first attr-exprs)
+                           (cons alist-first args))))]
+    (jdbc/update! (db/db-connection-conn conn)
+                  name
+                  (into {} (map (fn [[k v]] [k (:val v)]) alist))
+                  (put/sql-expression->string
+                   (db/db-connection-paramaterization conn)
+                   (rsql/expression->sql (apply criterion-proc attr-exprs))))))
 
-(def close-database c/close-db-connection)
-(def run-sql c/db-run-sql)
-
-(defn call-with-database
-  [conn thunk]
-  (do
-    (when-not conn
-      (throw (Exception. (str 'call-with-database
-                              " re-entered call-with-database"))))
-    thunk
-    (close-database conn)))
+(defn run-sql
+  [conn sql]
+  (jdbc/execute! (db/db-connection-conn conn) sql))

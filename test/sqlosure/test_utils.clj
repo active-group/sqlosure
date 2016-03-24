@@ -1,9 +1,10 @@
 (ns sqlosure.test-utils
-  (:require [sqlosure.core :refer :all]
-            [sqlosure.time :as time]
-            [sqlosure.database :as dbs]
-            [clojure.java.jdbc :as jdbc]
-            [clojure.walk :refer [stringify-keys]]))
+  (:require [clojure.java.jdbc :as jdbc]
+            [clojure.walk :refer [stringify-keys]]
+            [sqlosure
+             [core :refer :all]
+             [database :as dbs]
+             [time :as time]]))
 
 (defn jdbc-out
   [db q & row-fns]
