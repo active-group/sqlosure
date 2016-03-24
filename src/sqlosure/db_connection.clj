@@ -43,10 +43,11 @@
        t/timestamp% (time/from-sql-timestamp value)
        value))))
 
-(define-record-type db-connection
+(define-record-type
   ^{:doc "`db-connection` serves as a container for storing the current
           db-connection as well as backend specific conversion and printer
           functions."}
+  db-connection
   (make-db-connection conn parameterization type-converter) db-connection?
   [^{:doc "The database connection map as used by jdbc."}
    conn db-connection-conn
