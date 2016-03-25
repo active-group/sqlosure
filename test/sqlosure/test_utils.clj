@@ -3,7 +3,7 @@
             [clojure.walk :refer [stringify-keys]]
             [sqlosure
              [core :refer :all]
-             [database :as dbs]
+             [db-connection :as dbs]
              [time :as time]]))
 
 (defn jdbc-out

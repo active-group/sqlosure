@@ -1,9 +1,9 @@
-(ns sqlosure.database-test
+(ns sqlosure.db-connection-test
   (:require [active.clojure.monad :refer [return]]
             [clojure.test :refer [deftest is testing]]
             [sqlosure
              [core :refer :all]
-             [database :as db]
+             [db-connection :as db]
              [test-utils :refer [actor-movie-table db-spec jdbc-out movie-table person-table sqlosure-out with-actor-db]]
              [time :as time]]))
 
