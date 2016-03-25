@@ -23,12 +23,8 @@
       function must realize the sequence, as the connection to the database may be closed after
       run-query returns.
     "
-  [conn q & opts]
-  (let [opts-map (apply hash-map opts)
-        qq (if (or (not (contains? opts-map :optimize?))
-                   (:optimize? opts-map)) ;; optimize? on by default
-             (o/optimize-query q)
-             q)
+  [conn q & {:keys [optimize?] :or {optimize? true} :as opts-map}]
+  (let [qq (if optimize? (o/optimize-query q) q)
         c (db/db-connection-type-converter conn)]
     (jdbc-utils/query (db/db-connection-conn conn) (rsql/query->sql qq)
                       (rel/query-scheme qq)
