@@ -1,25 +1,38 @@
 (ns sqlosure.db-connection-test
   (:require [active.clojure.monad :refer [return]]
+            [clojure.java.jdbc :as jdbc]
             [clojure.test :refer [deftest is testing]]
             [sqlosure
              [core :refer :all]
              [db-connection :as db]
+             [relational-algebra :as rel]
              [test-utils :refer [actor-movie-table db-spec jdbc-out movie-table person-table sqlosure-out with-actor-db]]
              [time :as time]]))
 
 (deftest insert!-test
-  (testing "without explicit rel-scheme"
-    (with-actor-db db-spec
-      (fn [db]
-        (let [conn (db-connect db)]
-          (let [axel {"id" -1 "first" "Axel" "last" "Hacke" "birthday" (time/make-date 1956 1 20) "sex" false}
-                get-1 (query [person (<- person-table)]
-                             (restrict ($= (! person "id") ($integer -1)))
-                             (return person))]
-            (do
-              (is (empty? (db/run-query conn get-1)))
-              (apply db/insert! conn person-table (vals axel))
-              (is (= #{axel} (set (db/run-query conn get-1)))))))))))
+  (with-actor-db db-spec
+    (fn [db]
+      (let [conn (db-connect db)
+            axel {"id" -1 "first" "Axel" "last" "Hacke" "birthday" (time/make-date 1956 1 20) "sex" false}
+            get-1 (query [person (<- person-table)]
+                         (restrict ($= (! person "id") ($integer -1)))
+                         (return person))]
+        (testing "without explicit rel-scheme"
+          (do
+            (is (empty? (db/run-query conn get-1)))
+            (apply db/insert! conn person-table (vals axel))
+            (is (= #{axel} (set (db/run-query conn get-1))))
+            ;; Remove the record for the next test.
+            ))
+        (testing "with explicit rel-scheme"
+          (do
+            ;; Clean the last insert
+            (jdbc/delete! db "person" ["id = ?" -1])
+            (is (empty? (db/run-query conn get-1)))
+            (apply db/insert! conn person-table
+                   (rel/base-relation-scheme person-table)
+                   (vals axel))
+            (is (= #{axel} (set (db/run-query conn get-1))))))))))
 
 ;; A set of example tests to illustrate one possible way to test with an
 ;; in-memory instance of sqlite3.

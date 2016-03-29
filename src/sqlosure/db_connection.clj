@@ -115,9 +115,8 @@
 
 (defn insert!
   [conn sql-table & args]
-  ;; FIXME: doesn't work as expected when called with explicit rel-scheme.
-  (let [[scheme vals] (if (and (t/pair? args) (rel/rel-scheme? (first args)))
-                        [(first args) (rest args)]
+  (let [[scheme vals] (if (and (seq args) (rel/rel-scheme? (first args)))
+                        (do (println "is rel-scheme") [(first args) (rest args)])
                         [(rel/query-scheme sql-table) args])
         c (db-connection-type-converter conn)]
     (jdbc/insert!
