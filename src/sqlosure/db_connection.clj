@@ -1,6 +1,9 @@
 (ns sqlosure.db-connection
-  (:require [active.clojure.record :refer [define-record-type]]
+  (:require [active.clojure
+             [condition :as c]
+             [record :refer [define-record-type]]]
             [clojure.java.jdbc :as jdbc]
+            [clojure.set :as set]
             [sqlosure
              [jdbc-utils :as jdbc-utils]
              [optimization :as o]
@@ -113,20 +116,64 @@
                       (db-connection-paramaterization conn)
                       (dissoc opts-map :optimize?))))
 
+(defn- validate-scheme
+  "`validate-scheme` takes two rel-schemes and checks if they obey the following
+  rules:
+      - `scheme` must not contain keys not present in `full-scheme`
+      - `scheme` must contain all non-nullable fields present in `full-scheme`
+      - `scheme`'s vals for each key must not differ in type from those in
+        `full-scheme`"
+  [full-scheme scheme]
+  (letfn [(no-extra-keys [ks1 ks2]
+            (empty? (set/difference (set ks2) (set ks1))))
+          (no-type-difference [m1 m2]
+            (reduce
+             (fn [acc [k v]] (and acc (= v (get m1 k)))) true m2))
+          (no-missing-non-nullable-types [m1 m2]
+            (reduce
+             (fn [acc [k v]]
+               (if (not (t/-nullable? v))
+                 (and acc (get m2 k))
+                 acc)) true m1))]
+    (let [[full-columns columns] [(rel/rel-scheme-columns full-scheme)
+                                  (rel/rel-scheme-columns scheme)]
+          [full-m m] [(rel/rel-scheme-map full-scheme) (rel/rel-scheme-map scheme)]
+          extra (no-extra-keys full-columns columns)
+          missing (no-missing-non-nullable-types full-m m)
+          type-diff (no-type-difference full-m m)]
+      (cond
+        (not extra)
+        (c/assertion-violation
+         `validate-scheme
+         "scheme contains extra keys not present in relation"
+         (clojure.data/diff full-columns columns))
+        (not missing)
+        (c/assertion-violation
+         `validate-scheme
+         "scheme is missing non-nullable keys"
+         (clojure.data/diff full-m m))
+        (not type-diff)
+        (c/assertion-violation
+         `validate-scheme
+         "scheme contains values that do not match types with relation"
+         (clojure.data/diff full-m m))
+        :else true))))
 (defn insert!
   [conn sql-table & args]
   (let [[scheme vals] (if (and (seq args) (rel/rel-scheme? (first args)))
-                        (do (println "is rel-scheme") [(first args) (rest args)])
+                        [(first args) (rest args)]
                         [(rel/query-scheme sql-table) args])
         c (db-connection-type-converter conn)]
-    (jdbc/insert!
-     (db-connection-conn conn)
-     (sql/sql-table-name (rel/base-relation-handle sql-table))
-     (into {}
-           (map (fn [[k t] v]
-                  [k ((type-converter-value->db-value c) t v)])
-                (rel/rel-scheme-map scheme)
-                vals)))))
+    (when (validate-scheme (rel/base-relation-scheme sql-table)
+                           scheme)
+      (jdbc/insert!
+       (db-connection-conn conn)
+       (sql/sql-table-name (rel/base-relation-handle sql-table))
+       (into {}
+             (map (fn [[k t] v]
+                    [k ((type-converter-value->db-value c) t v)])
+                  (rel/rel-scheme-map scheme)
+                  vals))))))
 
 (defn delete!
   [conn sql-table criterion-proc]

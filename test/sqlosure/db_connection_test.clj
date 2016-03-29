@@ -16,7 +16,8 @@
             axel {"id" -1 "first" "Axel" "last" "Hacke" "birthday" (time/make-date 1956 1 20) "sex" false}
             get-1 (query [person (<- person-table)]
                          (restrict ($= (! person "id") ($integer -1)))
-                         (return person))]
+                         (return person))
+            delete-1 #(jdbc/delete! db "person" ["id = ?" -1])]
         (testing "without explicit rel-scheme"
           (do
             (is (empty? (db/run-query conn get-1)))
@@ -27,12 +28,22 @@
         (testing "with explicit rel-scheme"
           (do
             ;; Clean the last insert
-            (jdbc/delete! db "person" ["id = ?" -1])
+            (delete-1)
             (is (empty? (db/run-query conn get-1)))
             (apply db/insert! conn person-table
                    (rel/base-relation-scheme person-table)
                    (vals axel))
-            (is (= #{axel} (set (db/run-query conn get-1))))))))))
+            (is (= #{axel} (set (db/run-query conn get-1)))))
+          (testing "should fail with underspecified rel-scheme"
+            ;; Clean the last insert
+            (delete-1)
+            (is (thrown?
+                 Exception
+                 (db/insert! conn person-table
+                             ;; Note missing keys which should cause this query to fail.
+                             (rel/alist->rel-scheme {"id" $integer
+                                                     "first" $string})
+                             -1 "Cormac")))))))))
 
 ;; A set of example tests to illustrate one possible way to test with an
 ;; in-memory instance of sqlite3.
