@@ -158,7 +158,25 @@
          "scheme contains values that do not match types with relation"
          (clojure.data/diff full-m m))
         :else true))))
+
 (defn insert!
+  "`insert!` takes a db-connection and an sql-table and some rest `args` and
+  attempts to insert them into the connected databases table.
+  The table to insert into is the `relational-algebra/base-relation-handle` of
+  `sql-table`.
+
+  `args` can either be:
+      - a set of values to insert if there is a value for each column. Those
+        must be in the order of the columns in the table.
+      - a rel-scheme, specifying the columns to insert the values into follwed
+        by the desired values.
+
+  If the rel-scheme of the value to insert is explicitly specified it will be
+  checked for:
+      - missing mandatory keys (non-nullable fields)
+      - keys that are not present in the original scheme
+      - type mismatches
+  If this fails, an assertion will be thrown."
   [conn sql-table & args]
   (let [[scheme vals] (if (and (seq args) (rel/rel-scheme? (first args)))
                         [(first args) (rest args)]
