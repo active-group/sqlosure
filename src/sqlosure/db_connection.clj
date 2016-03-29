@@ -195,14 +195,25 @@
 
 (defn delete!
   [conn sql-table criterion-proc]
-  (let [name (sql/sql-table-name (rel/base-relation-handle sql-table))]
+  (let [name (sql/sql-table-name (rel/base-relation-handle sql-table))
+        cols (rel/rel-scheme-columns (rel/base-relation-scheme sql-table))
+        [crit-s & crit-vals]
+        (put/sql-expression->string
+         (db-connection-paramaterization conn)
+         (rsql/expression->sql
+          (apply criterion-proc
+                 (map rel/make-attribute-ref
+                      (rel/rel-scheme-columns
+                       (rel/base-relation-scheme sql-table))))))
+        mapped-vals
+        (mapv
+         (fn [[t v]]
+           ((type-converter-value->db-value (db-connection-type-converter conn))
+            t v))
+         crit-vals)]
     (jdbc/delete! (db-connection-conn conn)
                   name
-                  (put/sql-expression->string
-                   (db-connection-paramaterization conn)
-                   (apply criterion-proc
-                          (map rel/make-attribute-ref
-                               (rel/rel-scheme-columns (rel/query-scheme sql-table))))))))
+                  (cons crit-s mapped-vals))))
 
 (defn update!
   [conn sql-table criterion-proc alist-first & args]

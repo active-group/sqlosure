@@ -45,6 +45,39 @@
                                                      "first" $string})
                              -1 "Cormac")))))))))
 
+(deftest delete!-test
+  (with-actor-db db-spec
+    (fn [db]
+      (let [conn (db-connect db)]
+        (testing "deletion of one record"
+          (let [r (first (db/run-query conn (query [p (<- person-table)]
+                                                   (return p))))]
+            (do
+              (is r)  ;; We have on record now.
+              (is (= r (first (db/run-query conn (query [p (<- person-table)]
+                                                        (return p))))))
+              (db/delete! conn person-table
+                          (fn [id _ _ _ _]
+                            ($= id ($integer 1)))))))
+        (testing "deletion of a set of records"
+          ;; Insert a few records we know the id's of.
+          (doseq [i (range -5 0)]
+            (db/insert! conn person-table
+                        i "some" "name" (time/make-date 1989 10 31) false))
+          (let [q (query [p (<- person-table)]
+                         (restrict ($and
+                                    ($>= (! p "id")
+                                         ($integer -5))
+                                    ($<= (! p "id")
+                                         ($integer 0))))
+                         (return p))]
+            (is (= 5 (count (db/run-query conn q))))
+            (db/delete! conn person-table
+                        (fn [id _ _ _ _]
+                          ($and ($>= id ($integer -5))
+                                ($<= id ($integer 0)))))
+            (is (empty? (db/run-query conn q)))))))))
+
 ;; A set of example tests to illustrate one possible way to test with an
 ;; in-memory instance of sqlite3.
 (deftest simple-test
