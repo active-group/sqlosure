@@ -18,7 +18,8 @@
   (-numeric? [this] "Is this type numeric?")
   (-ordered? [this] "Is this type ordered?")
   (-const->datum [this val] "Convert value to datum.")
-  (-datum->const [this datum] "Convert datum to value."))
+  (-datum->const [this datum] "Convert datum to value.")
+  (-method-map-atom [this] "Get us an an atom pointing to a map of type-specific methods."))
 
 (defn nullable-type?
   "Is type nullable?"
@@ -31,10 +32,21 @@
   [t]
   (-name t))
 
+(defn define-type-method
+  [ty name fun]
+  (swap! (-method-map-atom ty)
+         assoc name fun))
+
+(defn type-method
+  [ty name]
+  (get @(-method-map-atom ty) name))
+
 (declare make-atomic-type)
 
 (define-record-type atomic-type
-  (make-atomic-type name nullable? numeric? ordered? predicate const->datum-fn datum->const-fn)
+  (make-atomic-type name nullable? numeric? ordered? predicate
+                    const->datum-fn datum->const-fn
+                    method-map-atom)
   atomic-type?
   [name atomic-type-name
    nullable? atomic-type-nullable?
@@ -42,17 +54,23 @@
    ordered? atomic-type-ordered?
    predicate atomic-type-predicate
    const->datum-fn atomic-type-const->datum-fn
-   datum->const-fn atomic-type-datum->const-fn]
+   datum->const-fn atomic-type-datum->const-fn
+   method-map-atom atomic-type-method-map-atom]
   base-type-protocol
   (-name [_] name)
   (-contains? [_ val] (predicate val))
   (-nullable? [_] nullable?)
-  (-nullable [_] (make-atomic-type name true numeric? ordered? predicate const->datum-fn datum->const-fn))
-  (-non-nullable [_] (make-atomic-type name false numeric? ordered? predicate const->datum-fn datum->const-fn))
+  (-nullable [_] (make-atomic-type name true numeric? ordered? predicate
+                                   const->datum-fn datum->const-fn
+                                   method-map-atom))
+  (-non-nullable [_] (make-atomic-type name false numeric? ordered? predicate
+                                       const->datum-fn datum->const-fn
+                                       method-map-atom))
   (-numeric? [_] numeric?)
   (-ordered? [_] ordered?)
   (-const->datum [_ val] (const->datum-fn val))
-  (-datum->const [_ datum] (datum->const-fn datum)))
+  (-datum->const [_ datum] (datum->const-fn datum))
+  (-method-map-atom [_] method-map-atom))
 
 (defmethod print-method atomic-type [r, ^Writer w]
   (.write w "#")
@@ -78,12 +96,15 @@
   (let [t (make-atomic-type name false
                             (boolean numeric?) (boolean ordered?)
                             predicate
-                            const->datum-proc datum->const-proc)]
+                            const->datum-proc datum->const-proc
+                            (atom {}))]
     (when universe
       (register-type! universe name t))
     t))
 
 (declare really-make-bounded-string-type)
+
+(def ^:private bounded-string-type-method-map-atom (atom {}))
 
 (define-record-type bounded-string-type
   (really-make-bounded-string-type max-size nullable?) bounded-string-type?
@@ -98,7 +119,8 @@
   (-numeric? [_] false)
   (-ordered? [_] true)
   (-const->datum [_ val] val)
-  (-datum->const [_ datum] datum))
+  (-datum->const [_ datum] datum)
+  (-method-map-atom [_] bounded-string-type-method-map-atom))
 
 (defn make-bounded-string-type
   "Create string type with given maximum number of chars."

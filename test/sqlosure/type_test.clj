@@ -199,3 +199,10 @@
     (is (thrown? Exception (datum->const my-product% 42)))
     (is (thrown? Exception (datum->const my-set% 42)))
     (is (thrown? Exception (datum->const String "foobar")))))
+
+(deftest type-method-test
+  (let [ty (make-base-type 'string string? identity identity
+                           :ordered? true)]
+    (define-type-method ty ::foo (fn [x] (+ x 1)))
+    (is (= 2 ((type-method ty ::foo) 1)))
+    (is (= 2 ((type-method (make-nullable-type ty) ::foo) 1)))))
