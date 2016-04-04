@@ -94,27 +94,23 @@
   (put/make-sql-put-parameterization put/put-dummy-alias put/default-put-combine put/default-put-literal))
 
 (defn run-query
-  "Takes a database connection and a query and runs it against the database.
-  The optional keyword arguments specify how to
-  construct the result set:
-    :as-arrays? - return each row as a vector of the field values, default false, in which
-      a row is represented as a hash-map of the columns of the query scheme to the corresponding
-      field values.
-    :row-fn - applied to each row (vector or map) as the result set is constructed, defaults
-      to identity.
-    :result-set-fn - applied to a lazy sequence of all rows, defaults doall. Note that the
-      function must realize the sequence, as the connection to the database may be closed after
-      run-query returns.
-    "
+  "Takes a database connection and a query and runs it against the database."
   [conn q & {:keys [optimize?] :or {optimize? true} :as opts-map}]
   (let [qq (if optimize? (o/optimize-query q) q)
-        c (db-connection-type-converter conn)]
-    (jdbc-utils/query (db-connection-conn conn) (rsql/query->sql qq)
-                      (rel/query-scheme qq)
-                      (type-converter-db-value->value c)
-                      (type-converter-value->db-value c)
-                      (db-connection-paramaterization conn)
-                      (dissoc opts-map :optimize?))))
+        c (db-connection-type-converter conn)
+        from-db-value (type-converter-db-value->value c)
+        to-db-value (type-converter-value->db-value c)
+        scheme (rel/query-scheme qq)
+        col-types (rel/rel-scheme-types scheme)
+        asql (rsql/query->sql qq)
+        [sql & param-types+args] (put/sql-select->string (db-connection-paramaterization conn) asql)
+        rows (apply jdbc-utils/query
+                    (db-connection-conn conn)
+                    sql
+                    (map (fn [[t v]] (to-db-value t v)) param-types+args)
+                    (dissoc opts-map :optimize?))]
+    (map (fn [row] (mapv from-db-value col-types row))
+         rows)))
 
 (defn- validate-scheme
   "`validate-scheme` takes two rel-schemes and checks if they obey the following

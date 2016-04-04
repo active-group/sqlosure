@@ -1,50 +1,46 @@
 (ns sqlosure.jdbc-utils
   "Utilities for using clojure.java.jdbc as a backend."
+  (:import [java.sql PreparedStatement ResultSet])
   (:require [clojure.java.jdbc :as jdbc]
             [sqlosure
              [relational-algebra :as rel]
              [sql-put :as put]]))
 
-(defn query-row-fn
-  "Takes the types of a  relational scheme and a row returned by a query, then
-  returns a vector of values converted by convert-base-value, in the
-  order defined by the given scheme."
-  [convert-base-value types row]
-  ;; Note: not much more than 'map' currently
-  (let [ ;; vals are/must be in the order of the scheme
-        conv-vals (mapv convert-base-value ;; assert (base-type? tt) ?
-                        types
-                        row)]
-    (assert (= (count types) (count row)))
-    conv-vals))
+(defn result-set-seq
+  "Creates and returns a lazy sequence of maps corresponding to the rows in the
+   java.sql.ResultSet rs."
+  [^ResultSet rs]
+  (let [rsmeta (.getMetaData rs)
+        idxs (range 1 (inc (.getColumnCount rsmeta)))
+        row-values (fn [] (map (fn [^Integer i] (jdbc/result-set-read-column (.getObject rs i) rsmeta i)) idxs)) ;; FIXME, inline
+        rows ((fn thisfn []
+                (if (.next rs)
+                  (cons (vec (row-values))
+                        (lazy-seq (thisfn)))
+                  (.close rs))))]
+    rows))
 
-(defn result-set-fn
-  [as-arrays? row-fn result-set-fn scheme-cols results]
-  ;; Note: cols is mangeled by jdbc (lowercase symbols, made unique with a suffix)
-  (let [[cols & rows] results
-        rows (if as-arrays?
-               ;; the cols are not needed, as the row always complies to
-               ;; the rel-scheme used (no 'select *')
-               rows
-               ;; Use the cols from the scheme; it cannot contain duplicates for example; but
-               ;; it will be strings (other than jdbc)
-               (map #(zipmap scheme-cols %) rows))]
-    ((or result-set-fn doall)
-     (if row-fn (map row-fn rows) rows))))
+(defn- set-parameters
+  "Add the parameters to the given statement."
+  [stmt params]
+  (dorun (map-indexed (fn [ix value]
+                        (jdbc/set-parameter value stmt (inc ix))) ;; FIXME: type-specific
+                      params)))
 
-(defn- put-select [parameterization select]
-  (put/sql-select->string parameterization select))
+;; top-level API for actual SQL operations
 
 (defn query
-  "Takes a jdbc db-spec a sql-select statement and a relational scheme
-  and runs the query against the database, applying
-  `from-db-value` to the selected values, and `to-db-value` to the parameters."
-  [db-spec select scheme from-db-value to-db-value parameterization opts]
-  (let [[select-query & select-types+args] (put-select parameterization select)]
-    (jdbc/query db-spec
-                (cons select-query (map (fn [[t v]] (to-db-value t v)) select-types+args))
-                :result-set-fn #(result-set-fn (:as-arrays? opts) (:row-fn opts)
-                                               (:result-set-fn opts)
-                                               (rel/rel-scheme-columns scheme) %)
-                :as-arrays? true
-                :row-fn #(query-row-fn from-db-value (rel/rel-scheme-types scheme) %))))
+  "Given a database connection and a vector containing SQL and optional parameters,
+  perform a simple database query."
+  [db sql params & prepare-options]
+  (let [run-query-with-params
+        (^{:once true} fn* [con]
+         (let [^PreparedStatement stmt (apply jdbc/prepare-statement con sql prepare-options)]
+           (set-parameters stmt params)
+           (.closeOnCompletion stmt)
+           (result-set-seq (.executeQuery stmt))))]
+    (if-let [con (jdbc/db-find-connection db)]
+      (run-query-with-params con)
+      (with-open [con (jdbc/get-connection db)]
+        (doall ; sorry
+         (run-query-with-params con))))))
