@@ -123,10 +123,11 @@
 
 (defn- set-parameters
   "Add the parameters to the given statement."
-  [stmt param-types+args]
+  [stmt param-types+args to-db-value]
   ;; FIXME: don't do map
   (dorun (map-indexed (fn [ix [ty val]]
-                        (t/invoke-type-method ty set-parameter-method stmt (inc ix) val))
+                        (t/invoke-type-method ty set-parameter-method stmt (inc ix)
+                                              (to-db-value ty val)))
                       param-types+args)))
 
 (defn run-query
@@ -141,12 +142,11 @@
         asql (rsql/query->sql qq)
         [sql & param-types+args] (put/sql-select->string (db-connection-paramaterization conn) asql)
         db (db-connection-conn conn)
-        params (map (fn [[t v]] (to-db-value t v)) param-types+args)
         run-query-with-params
         (^{:once true} fn* [con]
          (let [^PreparedStatement stmt
                (apply jdbc/prepare-statement con sql (dissoc opts-map :optimize?))]
-           (set-parameters stmt param-types+args)
+           (set-parameters stmt param-types+args to-db-value)
            (.closeOnCompletion stmt)
            (result-set-seq (.executeQuery stmt) col-types from-db-value)))]
     (if-let [con (jdbc/db-find-connection db)]
