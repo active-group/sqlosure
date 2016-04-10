@@ -101,11 +101,13 @@
 (defn result-set-seq
   "Creates and returns a lazy sequence of maps corresponding to the rows in the
    java.sql.ResultSet rs."
-  [^ResultSet rs col-types]
+  [^ResultSet rs col-types from-db-value]
   (let [row-values (fn []
                      ;; should cache the method implementations
                      (map-indexed (fn [^Integer i ty]
-                                    (t/invoke-type-method ty get-from-result-set-method rs (inc i)))
+                                    (from-db-value
+                                     ty
+                                     (t/invoke-type-method ty get-from-result-set-method rs (inc i))))
                                   col-types))
         rows ((fn thisfn []
                 (if (.next rs)
@@ -146,16 +148,14 @@
                (apply jdbc/prepare-statement con sql (dissoc opts-map :optimize?))]
            (set-parameters stmt param-types+args)
            (.closeOnCompletion stmt)
-           (result-set-seq (.executeQuery stmt) col-types)))
-        rows (if-let [con (jdbc/db-find-connection db)]
-               (run-query-with-params con)
-               (with-open [con (jdbc/get-connection db)]
-                 (doall ; sorry
-                  (run-query-with-params con))))]
-    (map (fn [row] (mapv from-db-value col-types row))
-         rows)))
+           (result-set-seq (.executeQuery stmt) col-types from-db-value)))]
+    (if-let [con (jdbc/db-find-connection db)]
+      (run-query-with-params con)
+      (with-open [con (jdbc/get-connection db)]
+        (doall ; sorry
+         (run-query-with-params con))))))
 
-(defn- validate-scheme
+  (defn- validate-scheme
   "`validate-scheme` takes two rel-schemes and checks if they obey the following
   rules:
       - `scheme` must not contain keys not present in `full-scheme`
