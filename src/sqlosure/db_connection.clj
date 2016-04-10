@@ -96,10 +96,12 @@
 (defn result-set-seq
   "Creates and returns a lazy sequence of maps corresponding to the rows in the
    java.sql.ResultSet rs."
-  [^ResultSet rs]
-  (let [rsmeta (.getMetaData rs)
-        idxs (range 1 (inc (.getColumnCount rsmeta)))
-        row-values (fn [] (map (fn [^Integer i] (jdbc/result-set-read-column (.getObject rs i) rsmeta i)) idxs)) ;; FIXME, inline
+  [^ResultSet rs col-types]
+  (let [idxs (range 1 (inc (count col-types)))
+        row-values (fn []
+                     (map (fn [^Integer i]
+                            (.getObject rs i))
+                          idxs)) ;; FIXME, inline
         rows ((fn thisfn []
                 (if (.next rs)
                   (cons (vec (row-values))
@@ -114,22 +116,6 @@
                         (.setObject stmt (inc ix) (jdbc/sql-value value))) ;; FIXME: type-specific
                       params)))
 
-(defn query
-  "Given a database connection and a vector containing SQL and optional parameters,
-  perform a simple database query."
-  [db sql params & prepare-options]
-  (let [run-query-with-params
-        (^{:once true} fn* [con]
-         (let [^PreparedStatement stmt (apply jdbc/prepare-statement con sql prepare-options)]
-           (set-parameters stmt params)
-           (.closeOnCompletion stmt)
-           (result-set-seq (.executeQuery stmt))))]
-    (if-let [con (jdbc/db-find-connection db)]
-      (run-query-with-params con)
-      (with-open [con (jdbc/get-connection db)]
-        (doall ; sorry
-         (run-query-with-params con))))))
-
 (defn run-query
   "Takes a database connection and a query and runs it against the database."
   [conn q & {:keys [optimize?] :or {optimize? true} :as opts-map}]
@@ -141,11 +127,20 @@
         col-types (rel/rel-scheme-types scheme)
         asql (rsql/query->sql qq)
         [sql & param-types+args] (put/sql-select->string (db-connection-paramaterization conn) asql)
-        rows (apply query
-                    (db-connection-conn conn)
-                    sql
-                    (map (fn [[t v]] (to-db-value t v)) param-types+args)
-                    (dissoc opts-map :optimize?))]
+        db (db-connection-conn conn)
+        params (map (fn [[t v]] (to-db-value t v)) param-types+args)
+        run-query-with-params
+        (^{:once true} fn* [con]
+         (let [^PreparedStatement stmt
+               (apply jdbc/prepare-statement con sql (dissoc opts-map :optimize?))]
+           (set-parameters stmt params)
+           (.closeOnCompletion stmt)
+           (result-set-seq (.executeQuery stmt) col-types)))
+        rows (if-let [con (jdbc/db-find-connection db)]
+               (run-query-with-params con)
+               (with-open [con (jdbc/get-connection db)]
+                 (doall ; sorry
+                  (run-query-with-params con))))]
     (map (fn [row] (mapv from-db-value col-types row))
          rows)))
 
