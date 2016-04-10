@@ -114,12 +114,18 @@
                   (.close rs))))]
     rows))
 
+(def set-parameter-method
+  (t/make-type-method ::set-parameter
+                      (fn [^PreparedStatement stmt ix val]
+                        (.setObject stmt ix val))))
+
 (defn- set-parameters
   "Add the parameters to the given statement."
-  [stmt params]
-  (dorun (map-indexed (fn [ix value]
-                        (.setObject stmt (inc ix) (jdbc/sql-value value))) ;; FIXME: type-specific
-                      params)))
+  [stmt param-types+args]
+  ;; FIXME: don't do map
+  (dorun (map-indexed (fn [ix [ty val]]
+                        (t/invoke-type-method ty set-parameter-method stmt (inc ix) val))
+                      param-types+args)))
 
 (defn run-query
   "Takes a database connection and a query and runs it against the database."
@@ -138,7 +144,7 @@
         (^{:once true} fn* [con]
          (let [^PreparedStatement stmt
                (apply jdbc/prepare-statement con sql (dissoc opts-map :optimize?))]
-           (set-parameters stmt params)
+           (set-parameters stmt param-types+args)
            (.closeOnCompletion stmt)
            (result-set-seq (.executeQuery stmt) col-types)))
         rows (if-let [con (jdbc/db-find-connection db)]
