@@ -93,15 +93,20 @@
 (def postgresql-sql-put-parameterization
   (put/make-sql-put-parameterization put/put-dummy-alias put/default-put-combine put/default-put-literal))
 
+(def get-from-result-set-method
+  (t/make-type-method ::get-from-result-get
+                      (fn [^ResultSet rs ix]
+                        (.getObject rs ix))))
+
 (defn result-set-seq
   "Creates and returns a lazy sequence of maps corresponding to the rows in the
    java.sql.ResultSet rs."
   [^ResultSet rs col-types]
-  (let [idxs (range 1 (inc (count col-types)))
-        row-values (fn []
-                     (map (fn [^Integer i]
-                            (.getObject rs i))
-                          idxs)) ;; FIXME, inline
+  (let [row-values (fn []
+                     ;; should cache the method implementations
+                     (map-indexed (fn [^Integer i ty]
+                                    (t/invoke-type-method ty get-from-result-set-method rs (inc i)))
+                                  col-types))
         rows ((fn thisfn []
                 (if (.next rs)
                   (cons (vec (row-values))

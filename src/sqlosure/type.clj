@@ -32,14 +32,29 @@
   [t]
   (-name t))
 
-(defn define-type-method
-  [ty name fun]
-  (swap! (-method-map-atom ty)
-         assoc name fun))
+(define-record-type type-method
+  (really-make-type-method name default-implementation)
+  type-method?
+  [name type-method-name
+   default-implementation type-method-default-implementation])
 
-(defn type-method
-  [ty name]
-  (get @(-method-map-atom ty) name))
+(defn make-type-method
+  [name & [default-implementation]]
+  (really-make-type-method name default-implementation))
+
+(defn define-type-method-implementation
+  [ty method fun]
+  (swap! (-method-map-atom ty)
+         assoc (type-method-name method) fun))
+
+(defn type-method-implementation
+  [ty method]
+  (or (get @(-method-map-atom ty) (type-method-name method))
+      (type-method-default-implementation method)))
+
+(defn invoke-type-method
+  [ty method & args]
+  (apply (type-method-implementation ty method) args))
 
 (declare make-atomic-type)
 

@@ -202,7 +202,16 @@
 
 (deftest type-method-test
   (let [ty (make-base-type 'string string? identity identity
-                           :ordered? true)]
-    (define-type-method ty ::foo (fn [x] (+ x 1)))
-    (is (= 2 ((type-method ty ::foo) 1)))
-    (is (= 2 ((type-method (make-nullable-type ty) ::foo) 1)))))
+                           :ordered? true)
+        method (make-type-method ::foo
+                                 (fn [x]
+                                   (* x 2)))]
+    (define-type-method-implementation ty method (fn [x] (+ x 1)))
+    (is (= 2 (invoke-type-method ty method 1)))
+    (is (= 2 (invoke-type-method (make-nullable-type ty) method 1)))
+    (is (= 10 (invoke-type-method (make-base-type 'integer integer? identity identity
+                                                  :numeric? true :ordered? true)
+                                  method
+                                  5)))))
+                                   
+                                   
