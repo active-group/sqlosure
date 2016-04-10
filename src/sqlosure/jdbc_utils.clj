@@ -24,7 +24,7 @@
   "Add the parameters to the given statement."
   [stmt params]
   (dorun (map-indexed (fn [ix value]
-                        (jdbc/set-parameter value stmt (inc ix))) ;; FIXME: type-specific
+                        (.setObject stmt (inc ix) (jdbc/sql-value value))) ;; FIXME: type-specific
                       params)))
 
 ;; top-level API for actual SQL operations
