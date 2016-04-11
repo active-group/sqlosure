@@ -78,21 +78,20 @@
    ;; TOP n, etc.
    (extra sql-select-extra sql-select-extra-lens)])
 
-;; FIXME: Use proper representation of empty values instead of nil.
-(defn ^{:test false} new-sql-select
+(defn new-sql-select
   "Create a new, empty sql-select."
   []
-  (make-sql-select nil    ;; options
-                   nil    ;; attributes
+  (make-sql-select []     ;; options
+                   []      ;; attributes
                    false  ;; nullary?
-                   nil    ;; tables
-                   nil    ;; outer-tables
+                   []     ;; tables
+                   []     ;; outer-tables
                    nil    ;; criteria
                    nil    ;; outer-criteria
                    nil    ;; group-by
                    nil    ;; having
-                   nil    ;; order-by
-                   nil    ;; extra
+                   []     ;; order-by
+                   []     ;; extra
                    ))
 
 (def ^{:private true} sql-order #{:ascending :descending})
