@@ -30,16 +30,6 @@
                       [[nil (lens/shove sql sql/sql-select-group-by-lens nil)]])
           (lens/shove sql/sql-select-group-by-lens (sql/sql-select-group-by sql))))))
 
-#_(defn x->sql-select
-  "Takes a sql expression and turns it into a sql-select."
-  [sql]
-  (cond
-    (sql/sql-select-empty? sql) (sql/new-sql-select)
-    (and (sql/sql-select? sql)
-         (empty? (sql/sql-select-attributes sql))) sql
-    :else (let [new (sql/new-sql-select)]
-            (sql/set-sql-select-tables new [[nil sql]]))))
-
 (defn aggregation-op->sql
   "Takes an op keyword and returns the corresponding sql-op. If there is no
   sql-op, return the name of the keyword."
