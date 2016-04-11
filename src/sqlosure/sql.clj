@@ -109,6 +109,7 @@
 (defn set-sql-select-extra [sql-select extra]
   (assoc sql-select :extra extra))
 
+;; FIXME: Use proper representation of empty values instead of nil.
 (defn ^{:test false} new-sql-select
   "Create a new, empty sql-select."
   []
