@@ -35,24 +35,6 @@
     (is (= ["?" [[boolean% true]]] (with-out-str-and-value (put-literal p boolean% true))))
     (is (= ["?" [[boolean% false]]] (with-out-str-and-value (put-literal p boolean% false))))))
 
-;; TODO: is this a test? use deftest or zap.
-(with-out-str-and-value
-  (put-sql-select default-sql-put-parameterization (-> (new-sql-select)
-                                                       (set-sql-select-tables
-                                                        [["S" (make-sql-select-table "SUPPLIERS")]
-                                                         [nil (make-sql-select-table "CUSTOMERS")]])
-                                                       (set-sql-select-attributes
-                                                        {"UID" (make-sql-expr-column "UID")})
-                                                       (set-sql-select-order-by
-                                                        [[(make-sql-expr-column "uid") :ascending]])
-                                                       (set-sql-select-criteria
-                                                        [(make-sql-expr-app op-<
-                                                                            (make-sql-expr-column "foo")
-                                                                            (make-sql-expr-const integer% 10))
-                                                         (make-sql-expr-app op-=
-                                                                            (make-sql-expr-column "uid")
-                                                                            (make-sql-expr-const integer% 5))]))))
-
 (deftest put-sql-select-test
   (let [put-sql-select*
         (partial put-sql-select default-sql-put-parameterization)]
