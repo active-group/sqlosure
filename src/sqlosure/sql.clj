@@ -7,6 +7,7 @@
                                    non-nullable-type]]
             [active.clojure.record :refer [define-record-type]]
             [active.clojure.condition :refer [assertion-violation]]
+            [active.clojure.lens :as lens]
             [clojure.string :as string]))
 
 (define-record-type sql-table
@@ -50,64 +51,32 @@
    ;; [] is for '*'
    ;; nil means open - can still add some
    ;; result
-   attributes sql-select-attributes
+   (attributes sql-select-attributes sql-select-attributes-lens)
    ;; true if the select represents a nullary relation. In this case,
    ;; attributes should contain a single dummy attribute.
    ;; TODO / FIXME: Is this comment still true?
-   nullary? sql-select-nullary?
+   (nullary? sql-select-nullary? sql-select-nullary?-lens)
    ;; [ [alias sql-select-talbe] ]
    ;; FROM
-   tables sql-select-tables  ;; (vec-of ["alias" sql-select-table])
+   (tables sql-select-tables sql-select-tables-lens) ;; (vec-of ["alias" sql-select-table])
    ;; [ sql-expr ]
    ;; WHERE
    ;; [ sql-expr ]
    ;; GROUP-BY
-   outer-tables sql-select-outer-tables
-   criteria sql-select-criteria
-   outer-criteria sql-select-outer-criteria
+   (outer-tables sql-select-outer-tables sql-select-outer-tables-lens)
+   (criteria sql-select-criteria sql-select-criteria-lens)
+   (outer-criteria sql-select-outer-criteria sql-select-outer-criteria-lens)
    ^{:doc "set of SQL column names or `nil`."}
-   group-by sql-select-group-by
+   (group-by sql-select-group-by sql-select-group-by-lens)
 
    ^{:doc "List of SQL expressions or nil."}
-   having sql-select-having
+   (having sql-select-having sql-select-having-lens)
    ;; [ {sql-expr sql-order} ]
    ;; ORDER BY
-   order-by sql-select-order-by
+   (order-by sql-select-order-by sql-select-order-by-lens)
    ;; [ string ]
    ;; TOP n, etc.
-   extra sql-select-extra])
-
-; FIXME: these should be done with lenses instead
-
-(defn set-sql-select-attributes [sql-select attributes]
-  (assoc sql-select :attributes attributes))
-
-(defn set-sql-select-nullary? [sql-select nullary?]
-  (assoc sql-select :nullary? nullary?))
-
-(defn set-sql-select-tables [sql-select tables]
-  (assoc sql-select :tables tables))
-
-(defn set-sql-select-outer-tables [sql-select outer-tables]
-  (assoc sql-select :outer-tables outer-tables))
-
-(defn set-sql-select-criteria [sql-select criteria]
-  (assoc sql-select :criteria criteria))
-
-(defn set-sql-select-outer-criteria [sql-select outer-criteria]
-  (assoc sql-select :outer-criteria outer-criteria))
-
-(defn set-sql-select-group-by [sql-select group-by*]
-  (assoc sql-select :group-by group-by*))
-
-(defn set-sql-select-having [sql-select having]
-  (assoc sql-select :having having))
-
-(defn set-sql-select-order-by [sql-select order-by]
-  (assoc sql-select :order-by order-by))
-
-(defn set-sql-select-extra [sql-select extra]
-  (assoc sql-select :extra extra))
+   (extra sql-select-extra sql-select-extra-lens)])
 
 ;; FIXME: Use proper representation of empty values instead of nil.
 (defn ^{:test false} new-sql-select
