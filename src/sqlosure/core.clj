@@ -28,10 +28,10 @@
     (assertion-violation `db-connect "unsupported db-spec" db-spec)))
 
 (defn table
-  "`deftable` can be used to define tables for sqlosure. It will define a
-  (Clojure) value named `?name`. `?sql-name` ist the name of the table in the
-  DBMS, `?map` is a map of column-name -> sqlosure.type-type. `opts` may contain
-  a :universe key and a universe (defaults to `nil`)."
+  "Returns a `sqlosure.relational-algebra/base-relation`.
+  `sql-name` ist the name of the table in the DBMS, `map` is a map of column-name
+  -> sqlosure.type-type. `opts` may contain a :universe key and a universe
+  (defaults to `nil`)."
   [sql-name map & opts]
   (let [opts-m (apply hash-map opts)
         universe? (get opts-m :universe)]
