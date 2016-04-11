@@ -5,7 +5,8 @@
             [sqlosure.relational-algebra :refer :all]
             [sqlosure.type :refer [string% integer% double% boolean%]]
             [clojure.test :refer :all]
-            [clojure.string :as s]))
+            [clojure.string :as s]
+            [active.clojure.lens :as lens]))
 
 (def tbl1 (make-sql-table "tbl1"
                           {"one" string%
@@ -35,24 +36,6 @@
     (is (= ["?" [[boolean% true]]] (with-out-str-and-value (put-literal p boolean% true))))
     (is (= ["?" [[boolean% false]]] (with-out-str-and-value (put-literal p boolean% false))))))
 
-;; TODO: is this a test? use deftest or zap.
-(with-out-str-and-value
-  (put-sql-select default-sql-put-parameterization (-> (new-sql-select)
-                                                       (set-sql-select-tables
-                                                        [["S" (make-sql-select-table "SUPPLIERS")]
-                                                         [nil (make-sql-select-table "CUSTOMERS")]])
-                                                       (set-sql-select-attributes
-                                                        {"UID" (make-sql-expr-column "UID")})
-                                                       (set-sql-select-order-by
-                                                        [[(make-sql-expr-column "uid") :ascending]])
-                                                       (set-sql-select-criteria
-                                                        [(make-sql-expr-app op-<
-                                                                            (make-sql-expr-column "foo")
-                                                                            (make-sql-expr-const integer% 10))
-                                                         (make-sql-expr-app op-=
-                                                                            (make-sql-expr-column "uid")
-                                                                            (make-sql-expr-const integer% 5))]))))
-
 (deftest put-sql-select-test
   (let [put-sql-select*
         (partial put-sql-select default-sql-put-parameterization)]
@@ -71,28 +54,28 @@
       (is (= "SELECT * FROM tbl1 ORDER BY one ASC" res-str))
       (is (= res-args '())))
     (let [q1 (-> (new-sql-select)
-                 (set-sql-select-tables
-                  [["S" (make-sql-select-table "SUPPLIERS")]
-                   [nil (make-sql-select-table "CUSTOMERS")]])
-                 (set-sql-select-attributes
-                  {"UID" (make-sql-expr-column "UID")})
-                 (set-sql-select-order-by
-                  [[(make-sql-expr-column "uid") :ascending]])
-                 (set-sql-select-criteria
-                  [(make-sql-expr-app op-<
-                                      (make-sql-expr-column "foo")
-                                      (make-sql-expr-const integer% 10))
-                   (make-sql-expr-app op-=
-                                      (make-sql-expr-column "uid")
-                                      (make-sql-expr-const integer% 5))]))
+                 (lens/shove sql-select-tables-lens
+                             [["S" (make-sql-select-table "SUPPLIERS")]
+                              [nil (make-sql-select-table "CUSTOMERS")]])
+                 (lens/shove sql-select-attributes-lens
+                             {"UID" (make-sql-expr-column "UID")})
+                 (lens/shove sql-select-order-by-lens
+                             [[(make-sql-expr-column "uid") :ascending]])
+                 (lens/shove sql-select-criteria-lens
+                             [(make-sql-expr-app op-<
+                                                 (make-sql-expr-column "foo")
+                                                 (make-sql-expr-const integer% 10))
+                              (make-sql-expr-app op-=
+                                                 (make-sql-expr-column "uid")
+                                                 (make-sql-expr-const integer% 5))]))
           q2 (-> (new-sql-select)
-                 (set-sql-select-attributes
-                  {"cost" (make-sql-expr-column "cost")})
+                 (lens/shove sql-select-attributes-lens
+                             {"cost" (make-sql-expr-column "cost")})
                  (add-table (make-sql-select-table "PARTS"))
-                 (set-sql-select-criteria
-                  [(make-sql-expr-app op-<
-                                      (make-sql-expr-column "cost")
-                                      (make-sql-expr-const integer% 100))]))]
+                 (lens/shove sql-select-criteria-lens
+                             [(make-sql-expr-app op-<
+                                                 (make-sql-expr-column "cost")
+                                                 (make-sql-expr-const integer% 100))]))]
       (let [[res-str res-args]
             (with-out-str-and-value (put-sql-select* q1))]
         (is (= "SELECT UID FROM SUPPLIERS AS S, CUSTOMERS WHERE (foo < ?) AND (uid = ?) ORDER BY uid ASC"
@@ -164,28 +147,28 @@
 
 (deftest default-put-combine-test
   (let [q1 (-> (new-sql-select)
-               (set-sql-select-tables
-                [["S" (make-sql-select-table "SUPPLIERS")]
-                 [nil (make-sql-select-table "CUSTOMERS")]])
-               (set-sql-select-attributes
-                {"UID" (make-sql-expr-column "UID")})
-               (set-sql-select-order-by
-                [[(make-sql-expr-column "uid") :ascending]])
-               (set-sql-select-criteria
-                [(make-sql-expr-app op-<
-                                    (make-sql-expr-column "foo")
-                                    (make-sql-expr-const integer% 10))
-                 (make-sql-expr-app op-=
-                                    (make-sql-expr-column "uid")
-                                    (make-sql-expr-const integer% 5))]))
+               (lens/shove sql-select-tables-lens
+                           [["S" (make-sql-select-table "SUPPLIERS")]
+                            [nil (make-sql-select-table "CUSTOMERS")]])
+               (lens/shove sql-select-attributes-lens
+                           {"UID" (make-sql-expr-column "UID")})
+               (lens/shove sql-select-order-by-lens
+                           [[(make-sql-expr-column "uid") :ascending]])
+               (lens/shove sql-select-criteria-lens
+                           [(make-sql-expr-app op-<
+                                               (make-sql-expr-column "foo")
+                                               (make-sql-expr-const integer% 10))
+                            (make-sql-expr-app op-=
+                                               (make-sql-expr-column "uid")
+                                               (make-sql-expr-const integer% 5))]))
         q2 (-> (new-sql-select)
-               (set-sql-select-attributes
-                {"cost" (make-sql-expr-column "cost")})
+               (lens/shove sql-select-attributes-lens
+                           {"cost" (make-sql-expr-column "cost")})
                (add-table (make-sql-select-table "PARTS"))
-               (set-sql-select-criteria
-                [(make-sql-expr-app op-<
-                                    (make-sql-expr-column "cost")
-                                    (make-sql-expr-const integer% 100))]))
+               (lens/shove sql-select-criteria-lens
+                           [(make-sql-expr-app op-<
+                                               (make-sql-expr-column "cost")
+                                               (make-sql-expr-const integer% 100))]))
         [res-str res-args] (with-out-str-and-value (default-put-combine default-sql-put-parameterization
                                                                         :union q1 q2))]
     (is (= "(SELECT UID FROM SUPPLIERS AS S, CUSTOMERS WHERE (foo < ?) AND (uid = ?) ORDER BY uid ASC) UNION (SELECT cost FROM PARTS WHERE (cost < ?))" res-str))

@@ -3,7 +3,8 @@
             [sqlosure.sql :as sql]
             [sqlosure.type :as t]
             [clojure.set :as set]
-            [active.clojure.condition :as c]))
+            [active.clojure.condition :as c]
+            [active.clojure.lens :as lens]))
 
 (defn x->sql-select
   [sql]
@@ -11,32 +12,23 @@
     (sql/sql-select-empty? sql) (sql/new-sql-select)
 
     (sql/sql-select-table? sql)
-    (sql/set-sql-select-tables (sql/new-sql-select) [[nil sql]])
+    (lens/shove (sql/new-sql-select) sql/sql-select-tables-lens [[nil sql]])
 
     (sql/sql-select-combine? sql)
-    (sql/set-sql-select-tables (sql/new-sql-select) [[nil sql]])
-    
+    (lens/shove (sql/new-sql-select) sql/sql-select-tables-lens [[nil sql]])
+
     (sql/sql-select? sql)
     (cond
       (nil? (sql/sql-select-attributes sql)) sql
-    
+
       (some? (sql/sql-select-group-by sql))
-      (sql/set-sql-select-tables (sql/new-sql-select) [[nil sql]])
+      (lens/shove (sql/new-sql-select) sql/sql-select-tables-lens [[nil sql]])
 
        :else
       (-> (sql/new-sql-select)
-          (sql/set-sql-select-tables [[nil (sql/set-sql-select-group-by sql nil)]])
-          (sql/set-sql-select-group-by (sql/sql-select-group-by sql))))))
-
-#_(defn x->sql-select
-  "Takes a sql expression and turns it into a sql-select."
-  [sql]
-  (cond
-    (sql/sql-select-empty? sql) (sql/new-sql-select)
-    (and (sql/sql-select? sql)
-         (empty? (sql/sql-select-attributes sql))) sql
-    :else (let [new (sql/new-sql-select)]
-            (sql/set-sql-select-tables new [[nil sql]]))))
+          (lens/shove sql/sql-select-tables-lens
+                      [[nil (lens/shove sql sql/sql-select-group-by-lens nil)]])
+          (lens/shove sql/sql-select-group-by-lens (sql/sql-select-group-by sql))))))
 
 (defn aggregation-op->sql
   "Takes an op keyword and returns the corresponding sql-op. If there is no
@@ -99,16 +91,18 @@
 (defn add-table
   "Takes an sql-select statement and adds a table to its select-tables list."
   [sql q]
-  (sql/set-sql-select-tables sql
-                             (conj (sql/sql-select-tables sql) [nil q])))
+  (lens/shove sql sql/sql-select-tables-lens
+              (conj (sql/sql-select-tables sql) [nil q])))
 
 (defn project->sql
   "Takes a project query and returns the abstract Sql representation."
   [q]
   (let [alist (rel/project-alist q)]
-    (sql/set-sql-select-nullary?
-     (sql/set-sql-select-attributes (x->sql-select (query->sql (rel/project-query q)))
-                                    (project-alist->sql alist))
+    (lens/shove
+     (lens/shove (x->sql-select (query->sql (rel/project-query q)))
+                 sql/sql-select-attributes-lens
+                 (project-alist->sql alist))
+     sql/sql-select-nullary?-lens
      (empty? alist))))
 
 (defn query->sql
@@ -127,20 +121,17 @@
                                                 (rel/restrict-query q)))
                             exp (rel/restrict-exp q)]
                         (if (rel/aggregate? exp)
-                          (sql/set-sql-select-having
-                           sql
-                           (cons (expression->sql exp)
-                                 (sql/sql-select-having sql)))
-                          (sql/set-sql-select-criteria
-                           sql
-                           (cons (expression->sql exp)
-                                 (sql/sql-select-criteria sql)))))
+                          (lens/shove sql sql/sql-select-having-lens
+                                      (cons (expression->sql exp)
+                                            (sql/sql-select-having sql)))
+                          (lens/shove sql sql/sql-select-criteria-lens
+                                      (cons (expression->sql exp)
+                                            (sql/sql-select-criteria sql)))))
     (rel/restrict-outer? q) (let [sql (x->sql-select (query->sql
                                                       (rel/restrict-outer-query q)))]
-                              (sql/set-sql-select-outer-criteria
-                               sql
-                               (cons (expression->sql (rel/restrict-outer-exp q))
-                                     (sql/sql-select-outer-criteria sql))))
+                              (lens/shove sql sql/sql-select-outer-criteria-lens
+                                          (cons (expression->sql (rel/restrict-outer-exp q))
+                                                (sql/sql-select-outer-criteria sql))))
     (rel/combine? q)
     (let [q1 (rel/combine-query-1 q)
           q2 (rel/combine-query-2 q)
@@ -158,8 +149,9 @@
             (add-table sql2 sql1)
 
             :else
-            (sql/set-sql-select-tables (sql/new-sql-select) [[nil sql1]
-                                                             [nil sql2]])))
+            (lens/shove (sql/new-sql-select) sql/sql-select-tables-lens
+                        [[nil sql1]
+                         [nil sql2]])))
 
         :left-outer-product
         (let [sql1 (query->sql q1)
@@ -169,8 +161,8 @@
           ;; make-restrict-outer) to wrap another SQL query around the
           ;; whole thing, thus moving the ON to a place where it's invalid
           (-> (sql/new-sql-select)
-              (sql/set-sql-select-tables [[nil sql1]])
-              (sql/set-sql-select-outer-tables [[nil sql2]])))
+              (lens/shove sql/sql-select-tables-lens [[nil sql1]])
+              (lens/shove sql/sql-select-outer-tables-lens [[nil sql2]])))
 
         :quotient
         (let [scheme-1 (rel/query-scheme q1)
@@ -184,32 +176,32 @@
                   sql (sql/new-sql-select)]
               (-> sql
                   (add-table sql1)
-                  (sql/set-sql-select-attributes
-                   (map
-                    (fn [k] [k (sql/make-sql-expr-column k)]) diff-columns))
-                  (sql/set-sql-select-criteria
-                   (list (sql/make-sql-expr-app
-                          sql/op-in
-                          (sql/make-sql-expr-column name-2)
-                          (sql/make-sql-expr-subquery sql2))))
-                  (sql/set-sql-select-group-by
-                   (map
-                    (fn [k] (sql/make-sql-expr-column k)) diff-columns))
-                  (sql/set-sql-select-having
-                   [(sql/make-sql-expr-app
-                     sql/op-=
-                     (sql/make-sql-expr-app
-                      sql/op-count
-                      (sql/make-sql-expr-column
-                       (first diff-columns)))
-                     (sql/make-sql-expr-subquery
-                      (let [sql* (sql/new-sql-select)]
-                        (-> sql*
-                            (add-table sql2)
-                            (sql/set-sql-select-attributes
-                             (list [nil (sql/make-sql-expr-app
-                                         sql/op-count
-                                         (sql/make-sql-expr-column name-2))]))))))])))
+                  (lens/shove sql/sql-select-attributes-lens
+                              (map
+                               (fn [k] [k (sql/make-sql-expr-column k)]) diff-columns))
+                  (lens/shove sql/sql-select-criteria-lens
+                              (list (sql/make-sql-expr-app
+                                     sql/op-in
+                                     (sql/make-sql-expr-column name-2)
+                                     (sql/make-sql-expr-subquery sql2))))
+                  (lens/shove sql/sql-select-group-by-lens
+                              (map
+                               (fn [k] (sql/make-sql-expr-column k)) diff-columns))
+                  (lens/shove sql/sql-select-having-lens
+                              [(sql/make-sql-expr-app
+                                sql/op-=
+                                (sql/make-sql-expr-app
+                                 sql/op-count
+                                 (sql/make-sql-expr-column
+                                  (first diff-columns)))
+                                (sql/make-sql-expr-subquery
+                                 (let [sql* (sql/new-sql-select)]
+                                   (-> sql*
+                                       (add-table sql2)
+                                       (lens/shove sql/sql-select-attributes-lens
+                                                   (list [nil (sql/make-sql-expr-app
+                                                               sql/op-count
+                                                               (sql/make-sql-expr-column name-2))]))))))])))
 
             (let [diff-project-alist (map (fn [k] [k (rel/make-attribute-ref k)])
                                           (rel/rel-scheme-columns diff-scheme))
@@ -229,23 +221,25 @@
     (let [sql (x->sql-select (query->sql (rel/order-query q)))
           new-order (map (fn [[k v]] [(expression->sql k) v])
                          (rel/order-alist q))]
-      (sql/set-sql-select-order-by sql (concat new-order (sql/sql-select-order-by sql))))
+      (lens/shove sql sql/sql-select-order-by-lens
+                  (concat new-order (sql/sql-select-order-by sql))))
 
 
     (rel/group? q)
     (let [sql (x->sql-select (query->sql (rel/group-query q)))]
-      (sql/set-sql-select-group-by sql
-                                   (set/union (sql/sql-select-group-by sql)
-                                              (rel/group-columns q))))
+      (lens/shove sql sql/sql-select-group-by-lens
+                  (set/union (sql/sql-select-group-by sql)
+                             (rel/group-columns q))))
     
     (rel/top? q)
     (let [sql (x->sql-select (query->sql (rel/top-query q)))]
-      (sql/set-sql-select-extra sql (cons (if-let [off (rel/top-offset q)]
-                                            ;; TODO: there are a lot of different syntax versions for this
-                                            ;; (http://stackoverflow.com/questions/1528604/how-universal-is-the-limit-statement-in-sql)
-                                            (str "LIMIT " (rel/top-count q) " OFFSET " off)
-                                            ;; no offset should be the same as offset 0 though:
-                                            (str "LIMIT " (rel/top-count q)))
-                                          (sql/sql-select-extra sql))))
+      (lens/shove sql sql/sql-select-extra-lens
+                  (cons (if-let [off (rel/top-offset q)]
+                          ;; TODO: there are a lot of different syntax versions for this
+                          ;; (http://stackoverflow.com/questions/1528604/how-universal-is-the-limit-statement-in-sql)
+                          (str "LIMIT " (rel/top-count q) " OFFSET " off)
+                          ;; no offset should be the same as offset 0 though:
+                          (str "LIMIT " (rel/top-count q)))
+                        (sql/sql-select-extra sql))))
     (rel/empty-query? q) sql/the-sql-select-empty
     :else (c/assertion-violation `query->sql "unknown query" (pr-str q))))

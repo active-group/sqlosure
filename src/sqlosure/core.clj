@@ -28,10 +28,10 @@
     (assertion-violation `db-connect "unsupported db-spec" db-spec)))
 
 (defn table
-  "`deftable` can be used to define tables for sqlosure. It will define a
-  (Clojure) value named `?name`. `?sql-name` ist the name of the table in the
-  DBMS, `?map` is a map of column-name -> sqlosure.type-type. `opts` may contain
-  a :universe key and a universe (defaults to `nil`)."
+  "Returns a `sqlosure.relational-algebra/base-relation`.
+  `sql-name` ist the name of the table in the DBMS, `map` is a map of column-name
+  -> sqlosure.type-type. `opts` may contain a :universe key and a universe
+  (defaults to `nil`)."
   [sql-name map & opts]
   (let [opts-m (apply hash-map opts)
         universe? (get opts-m :universe)]
@@ -52,15 +52,91 @@
 ;; -----------------------------------------------------------------------------
 
 ;; Reexports of query-monad operators.
-(def <- qc/embed)
-(def ! qc/!)
-(def restrict qc/restrict)
-(def restrict-outer qc/restrict-outer)
-(def restricted qc/restricted)
-(def group qc/group)
-(def project qc/project)
-(def order qc/order)
-(def top qc/top)
+(defn <-
+  "Embed a RA query into the current query."
+  [q]
+  (qc/embed q))
+
+(defn !
+  "`!` selects an attribute from a relation.
+
+      Example: (! t \"id\") corresponds to SQL \"t.id\"."
+  [rel name]
+  (qc/! rel name))
+
+(defn restrict
+  "Restrict the current query by a condition.
+
+  expr -> query(nil)
+
+  Note this doesn't return anything."
+  [expr]
+  (qc/restrict expr))
+
+(defn restrict-outer
+  "Restrict outer part of the current query by a condition.
+
+  expr -> query(nil)
+
+  Note: this is a monadic action that doesn't return anything."
+  [expr]
+  (qc/restrict-outer expr))
+
+(defn restricted
+  "Restrict the current query by a condition. Returns the resulting state.
+
+  Example:
+      (query [t (<- embed t-table)]
+                (restricted t ($<= (! t \"id\")
+                                   ($integer 1))
+
+  The corresponding SQL statement would be \"SELECT <all cols of t> FROM t WHERE id <= 1\"
+
+  relation expr -> query(relation)."
+  [expr]
+  (qc/restricted expr))
+
+(defn group
+  "Group by specified seq of column references `[rel name]`.
+  Example
+      (query [t (<- embed t-table)]
+             (group [t \"some_field\"])"
+  [alist]
+  (qc/group alist))
+
+(defn project
+  "Project some columns of the current query. Returns the resulting state.
+
+  Example:
+      (query [t (<- embed t-table)]
+                (project {\"foo\" (! t \"foo\")
+                          \"bar\" (! t \"bar\"))
+
+  The corresponding SQL statemant would be \"SELECT foo, bar FROM t\"."
+  [alist]
+  (qc/project alist))
+
+(defn order
+  "Takes an alist of [[attribute-ref] :descending/:ascending] to order
+  the result by this attribute.
+
+  Example:
+      (query [t (embed t-table)]
+             (order {(! t \"foo\") :ascending})
+             (project {\"foo\" (! t \"foo\")}))
+
+  The corresponding SQL statemant would be \"SELECT foo FROM t ORDER BY foo ASC\"."
+  [alist]
+  (qc/order alist))
+
+(defn top
+  "`top` is used to define queries that return a cerain number of entries.
+  When called with one argument `n`, top constructs a query that only returns
+  the first `n` elements.
+  Whan called with two arguments `offset` and `n`, top constructs a query that
+  returns the first `n` elements with an offset of `offset`."
+  ([n] (qc/top nil n))
+  ([offset n] (qc/top offset n)))
 
 
 ;; -----------------------------------------------------------------------------
@@ -79,25 +155,61 @@
   (apply rel/make-aggregation aggregation-op attribute))
 
 ;; Aggregations on attributes.
-(defn $count [aref] (aggregate :count aref))
-(defn $sum [aref] (aggregate :sum aref))
-(defn $avg [aref] (aggregate :avg aref))
-(defn $min [aref] (aggregate :min aref))
-(defn $max [aref] (aggregate :max aref))
-(defn $std-dev [aref] (aggregate :std-dev aref))
+(defn $count
+  "Aggregation. Count column `aref`."
+  [aref]
+  (aggregate :count aref))
+
+(defn $sum
+  "Aggregation. Sum column `aref`."
+  [aref]
+  (aggregate :sum aref))
+
+(defn $avg
+  "Aggregation. Calculates average of column `aref`."
+  [aref]
+  (aggregate :avg aref))
+
+(defn $min
+  "Aggregation. Calculates minimum of column `aref`."
+  [aref]
+  (aggregate :min aref))
+
+(defn $max
+  "Aggretation. Calculates maximum of column `aref`."
+  [aref]
+  (aggregate :max aref))
+
+(defn $std-dev
+  "Aggregation. Calculates the standard deviation of column `aref`."
+  [aref]
+  (aggregate :std-dev aref))
+
 (defn $std-dev-p [aref] (aggregate :std-dev-p aref))
-(defn $var [aref] (aggregate :var aref))
+
+(defn $var
+  "Aggregation. Calculates the variance of column `aref`."
+  [aref]
+  (aggregate :var aref))
+
 (defn $var-p [aref] (aggregate :var-p aref))
 
 ;; Aggregations on relations (count(*) etc.).
-(def $count* (aggregate :count-all))
-(def $sum* (aggregate :sum))
-(def $avg* (aggregate :avg))
-(def $min* (aggregate :min))
-(def $max* (aggregate :max))
-(def $std-dev (aggregate :std-dev))
+(def ^{:doc "Aggregation. Count whole relation (`COUNT(*)`)."}
+  $count* (aggregate :count-all))
+(def ^{:doc "Aggregation. Sum up whole relation (`SUM(*)`)."}
+  $sum* (aggregate :sum))
+(def ^{:doc "Aggregation. Calculate average of whole relation (`AVG(*)`)."}
+  $avg* (aggregate :avg))
+(def ^{:doc "Aggregation. Calculate minimum of whole relation (`MIN(*)`)."}
+  $min* (aggregate :min))
+(def ^{:doc "Aggregation. Calculate maximum of whole relation (`MAX(*)`)."}
+  $max* (aggregate :max))
+(def ^{:doc "Aggregation. Calculate standart deviation of whole relation (`STDEV(*)`)."}
+  $std-dev (aggregate :std-dev))
 (def $std-dev-p (aggregate :std-dev-p))
-(def $var (aggregate :var))
+(def ^{:doc "Aggregation. Calculate variance of whole relation (`VAR(*)`)."}
+  $var (aggregate :var))
 (def $var-p (aggregate :var-p))
 
 ;; -----------------------------------------------------------------------------

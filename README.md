@@ -1,70 +1,122 @@
-Currently supports [postgresql](http://www.postgresql.org/) and [sqlite](http://www.sqlite.org/).
+`sqlosure` is a library for accessing SQL-Databases.
+(currently supports [postgresql](http://www.postgresql.org/) and [sqlite](http://www.sqlite.org/)).
 
-# Minimal example
+It provides a query DSL based on relational algebra in form of a query monad which itself ist loosely based on [HaskellDB's](https://hackage.haskell.org/package/haskelldb).
 
-Suppose we have the following table in our database.
+# Overview
+
+Suppose we have the following tables in our database.
 
 ```sql
-CREATE TABLE movies (
-  title text,
-  director text,
-  year integer,
-  any_good boolean
+CREATE TABLE movie (
+    id INT,
+    title TEXT,
+    release DATE,
+    good BOOLEAN,
+);
+
+CREATE TABLE person (
+    id INT,
+    first VARCHAR(30),  -- first name
+    last VARCHAR(30),   -- last name
+    birthday DATE,
+    sex BOOLEAN         -- true == female
+);
+
+CREATE TABLE actor_movie (
+    actor_id INT,
+    movie_id INT
 );
 ```
 
-We can now execute queries against this table as follows
-(for now, this will be made more comfortable in the future):
+To access those tables in Clojure, we first need to define them as a `table`.
 
 ```clojure
-(ns sqlosure.test
-  (:require [sqlosure.sql :as sql :refer [=$ or$]]
-            [sqlosure.relational-algebra :as rel :refer [make-const]]
-            [sqlosure.type :as t]
-            ;; [sqlosure.db-sqlite3 :refer :all]  ;; either postgres or sqlite3
-            [sqlosure.db-postgresql :refer [open-db-connetion-postgresql]]
-            [sqlosure.database :as db :refer [run-query insert delete update]]))
+(ns your.name.space
+  (:require [active.clojure.monad :refer [return]]
+            [sqlosure.core :refer :all]))
 
-;; Our table we want to query.
-(def movies-table (sql/make-sql-table
-                   "movies"
-                   (rel/make-rel-scheme {"title" t/string%
-                                         "director" t/string%
-                                         "year" t/integer%
-                                         "any_good" t/boolean%})))
+(def person-table
+  (table "person"
+         {"id" $integer-t
+          "first" $string-t
+          "last" $string-t
+          "birthday" $date-t
+          "sex" $boolean-t}))
 
-;; Query to count all movies (represented as a projection + aggregation).
-;; Read: take all records of movies-table, aggregate via count and project the
-;; count (as row called "sum") as the result
-(def count-movies (rel/make-project
-                   {"sum" (rel/make-aggregation :count (rel/make-attribute-ref "title"))}
-                   movies-table))
+(def movie-table
+  (table "movie"
+         {"id" $integer-t
+          "title" $string-t
+          "release" $date-t
+          "good" $boolean-t}))
 
-;; Query to project title and year of all entries in movies-table.
-;; Read: take all record of movies-table and project column title as "title" and column year as "releasedin"
-(def project-title-and-year (rel/make-project {"title" (rel/make-attribute-ref "title")
-                                               "releasedin" (rel/make-attribute-ref "year")}
-                                              movies-table))
-
-(let [conn (open-db-connection-postgresql "<db-host>" <db-port> "<db-user>" "<db-dbname>" "<db-password>")]
-  (do
-    (run-query conn project-title-and-year)  ;; => [{:title <title> :releasedin <year>} ...]
-    (run-query conn count-movies)  ;; => {:sum <the-count>}
-    ;; Insert a new record
-    (insert conn movies-table "Leon the Professional" "Luc Besson" 1994 true)
-    ;; Update records: update all records titles with
-    ;; director='Some Director' OR year=1999
-    ;; to 'Changed Title'
-    (update conn movies-table
-            (fn [title director year any-good?]
-              (or$ (=$ director (make-const t/string% "Some Director"))
-                   (=$ year (make-const t/integer% 1999))))
-            (fn [title director year any-good?]
-              {"title" (make-const t/string% "Changed title")}))
-    ;; Delete all reecords with title='Changed title'
-    (delete conn movies-table (fn [title director year any-good?]
-                                (=$ title (make-const t/string% "Changed title"))))))
+(def actor-movie-table
+  (table "actor_movie"
+         {"actor_id" $integer-t
+          "movie_id" $integer-t}))
 ```
+
+
+First, we need to define our database spec. This is just a map containing the 
+connection information.
+```clojure
+(def db-spec {:classname "org.sqlite.JDBC"
+              :subprotocol "sqlite"
+              :subname ":memory:"})
+
+(def conn (db-connect db-spec))
+```
+
+We can now use sqlosure to formulate queries. A few examples:
+
+```clojure
+;; SELECT * FROM person
+(run-query conn (query [person (<- person-table)]
+                       [return person]))
+
+;; SELECT first, last FROM person WHERE id < 10
+(run-query conn (query [person (<- person-table)]
+                       ;; Restrict the result set.
+                       (restrict ($< (! person "id")
+                                     ($integer 10)))
+                       ;; Finally, project the desired columns.
+                       (project {"first" (! person "first")
+                                 "last" (! person "last")})))
+```
+
+One can easily construct more complex queries containig multiple tables, for
+example the get all actors for a given movie title, one might forumlate the
+following sqlosure-query. To make it reusable, we'll define it as a function:
+
+```clojure
+(defn actors-by-movie
+  [movie-title]
+  (query [p (<- person-table)
+          m (<- movie-table)
+          ma (<- actor-movie-table)]
+         (restrict ($= (! m "title")
+                       ($string movie-title)))
+         (restrict ($= (! m "id")
+                       (! ma "movie_id")))
+         (restrict ($= (! p "id")
+                       (! ma "actor_id")))
+         (project {"first" (! p "first")
+                   "last" (! p "last")
+                   "movie_title" (! m "title")})
+
+(run-query conn (actors-by-movie "Moonrise Kingdom"))
+```
+
+We can also use this to create nested queries. For example, if you wanted to use
+the result of this query to get ne number of actors for the given movie:
+
+```clojure
+(run-query conn (query [sub (<- (actors-by-movie "Moonrise Kingdom"))]
+                       (project {"number_of_actors" $count*})))
+```
+
+More to come...
 
 ## License
 

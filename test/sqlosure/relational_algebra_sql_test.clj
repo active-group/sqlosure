@@ -5,7 +5,8 @@
             [sqlosure.type :refer :all]
             [sqlosure.universe :refer [make-universe]]
             [clojure.pprint :refer [pprint]]
-            [clojure.test :refer :all]))
+            [clojure.test :refer :all]
+            [active.clojure.lens :as lens]))
 
 (def test-universe (make-sql-universe))
 
@@ -23,11 +24,10 @@
 
 (deftest x->sql-select-test
   (is (= (new-sql-select) (x->sql-select the-sql-select-empty)))
-  (let [sel (set-sql-select-attributes
-             (new-sql-select) {"one" (make-sql-expr-column "one")})]
-    (is (= (set-sql-select-tables (new-sql-select) [[nil sel]])
+  (let [sel (lens/shove (new-sql-select) sql-select-attributes-lens {"one" (make-sql-expr-column "one")})]
+    (is (= (lens/shove (new-sql-select) sql-select-tables-lens [[nil sel]])
            (x->sql-select sel))))
-  (let [sel (set-sql-select-nullary? (new-sql-select) true)]
+  (let [sel (lens/shove (new-sql-select) sql-select-nullary?-lens true)]
     (is (= sel (x->sql-select sel)))))
 
 (deftest aggregation-op->sql-test
@@ -95,8 +95,9 @@
     (let [p (make-project [["two" (make-attribute-ref "two")]
                            ["one" (make-attribute-ref "one")]]
                           tbl1)
-          res (set-sql-select-attributes (x->sql-select (query->sql tbl1))
-                                         (project-alist->sql (project-alist p)))
+          res (lens/shove (x->sql-select (query->sql tbl1))
+                          sql-select-attributes-lens
+                          (project-alist->sql (project-alist p)))
           nullary-p (make-project [] tbl1)]
       (is (sql-select-nullary? (query->sql nullary-p)))
       (is (= res (query->sql p)))
