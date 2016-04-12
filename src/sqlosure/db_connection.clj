@@ -5,14 +5,14 @@
             [clojure.java.jdbc :as jdbc]
             [clojure.set :as set]
             [sqlosure
-             [jdbc-utils :as jdbc-utils]
              [optimization :as o]
              [relational-algebra :as rel]
              [relational-algebra-sql :as rsql]
              [sql :as sql]
              [sql-put :as put]
              [time :as time]
-             [type :as t]]))
+             [type :as t]])
+    (:import [java.sql PreparedStatement ResultSet]))
 
 (define-record-type type-converter
   ^{:doc "`type-converter` serves as a container for the conversion functions
@@ -93,30 +93,69 @@
 (def postgresql-sql-put-parameterization
   (put/make-sql-put-parameterization put/put-dummy-alias put/default-put-combine put/default-put-literal))
 
+(def get-from-result-set-method
+  (t/make-type-method ::get-from-result-get
+                      (fn [^ResultSet rs ix]
+                        (.getObject rs ix))))
+
+(defn result-set-seq
+  "Creates and returns a lazy sequence of maps corresponding to the rows in the
+   java.sql.ResultSet rs."
+  [^ResultSet rs col-types from-db-value]
+  (let [row-values (fn []
+                     ;; should cache the method implementations
+                     (map-indexed (fn [^Integer i ty]
+                                    (from-db-value
+                                     ty
+                                     (t/invoke-type-method ty get-from-result-set-method rs (inc i))))
+                                  col-types))
+        rows ((fn thisfn []
+                (if (.next rs)
+                  (cons (vec (row-values))
+                        (lazy-seq (thisfn)))
+                  (.close rs))))]
+    rows))
+
+(def set-parameter-method
+  (t/make-type-method ::set-parameter
+                      (fn [^PreparedStatement stmt ix val]
+                        (.setObject stmt ix val))))
+
+(defn- set-parameters
+  "Add the parameters to the given statement."
+  [stmt param-types+args to-db-value]
+  ;; FIXME: don't do map
+  (dorun (map-indexed (fn [ix [ty val]]
+                        (t/invoke-type-method ty set-parameter-method stmt (inc ix)
+                                              (to-db-value ty val)))
+                      param-types+args)))
+
 (defn run-query
-  "Takes a database connection and a query and runs it against the database.
-  The optional keyword arguments specify how to
-  construct the result set:
-    :as-arrays? - return each row as a vector of the field values, default false, in which
-      a row is represented as a hash-map of the columns of the query scheme to the corresponding
-      field values.
-    :row-fn - applied to each row (vector or map) as the result set is constructed, defaults
-      to identity.
-    :result-set-fn - applied to a lazy sequence of all rows, defaults doall. Note that the
-      function must realize the sequence, as the connection to the database may be closed after
-      run-query returns.
-    "
+  "Takes a database connection and a query and runs it against the database."
   [conn q & {:keys [optimize?] :or {optimize? true} :as opts-map}]
   (let [qq (if optimize? (o/optimize-query q) q)
-        c (db-connection-type-converter conn)]
-    (jdbc-utils/query (db-connection-conn conn) (rsql/query->sql qq)
-                      (rel/query-scheme qq)
-                      (type-converter-db-value->value c)
-                      (type-converter-value->db-value c)
-                      (db-connection-paramaterization conn)
-                      (dissoc opts-map :optimize?))))
+        c (db-connection-type-converter conn)
+        from-db-value (type-converter-db-value->value c)
+        to-db-value (type-converter-value->db-value c)
+        scheme (rel/query-scheme qq)
+        col-types (rel/rel-scheme-types scheme)
+        asql (rsql/query->sql qq)
+        [sql & param-types+args] (put/sql-select->string (db-connection-paramaterization conn) asql)
+        db (db-connection-conn conn)
+        run-query-with-params
+        (^{:once true} fn* [con]
+         (let [^PreparedStatement stmt
+               (apply jdbc/prepare-statement con sql (dissoc opts-map :optimize?))]
+           (set-parameters stmt param-types+args to-db-value)
+           (.closeOnCompletion stmt)
+           (result-set-seq (.executeQuery stmt) col-types from-db-value)))]
+    (if-let [con (jdbc/db-find-connection db)]
+      (run-query-with-params con)
+      (with-open [con (jdbc/get-connection db)]
+        (doall ; sorry
+         (run-query-with-params con))))))
 
-(defn- validate-scheme
+  (defn- validate-scheme
   "`validate-scheme` takes two rel-schemes and checks if they obey the following
   rules:
       - `scheme` must not contain keys not present in `full-scheme`

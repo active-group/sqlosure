@@ -13,7 +13,7 @@
   (with-actor-db db-spec
     (fn [db]
       (let [conn (db-connect db)
-            axel {"id" -1 "first" "Axel" "last" "Hacke" "birthday" (time/make-date 1956 1 20) "sex" false}
+            axel [-1 "Axel" "Hacke" (time/make-date 1956 1 20) false]
             get-1 (query [person (<- person-table)]
                          (restrict ($= (! person "id") ($integer -1)))
                          (return person))
@@ -21,7 +21,7 @@
         (testing "without explicit rel-scheme"
           (do
             (is (empty? (db/run-query conn get-1)))
-            (apply db/insert! conn person-table (vals axel))
+            (apply db/insert! conn person-table axel)
             (is (= #{axel} (set (db/run-query conn get-1))))
             ;; Remove the record for the next test.
             ))
@@ -32,7 +32,7 @@
             (is (empty? (db/run-query conn get-1)))
             (apply db/insert! conn person-table
                    (rel/base-relation-scheme person-table)
-                   (vals axel))
+                   axel)
             (is (= #{axel} (set (db/run-query conn get-1)))))
           (testing "should fail with underspecified rel-scheme"
             ;; Clean the last insert
@@ -85,23 +85,24 @@
     (fn [db]
       (let [conn (db-connect db)]
         (testing "order"
-          (let [row-fn (fn [row] (assoc row :release (time/from-sql-time-string (:release row))))]
+          (let [row-fn (fn [row] (assoc row 1 (time/from-sql-time-string (get row 1))))]
             (is (= (jdbc-out db [(str "SELECT title, release "
-                                       "FROM movie "
-                                       "ORDER BY release DESC")]
+                                      "FROM movie "
+                                      "ORDER BY release DESC")]
                              row-fn)
                    (sqlosure-out conn (query [movie (<- movie-table)]
                                              (order {(! movie "release") :descending})
                                              (project {"title" (! movie "title")
-                                                       "release" (! movie "release")})))))
+                                                       "release" (! movie "release")}))))))
+          (let [row-fn (fn [[release]]
+                         [(time/from-sql-time-string release)])]
             (is (= (jdbc-out db ["SELECT release FROM movie ORDER BY release ASC"] row-fn)
                    (sqlosure-out conn (query [movie (<- movie-table)]
                                              (order {(! movie "release") :ascending})
                                              (project {"release" (! movie "release")})))))))
         (testing "top"
-          (let [row-fn (fn [row] (assoc row
-                                        :good (= 1 (:good row))
-                                        :release (time/from-sql-time-string (:release row))))]
+          (let [row-fn (fn [[id title release good]]
+                         [id title (time/from-sql-time-string release) (= 1 good)])]
             ;; NOTE: sqlite3 represents booleans a 0 and 1 -> need to convert to boolean manually.
             (is (= (jdbc-out db [(str "SELECT * FROM movie LIMIT 5")] row-fn)
                    (sqlosure-out conn (query [movie (<- movie-table)]
