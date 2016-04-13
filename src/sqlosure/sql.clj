@@ -46,6 +46,7 @@
   sql-select?
   [;; [ string ]
    ;; DISTINCT, ALL, etc.
+   ;; FIXME: right now, this is never actually used.
    options sql-select-options
    ;; list [sql-column sql-expr]
    ;; [] is for '*'
@@ -66,6 +67,7 @@
    (outer-tables sql-select-outer-tables sql-select-outer-tables-lens)
    (criteria sql-select-criteria sql-select-criteria-lens)
    (outer-criteria sql-select-outer-criteria sql-select-outer-criteria-lens)
+
    ^{:doc "set of SQL column names or `nil`."}
    (group-by sql-select-group-by sql-select-group-by-lens)
 
