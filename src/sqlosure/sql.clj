@@ -81,17 +81,17 @@
 (defn new-sql-select
   "Create a new, empty sql-select."
   []
-  (make-sql-select []     ;; options
-                   []      ;; attributes
-                   false  ;; nullary?
-                   []     ;; tables
-                   []     ;; outer-tables
+  (make-sql-select '()   ;; options
+                   nil   ;; attributes
+                   false ;; nullary?
+                   nil    ;; tables
+                   nil    ;; outer-tables
                    nil    ;; criteria
                    nil    ;; outer-criteria
-                   nil    ;; group-by
+                   #{}   ;; group-by
                    nil    ;; having
-                   []     ;; order-by
-                   []     ;; extra
+                   nil    ;; order-by
+                   nil    ;; extra
                    ))
 
 (def ^{:private true} sql-order #{:ascending :descending})

@@ -238,12 +238,10 @@
 
           v7 (put-padding-if-non-null (sql/sql-select-group-by sel)
                                       #(put-group-by param %))
-          
-          v8 (if-let [h (sql/sql-select-having sel)]
-               (do
-                 (put-space)
-                 (put-having param h))
-               [])
+
+          v8 (let [h (sql/sql-select-having sel)]
+               (when-not (empty? h)
+                 (do (put-space) (put-having param h))))
           v9 (put-padding-if-non-null (sql/sql-select-order-by sel)
                                       #(put-order-by param %))
           _ (let [extra (sql/sql-select-extra sel)]
@@ -251,7 +249,7 @@
                 (put-space)
                 (print (s/join " " extra))))]
       (concat v1 v2 v3 v5 v6 v7 v8 v9))
-      
+
     (sql/sql-select-combine? sel) ((sql-put-parameterization-combine-proc param)
                                    param
                                    (sql/sql-select-combine-op sel)
