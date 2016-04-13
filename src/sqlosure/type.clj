@@ -1,6 +1,4 @@
-(ns ^{:doc "Types."
-      :author "Marco Schneider, based on Mike Sperbers schemeql2"}
-    sqlosure.type
+(ns sqlosure.type
   (:require [sqlosure.universe :refer [register-type! universe-lookup-type]]
             [sqlosure.utils :refer [zip]]
             [active.clojure.record :refer [define-record-type]]
@@ -198,13 +196,15 @@
       :else (assertion-violation `type-member? "unhandled type" thing))))
 
 (defn numeric-type?
-  "Is type numeric, in the sense of the server's capability to call standard operations like MAX and AVG on them."
+  "Is type numeric, in the sense of the server's capability to call standard
+  operations like MAX and AVG on them."
   [ty]
   (and (satisfies? base-type-protocol ty)
        (-numeric? ty)))
 
 (defn ordered-type?
-  "Is type ordered, in the sense of the servers' capability to make an 'order by' on them."
+  "Is type ordered, in the sense of the servers' capability to make an
+  'order by' on them."
   [ty]
   (and (satisfies? base-type-protocol ty)
        (-ordered? ty)))
