@@ -234,6 +234,9 @@
 (def byte-array?
   (test-array byte-array))
 
+(def char-array?
+  (test-array char-array))
+
 (defn date?
   "checks whether a value is of type java.util.Date."
   [x]
@@ -263,6 +266,7 @@
                                 :ordered? true))
 
 (def blob% (make-base-type 'blob byte-array? 'lose 'lose))
+(def clob% (make-base-type 'clob char-array? 'lose 'lose))
 
 (def nullable-integer% (make-nullable-type integer%))
 

@@ -130,6 +130,49 @@
                                               (to-db-value ty val)))
                       param-types+args)))
 
+(defn define-type-method-implementations
+  "Conveniently define the `set-parameter` and `get-parameter` of a type
+  simultaniously."
+  [ty set-parameter-fn get-parameter-fn]
+  (swap! (t/-method-map-atom ty)
+         assoc
+         (t/type-method-name set-parameter-method) set-parameter-fn
+         (t/type-method-name get-from-result-set-method) get-parameter-fn))
+
+;; Type method implementations
+(define-type-method-implementations t/string%
+  (fn [^PreparedStatement stmt ix val] (.setString stmt ix val))
+  (fn [^ResultSet rs ix] (.getString rs ix)))
+
+(define-type-method-implementations t/integer%
+  (fn [^PreparedStatement stmt ix val] (.setInt stmt ix val))
+  (fn [^ResultSet rs ix] (.getInt rs ix)))
+
+(define-type-method-implementations t/double%
+  (fn [^PreparedStatement stmt ix val] (.setDouble stmt ix val))
+  (fn [^ResultSet rs ix] (.getDouble rs ix)))
+
+(define-type-method-implementations t/boolean%
+  (fn [^PreparedStatement stmt ix val] (.setDouble stmt ix val))
+  (fn [^ResultSet rs ix] (.getDouble rs ix)))
+
+(define-type-method-implementations t/boolean%
+  (fn [^PreparedStatement stmt ix val] (.setDouble stmt ix val))
+  (fn [^ResultSet rs ix] (.getDouble rs ix)))
+
+
+(define-type-method-implementations t/blob%
+  (fn [^PreparedStatement stmt ix val] (.setBlob stmt ix val))
+  (fn [^ResultSet rs ix] (.getBlob rs ix)))
+
+(define-type-method-implementations t/clob%
+  (fn [^PreparedStatement stmt ix val] (.setClob stmt ix val))
+  (fn [^ResultSet rs ix] (.getClob rs ix)))
+
+(define-type-method-implementations t/boolean%
+  (fn [^PreparedStatement stmt ix val] (.setDouble stmt ix val))
+  (fn [^ResultSet rs ix] (.getDouble rs ix)))
+
 (defn run-query
   "Takes a database connection and a query and runs it against the database."
   [conn q & {:keys [optimize?] :or {optimize? true} :as opts-map}]
