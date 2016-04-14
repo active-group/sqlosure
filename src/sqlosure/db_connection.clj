@@ -153,13 +153,8 @@
   (fn [^ResultSet rs ix] (.getDouble rs ix)))
 
 (define-type-method-implementations t/boolean%
-  (fn [^PreparedStatement stmt ix val] (.setDouble stmt ix val))
-  (fn [^ResultSet rs ix] (.getDouble rs ix)))
-
-(define-type-method-implementations t/boolean%
-  (fn [^PreparedStatement stmt ix val] (.setDouble stmt ix val))
-  (fn [^ResultSet rs ix] (.getDouble rs ix)))
-
+  (fn [^PreparedStatement stmt ix val] (.setBoolean stmt ix val))
+  (fn [^ResultSet rs ix] (.getBoolean rs ix)))
 
 (define-type-method-implementations t/blob%
   (fn [^PreparedStatement stmt ix val] (.setBlob stmt ix val))
@@ -168,10 +163,6 @@
 (define-type-method-implementations t/clob%
   (fn [^PreparedStatement stmt ix val] (.setClob stmt ix val))
   (fn [^ResultSet rs ix] (.getClob rs ix)))
-
-(define-type-method-implementations t/boolean%
-  (fn [^PreparedStatement stmt ix val] (.setDouble stmt ix val))
-  (fn [^ResultSet rs ix] (.getDouble rs ix)))
 
 (defn run-query
   "Takes a database connection and a query and runs it against the database."
