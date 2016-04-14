@@ -198,7 +198,7 @@
         (doall ; sorry
          (run-query-with-params con))))))
 
-  (defn- validate-scheme
+(defn- validate-scheme
   "`validate-scheme` takes two rel-schemes and checks if they obey the following
   rules:
       - `scheme` must not contain keys not present in `full-scheme`

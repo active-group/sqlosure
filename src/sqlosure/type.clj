@@ -257,7 +257,7 @@
 (def boolean% (make-base-type 'boolean boolean? identity identity))
 
 ;; Used to represent the type of sql NULL. Corresponds to nil in Clojure.
-(def null% (make-base-type 'unknown nil? identity identity))
+(def null% (make-base-type 'unknown nil? identity identity))  ;; FIXME Does this have any real purpose?
 (def any% (make-base-type 'any (constantly true) identity identity))
 
 (def date% (make-base-type 'date date? identity identity
