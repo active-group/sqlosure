@@ -94,7 +94,7 @@
   (put/make-sql-put-parameterization put/put-dummy-alias put/default-put-combine put/default-put-literal))
 
 (def get-from-result-set-method
-  (t/make-type-method ::get-from-result-get
+  (t/make-type-method ::get-from-result-set
                       (fn [^ResultSet rs ix]
                         (.getObject rs ix))))
 
