@@ -258,11 +258,7 @@
       (jdbc/insert!
        (db-connection-conn conn)
        (sql/sql-table-name (rel/base-relation-handle sql-table))
-       (into {}
-             (map (fn [[k t] v]
-                    [k ((type-converter-value->db-value c) t v)])
-                  (rel/rel-scheme-map scheme)
-                  vals))))))
+       (rel/rel-scheme-columns scheme) (vec vals)))))
 
 (defn delete!
   [conn sql-table criterion-proc]
