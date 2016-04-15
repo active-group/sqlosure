@@ -28,13 +28,11 @@
   (make-type-converter
    (fn [typ value]
      (cond
-       (= typ t/boolean%) (if value 1 0)
        (= typ t/date%) (time/to-sql-time-string value)
        (= typ t/timestamp%) (time/to-sql-time-string value)
        :else value))
    (fn [typ value]
      (cond
-       (= typ t/boolean%) (not= value 0)
        (= typ t/date%) (time/from-sql-time-string value)
        (= typ t/timestamp%) (time/from-sql-timestamp-string value)
        :else value))))
