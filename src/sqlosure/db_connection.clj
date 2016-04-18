@@ -14,58 +14,16 @@
              [type :as t]])
     (:import [java.sql PreparedStatement ResultSet]))
 
-(define-record-type type-converter
-  ^{:doc "`type-converter` serves as a container for the conversion functions
-          between Clojure and DB types."}
-  (make-type-converter value->db-value db-value->value) type-converter?
-  [^{:doc "A function that takes a `sqlosure.type` type and a value and returns
-           a corresponding value of a type the DB understands."}
-   value->db-value type-converter-value->db-value
-   ^{:doc "Inverse function to `value->db-value."}
-   db-value->value type-converter-db-value->value])
-
-(def sqlite3-type-converter
-  "A `type-converter` for sqlite3-specific type handling. In particular, dates
-  have to be treated seperately."
-  (make-type-converter
-   (fn [typ value]
-     (cond
-       (= typ t/date%) (time/to-sql-time-string value)
-       (= typ t/timestamp%) (time/to-sql-time-string value)
-       :else value))
-   (fn [typ value]
-     (cond
-       (= typ t/date%) (time/from-sql-time-string value)
-       (= typ t/timestamp%) (time/from-sql-timestamp-string value)
-       :else value))))
-
-(def postgresql-type-converter
-  "A `type-converter` for postgresql-specific type handling."
-  (make-type-converter
-   (fn [typ value]
-      (case typ
-        t/date% (time/to-sql-date value)
-        t/timestamp% (time/to-sql-timestamp value)
-        value))
-   (fn [typ value]
-     (case typ
-       t/date% (time/from-sql-date value)
-       t/timestamp% (time/from-sql-timestamp value)
-       value))))
-
 (define-record-type
   ^{:doc "`db-connection` serves as a container for storing the current
           db-connection as well as backend specific conversion and printer
           functions."}
   db-connection
-  (make-db-connection conn parameterization type-converter) db-connection?
+  (make-db-connection conn parameterization) db-connection?
   [^{:doc "The database connection map as used by jdbc."}
    conn db-connection-conn
    ^{:doc "A function to print values in a way the dbms understands."}
-   parameterization db-connection-paramaterization
-   ^{:doc "A `db-connection/type-converter` record for conversion between
-           Clojure and db types."}
-   type-converter db-connection-type-converter])
+   parameterization db-connection-paramaterization])
 
 (defn- sqlite3-put-combine
   "sqlite3 specific printer for combine queries."
@@ -105,7 +63,7 @@
 (defn result-set-seq
   "Creates and returns a lazy sequence of maps corresponding to the rows in the
    java.sql.ResultSet rs."
-  [^ResultSet rs col-types from-db-value]
+  [^ResultSet rs col-types]
   (let [row-values (fn []
                      ;; should cache the method implementations
                      (map-indexed
@@ -113,7 +71,6 @@
                         (t/invoke-type-method
                          ty
                          get-from-result-set-method
-                         from-db-value
                          rs
                          (inc i)))
                       col-types))
@@ -131,12 +88,11 @@
 
 (defn- set-parameters
   "Add the parameters to the given statement."
-  [stmt param-types+args to-db-value]
+  [stmt param-types+args]
   ;; FIXME: don't do map
   (dorun (map-indexed (fn [ix [ty val]]
                         (t/invoke-type-method ty
                                               set-parameter-method
-                                              to-db-value
                                               stmt
                                               (inc ix)
                                               val))
@@ -153,64 +109,71 @@
 
 ;; Type method implementations
 (define-type-method-implementations t/string%
-  (fn [_ ^PreparedStatement stmt ix val] (.setString stmt ix val))
-  (fn [_ ^ResultSet rs ix] (.getString rs ix)))
+  (fn [^PreparedStatement stmt ix val] (.setString stmt ix val))
+  (fn [^ResultSet rs ix] (.getString rs ix)))
 
 (define-type-method-implementations t/string%-nullable
   (fn [_ ^PreparedStatement stmt ix val] (.setString stmt ix val))
   (fn [_ ^ResultSet rs ix] (.getString rs ix)))
 
 (define-type-method-implementations t/integer%
-  (fn [_ ^PreparedStatement stmt ix val] (.setInt stmt ix val))
-  (fn [_ ^ResultSet rs ix] (.getInt rs ix)))
+  (fn [^PreparedStatement stmt ix val] (.setInt stmt ix val))
+  (fn [^ResultSet rs ix] (.getInt rs ix)))
 
 (define-type-method-implementations t/integer%-nullable
   (fn [_ ^PreparedStatement stmt ix val] (.setInt stmt ix val))
   (fn [_ ^ResultSet rs ix] (.getInt rs ix)))
 
 (define-type-method-implementations t/double%
-  (fn [_ ^PreparedStatement stmt ix val] (.setDouble stmt ix val))
-  (fn [_ ^ResultSet rs ix] (.getDouble rs ix)))
+  (fn [^PreparedStatement stmt ix val] (.setDouble stmt ix val))
+  (fn [^ResultSet rs ix] (.getDouble rs ix)))
 
 (define-type-method-implementations t/double%-nullable
   (fn [_ ^PreparedStatement stmt ix val] (.setDouble stmt ix val))
   (fn [_ ^ResultSet rs ix] (.getDouble rs ix)))
 
 (define-type-method-implementations t/boolean%
-  (fn [_ ^PreparedStatement stmt ix val] (.setBoolean stmt ix val))
-  (fn [_ ^ResultSet rs ix] (.getBoolean rs ix)))
+  (fn [^PreparedStatement stmt ix val] (.setBoolean stmt ix val))
+  (fn [^ResultSet rs ix] (.getBoolean rs ix)))
 
 (define-type-method-implementations t/blob%
-  (fn [_ ^PreparedStatement stmt ix val] (.setBlob stmt ix val))
-  (fn [_ ^ResultSet rs ix] (.getBlob rs ix)))
+  (fn [^PreparedStatement stmt ix val] (.setBlob stmt ix val))
+  (fn [^ResultSet rs ix] (.getBlob rs ix)))
 
 (define-type-method-implementations t/blob%-nullable
   (fn [_ ^PreparedStatement stmt ix val] (.setBlob stmt ix val))
   (fn [_ ^ResultSet rs ix] (.getBlob rs ix)))
 
 (define-type-method-implementations t/clob%
-  (fn [_ ^PreparedStatement stmt ix val] (.setClob stmt ix val))
-  (fn [_ ^ResultSet rs ix] (.getClob rs ix)))
+  (fn [^PreparedStatement stmt ix val] (.setClob stmt ix val))
+  (fn [^ResultSet rs ix] (.getClob rs ix)))
 
 (define-type-method-implementations t/date%
-  (fn [to-db-value ^PreparedStatement stmt ix val]
-    (.setObject stmt ix (to-db-value t/date% val)))
-  (fn [from-db-value ^ResultSet rs ix]
-    (from-db-value t/date% (.getObject rs ix))))
+  ;; NOTE `val` here is a `java.time.LocalDate` which has to be coerced to and
+  ;;      from `java.sql.Date` first.
+  (fn [^PreparedStatement stmt ix val]
+    (.setDate stmt ix (time/to-sql-date val)))
+  (fn [^ResultSet rs ix]
+    (try
+      (time/from-sql-date (.getDate rs ix))
+      (catch Exception e
+        ;; In this case, let's hope it's a string...
+        (time/from-sql-time-string (.getString rs ix))))))
 
 (define-type-method-implementations t/timestamp%
-  (fn [to-db-value ^PreparedStatement stmt ix val]
-    (.setObject stmt ix (to-db-value t/timestamp% val)))
-  (fn [from-db-value ^ResultSet rs ix]
-    (from-db-value t/timestamp% (.getObject rs ix))))
+  (fn [^PreparedStatement stmt ix val]
+    (.setTimestamp stmt ix (time/to-sql-timestamp val)))
+  (fn [^ResultSet rs ix]
+    (try
+      (time/from-sql-timestamp (.getTimestamp rs ix))
+      (catch Exception e
+        ;; In this case, let's hope it's a string...
+        (time/from-sql-timestamp-string (.getString rs ix))))))
 
 (defn run-query
   "Takes a database connection and a query and runs it against the database."
   [conn q & {:keys [optimize?] :or {optimize? true} :as opts-map}]
   (let [qq (if optimize? (o/optimize-query q) q)
-        c (db-connection-type-converter conn)
-        from-db-value (type-converter-db-value->value c)
-        to-db-value (type-converter-value->db-value c)
         scheme (rel/query-scheme qq)
         col-types (rel/rel-scheme-types scheme)
         asql (rsql/query->sql qq)
@@ -220,11 +183,10 @@
         run-query-with-params
         (^{:once true} fn* [con]
          (let [^PreparedStatement stmt
-               (apply jdbc/prepare-statement con sql
-                      (dissoc opts-map :optimize?))]
-           (set-parameters stmt param-types+args to-db-value)
+               (apply jdbc/prepare-statement con sql (dissoc opts-map :optimize?))]
+           (set-parameters stmt param-types+args)
            (.closeOnCompletion stmt)
-           (result-set-seq (.executeQuery stmt) col-types from-db-value)))]
+           (result-set-seq (.executeQuery stmt) col-types)))]
     (if-let [con (jdbc/db-find-connection db)]
       (run-query-with-params con)
       (with-open [con (jdbc/get-connection db)]
@@ -275,6 +237,16 @@
          (clojure.data/diff full-m m))
         :else true))))
 
+(defn- insert-statement-string
+  [table-name scheme]
+  (let [values (->> (rel/rel-scheme-columns scheme)
+                    (map (constantly "?"))
+                    (interpose ", ")
+                    (apply str))]
+    (str "INSERT INTO " table-name " ("
+         (apply str (interpose ", " (rel/rel-scheme-columns scheme))) ") "
+         "VALUES (" values ")")))
+
 (defn insert!
   "`insert!` takes a db-connection and an sql-table and some rest `args` and
   attempts to insert them into the connected databases table.
@@ -297,35 +269,58 @@
   (let [[scheme vals] (if (and (seq args) (rel/rel-scheme? (first args)))
                         [(first args) (rest args)]
                         [(rel/query-scheme sql-table) args])
-        c (db-connection-type-converter conn)]
-    (when (validate-scheme (rel/base-relation-scheme sql-table)
-                           scheme)
-      (jdbc/insert!
-       (db-connection-conn conn)
-       (sql/sql-table-name (rel/base-relation-handle sql-table))
-       (rel/rel-scheme-columns scheme) (vec vals)))))
+        db (db-connection-conn conn)
+        run-query-with-params
+        (^{:once true} fn* [con]
+         (let [^PreparedStatement stmt
+               (jdbc/prepare-statement
+                con
+                (insert-statement-string
+                 (rel/base-relation-name sql-table)
+                 scheme))
+               types+vals (map (fn [ty val]
+                                 [ty val])
+                               (rel/rel-scheme-types scheme) vals)]
+           (set-parameters stmt types+vals)
+           (.closeOnCompletion stmt)
+           (.executeUpdate stmt)))]
+    (if-let [con (jdbc/db-find-connection db)]
+      (run-query-with-params con)
+      (with-open [con (jdbc/get-connection db)]
+        (doall (run-query-with-params con))))))
+
+(defn- delete-statement-string
+  [table-name crit-s]
+  (str "DELETE FROM " table-name " WHERE "
+       crit-s))
 
 (defn delete!
   [conn sql-table criterion-proc]
   (let [name (sql/sql-table-name (rel/base-relation-handle sql-table))
-        cols (rel/rel-scheme-columns (rel/base-relation-scheme sql-table))
+        scheme (rel/base-relation-scheme sql-table)
+        cols (rel/rel-scheme-columns scheme)
+        db (db-connection-conn conn)
         [crit-s & crit-vals]
         (put/sql-expression->string
          (db-connection-paramaterization conn)
-         (rsql/expression->sql
-          (apply criterion-proc
-                 (map rel/make-attribute-ref
-                      (rel/rel-scheme-columns
-                       (rel/base-relation-scheme sql-table))))))
-        mapped-vals
-        (mapv
-         (fn [[t v]]
-           ((type-converter-value->db-value (db-connection-type-converter conn))
-            t v))
-         crit-vals)]
-    (jdbc/delete! (db-connection-conn conn)
-                  name
-                  (cons crit-s mapped-vals))))
+         (rsql/expression->sql (apply criterion-proc
+                                      (map rel/make-attribute-ref cols))))
+        run-query-with-params
+        (^{:once true} fn* [con]
+         (let [^PreparedStatement stmt
+               (jdbc/prepare-statement
+                con
+                (delete-statement-string
+                 (rel/base-relation-name sql-table)
+                 crit-s))]
+           (println crit-vals)
+           (set-parameters stmt crit-vals)
+           (.closeOnCompletion stmt)
+           (.executeUpdate stmt)))]
+    (if-let [con (jdbc/db-find-connection db)]
+      (run-query-with-params con)
+      (with-open [con (jdbc/get-connection db)]
+        (doall (run-query-with-params con))))))
 
 (defn update!
   [conn sql-table criterion-proc alist-first & args]
