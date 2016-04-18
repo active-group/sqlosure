@@ -102,11 +102,15 @@
   [^ResultSet rs col-types from-db-value]
   (let [row-values (fn []
                      ;; should cache the method implementations
-                     (map-indexed (fn [^Integer i ty]
-                                    (from-db-value
-                                     ty
-                                     (t/invoke-type-method ty get-from-result-set-method rs (inc i))))
-                                  col-types))
+                     (map-indexed
+                      (fn [^Integer i ty]
+                        (t/invoke-type-method
+                         ty
+                         get-from-result-set-method
+                         from-db-value
+                         rs
+                         (inc i)))
+                      col-types))
         rows ((fn thisfn []
                 (if (.next rs)
                   (cons (vec (row-values))
@@ -124,8 +128,12 @@
   [stmt param-types+args to-db-value]
   ;; FIXME: don't do map
   (dorun (map-indexed (fn [ix [ty val]]
-                        (t/invoke-type-method ty set-parameter-method stmt (inc ix)
-                                              (to-db-value ty val)))
+                        (t/invoke-type-method ty
+                                              set-parameter-method
+                                              to-db-value
+                                              stmt
+                                              (inc ix)
+                                              val))
                       param-types+args)))
 
 (defn define-type-method-implementations
@@ -139,28 +147,40 @@
 
 ;; Type method implementations
 (define-type-method-implementations t/string%
-  (fn [^PreparedStatement stmt ix val] (.setString stmt ix val))
-  (fn [^ResultSet rs ix] (.getString rs ix)))
+  (fn [_ ^PreparedStatement stmt ix val] (.setString stmt ix val))
+  (fn [_ ^ResultSet rs ix] (.getString rs ix)))
 
 (define-type-method-implementations t/integer%
-  (fn [^PreparedStatement stmt ix val] (.setInt stmt ix val))
-  (fn [^ResultSet rs ix] (.getInt rs ix)))
+  (fn [_ ^PreparedStatement stmt ix val] (.setInt stmt ix val))
+  (fn [_ ^ResultSet rs ix] (.getInt rs ix)))
 
 (define-type-method-implementations t/double%
-  (fn [^PreparedStatement stmt ix val] (.setDouble stmt ix val))
-  (fn [^ResultSet rs ix] (.getDouble rs ix)))
+  (fn [_ ^PreparedStatement stmt ix val] (.setDouble stmt ix val))
+  (fn [_ ^ResultSet rs ix] (.getDouble rs ix)))
 
 (define-type-method-implementations t/boolean%
-  (fn [^PreparedStatement stmt ix val] (.setBoolean stmt ix val))
-  (fn [^ResultSet rs ix] (.getBoolean rs ix)))
+  (fn [_ ^PreparedStatement stmt ix val] (.setBoolean stmt ix val))
+  (fn [_ ^ResultSet rs ix] (.getBoolean rs ix)))
 
 (define-type-method-implementations t/blob%
-  (fn [^PreparedStatement stmt ix val] (.setBlob stmt ix val))
-  (fn [^ResultSet rs ix] (.getBlob rs ix)))
+  (fn [_ ^PreparedStatement stmt ix val] (.setBlob stmt ix val))
+  (fn [_ ^ResultSet rs ix] (.getBlob rs ix)))
 
 (define-type-method-implementations t/clob%
-  (fn [^PreparedStatement stmt ix val] (.setClob stmt ix val))
-  (fn [^ResultSet rs ix] (.getClob rs ix)))
+  (fn [_ ^PreparedStatement stmt ix val] (.setClob stmt ix val))
+  (fn [_ ^ResultSet rs ix] (.getClob rs ix)))
+
+(define-type-method-implementations t/date%
+  (fn [to-db-value ^PreparedStatement stmt ix val]
+    (.setObject stmt ix (to-db-value t/date% val)))
+  (fn [from-db-value ^ResultSet rs ix]
+    (from-db-value t/date% (.getObject rs ix))))
+
+(define-type-method-implementations t/timestamp%
+  (fn [to-db-value ^PreparedStatement stmt ix val]
+    (.setObject stmt ix (to-db-value t/timestamp% val)))
+  (fn [from-db-value ^ResultSet rs ix]
+    (from-db-value t/timestamp% (.getObject rs ix))))
 
 (defn run-query
   "Takes a database connection and a query and runs it against the database."
