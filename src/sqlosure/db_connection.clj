@@ -25,6 +25,8 @@
    db-value->value type-converter-db-value->value])
 
 (def sqlite3-type-converter
+  "A `type-converter` for sqlite3-specific type handling. In particular, dates
+  have to be treated seperately."
   (make-type-converter
    (fn [typ value]
      (cond
@@ -38,6 +40,7 @@
        :else value))))
 
 (def postgresql-type-converter
+  "A `type-converter` for postgresql-specific type handling."
   (make-type-converter
    (fn [typ value]
       (case typ
@@ -85,11 +88,14 @@
     (put/default-put-literal type val)))
 
 (def sqlite3-sql-put-parameterization
-  "Printer for sqliter3."
-  (put/make-sql-put-parameterization put/default-put-alias sqlite3-put-combine sqlite3-put-literal))
+  "Printer for sqlite3."
+  (put/make-sql-put-parameterization put/default-put-alias sqlite3-put-combine
+                                     sqlite3-put-literal))
 
 (def postgresql-sql-put-parameterization
-  (put/make-sql-put-parameterization put/put-dummy-alias put/default-put-combine put/default-put-literal))
+  "Printer for postgresql."
+  (put/make-sql-put-parameterization put/put-dummy-alias put/default-put-combine
+                                     put/default-put-literal))
 
 (def get-from-result-set-method
   (t/make-type-method ::get-from-result-set
@@ -208,12 +214,14 @@
         scheme (rel/query-scheme qq)
         col-types (rel/rel-scheme-types scheme)
         asql (rsql/query->sql qq)
-        [sql & param-types+args] (put/sql-select->string (db-connection-paramaterization conn) asql)
+        [sql & param-types+args] (put/sql-select->string
+                                  (db-connection-paramaterization conn) asql)
         db (db-connection-conn conn)
         run-query-with-params
         (^{:once true} fn* [con]
          (let [^PreparedStatement stmt
-               (apply jdbc/prepare-statement con sql (dissoc opts-map :optimize?))]
+               (apply jdbc/prepare-statement con sql
+                      (dissoc opts-map :optimize?))]
            (set-parameters stmt param-types+args to-db-value)
            (.closeOnCompletion stmt)
            (result-set-seq (.executeQuery stmt) col-types from-db-value)))]
@@ -244,7 +252,8 @@
                  acc)) true m1))]
     (let [[full-columns columns] [(rel/rel-scheme-columns full-scheme)
                                   (rel/rel-scheme-columns scheme)]
-          [full-m m] [(rel/rel-scheme-map full-scheme) (rel/rel-scheme-map scheme)]
+          [full-m m] [(rel/rel-scheme-map full-scheme)
+                      (rel/rel-scheme-map scheme)]
           extra (no-extra-keys full-columns columns)
           missing (no-missing-non-nullable-types full-m m)
           type-diff (no-type-difference full-m m)]
