@@ -19,7 +19,8 @@
   (-ordered? [this] "Is this type ordered?")
   (-const->datum [this val] "Convert value to datum.")
   (-datum->const [this datum] "Convert datum to value.")
-  (-method-map-atom [this] "Get us an an atom pointing to a map of type-specific methods."))
+  (-method-map-atom [this] "Get us an an atom pointing to a map of type-specific methods.")
+  (-data [this] "Domain-specific data, for outside use."))
 
 (defn nullable-type?
   "Is type nullable?"
@@ -63,7 +64,7 @@
 (define-record-type atomic-type
   (make-atomic-type name nullable? numeric? ordered? predicate
                     const->datum-fn datum->const-fn
-                    method-map-atom)
+                    method-map-atom data)
   atomic-type?
   [name atomic-type-name
    nullable? atomic-type-nullable?
@@ -72,22 +73,24 @@
    predicate atomic-type-predicate
    const->datum-fn atomic-type-const->datum-fn
    datum->const-fn atomic-type-datum->const-fn
-   method-map-atom atomic-type-method-map-atom]
+   method-map-atom atomic-type-method-map-atom
+   data atomic-type-data]
   base-type-protocol
   (-name [_] name)
   (-contains? [_ val] (predicate val))
   (-nullable? [_] nullable?)
   (-nullable [_] (make-atomic-type name true numeric? ordered? predicate
                                    const->datum-fn datum->const-fn
-                                   method-map-atom))
+                                   method-map-atom data))
   (-non-nullable [_] (make-atomic-type name false numeric? ordered? predicate
                                        const->datum-fn datum->const-fn
-                                       method-map-atom))
+                                       method-map-atom data))
   (-numeric? [_] numeric?)
   (-ordered? [_] ordered?)
   (-const->datum [_ val] (const->datum-fn val))
   (-datum->const [_ datum] (datum->const-fn datum))
-  (-method-map-atom [_] method-map-atom))
+  (-method-map-atom [_] method-map-atom)
+  (-data [_] data))
 
 (defmethod print-method atomic-type [r, ^Writer w]
   (.write w "#")
@@ -109,12 +112,15 @@
   "Returns a new base type as specified.
   If :universe is supplied, the new type will be registered in the universe and
   this function returns a vector containing `[type universe]`."
-  [name predicate const->datum-proc datum->const-proc & {:keys [universe numeric? ordered?]}]
+  [name predicate const->datum-proc datum->const-proc
+   & {:keys [universe numeric? ordered? data]
+      :or [universe nil numeric? false ordered? false data nil]}]
   (let [t (make-atomic-type name false
                             (boolean numeric?) (boolean ordered?)
                             predicate
                             const->datum-proc datum->const-proc
-                            (atom {}))]
+                            (atom {})
+                            data)]
     (when universe
       (register-type! universe name t))
     t))
