@@ -19,12 +19,10 @@
   (case (:classname db-spec)
     "org.postgresql.Driver"
     (db/make-db-connection db-spec
-                           db/postgresql-sql-put-parameterization
-                           db/postgresql-type-converter)
+                           db/postgresql-sql-put-parameterization)
     "org.sqlite.JDBC"
     (db/make-db-connection db-spec
-                           db/sqlite3-sql-put-parameterization
-                           db/sqlite3-type-converter)
+                           db/sqlite3-sql-put-parameterization)
     (assertion-violation `db-connect "unsupported db-spec" db-spec)))
 
 (defn table

@@ -53,7 +53,7 @@
           (let [r (first (db/run-query conn (query [p (<- person-table)]
                                                    (return p))))]
             (do
-              (is r)  ;; We have on record now.
+              (is r)  ;; We have one record now.
               (is (= r (first (db/run-query conn (query [p (<- person-table)]
                                                         (return p))))))
               (db/delete! conn person-table
