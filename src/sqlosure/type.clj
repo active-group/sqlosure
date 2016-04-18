@@ -1,10 +1,12 @@
 (ns sqlosure.type
-  (:require [sqlosure.universe :refer [register-type! universe-lookup-type]]
-            [sqlosure.utils :refer [zip]]
-            [active.clojure.record :refer [define-record-type]]
-            [active.clojure.condition :refer [assertion-violation]])
-  (:import [java.time LocalDate LocalDateTime]
-           [java.io Writer]))
+  (:require [active.clojure
+             [condition :refer [assertion-violation]]
+             [record :refer [define-record-type]]]
+            [sqlosure
+             [universe :refer [register-type! universe-lookup-type]]
+             [utils :refer [zip]]])
+  (:import java.io.Writer
+           [java.time LocalDate LocalDateTime]))
 
 (defprotocol base-type-protocol
   "Protocol for base types."
@@ -51,6 +53,8 @@
       (type-method-default-implementation method)))
 
 (defn invoke-type-method
+  "Looks up the type-method-implementation for ty and method and applies it's
+  result (fn) to the rest-args."
   [ty method & args]
   (apply (type-method-implementation ty method) args))
 
@@ -267,8 +271,6 @@
 
 (def blob% (make-base-type 'blob byte-array? 'lose 'lose))
 (def clob% (make-base-type 'clob char-array? 'lose 'lose))
-
-(def nullable-integer% (make-nullable-type integer%))
 
 (def string%-nullable (make-nullable-type string%))
 (def integer%-nullable (make-nullable-type integer%))
