@@ -113,24 +113,24 @@
   (fn [^ResultSet rs ix] (.getString rs ix)))
 
 (define-type-method-implementations t/string%-nullable
-  (fn [_ ^PreparedStatement stmt ix val] (.setString stmt ix val))
-  (fn [_ ^ResultSet rs ix] (.getString rs ix)))
+  (fn [^PreparedStatement stmt ix val] (.setString stmt ix val))
+  (fn [^ResultSet rs ix] (.getString rs ix)))
 
 (define-type-method-implementations t/integer%
   (fn [^PreparedStatement stmt ix val] (.setInt stmt ix val))
   (fn [^ResultSet rs ix] (.getInt rs ix)))
 
 (define-type-method-implementations t/integer%-nullable
-  (fn [_ ^PreparedStatement stmt ix val] (.setInt stmt ix val))
-  (fn [_ ^ResultSet rs ix] (.getInt rs ix)))
+  (fn [^PreparedStatement stmt ix val] (.setInt stmt ix val))
+  (fn [^ResultSet rs ix] (.getInt rs ix)))
 
 (define-type-method-implementations t/double%
   (fn [^PreparedStatement stmt ix val] (.setDouble stmt ix val))
   (fn [^ResultSet rs ix] (.getDouble rs ix)))
 
 (define-type-method-implementations t/double%-nullable
-  (fn [_ ^PreparedStatement stmt ix val] (.setDouble stmt ix val))
-  (fn [_ ^ResultSet rs ix] (.getDouble rs ix)))
+  (fn [^PreparedStatement stmt ix val] (.setDouble stmt ix val))
+  (fn [^ResultSet rs ix] (.getDouble rs ix)))
 
 (define-type-method-implementations t/boolean%
   (fn [^PreparedStatement stmt ix val] (.setBoolean stmt ix val))
@@ -141,8 +141,8 @@
   (fn [^ResultSet rs ix] (.getBlob rs ix)))
 
 (define-type-method-implementations t/blob%-nullable
-  (fn [_ ^PreparedStatement stmt ix val] (.setBlob stmt ix val))
-  (fn [_ ^ResultSet rs ix] (.getBlob rs ix)))
+  (fn [^PreparedStatement stmt ix val] (.setBlob stmt ix val))
+  (fn [^ResultSet rs ix] (.getBlob rs ix)))
 
 (define-type-method-implementations t/clob%
   (fn [^PreparedStatement stmt ix val] (.setClob stmt ix val))
@@ -154,21 +154,13 @@
   (fn [^PreparedStatement stmt ix val]
     (.setDate stmt ix (time/to-sql-date val)))
   (fn [^ResultSet rs ix]
-    (try
-      (time/from-sql-date (.getDate rs ix))
-      (catch Exception e
-        ;; In this case, let's hope it's a string...
-        (time/from-sql-time-string (.getString rs ix))))))
+    (time/from-sql-date (.getDate rs ix))))
 
 (define-type-method-implementations t/timestamp%
   (fn [^PreparedStatement stmt ix val]
     (.setTimestamp stmt ix (time/to-sql-timestamp val)))
   (fn [^ResultSet rs ix]
-    (try
-      (time/from-sql-timestamp (.getTimestamp rs ix))
-      (catch Exception e
-        ;; In this case, let's hope it's a string...
-        (time/from-sql-timestamp-string (.getString rs ix))))))
+    (time/from-sql-timestamp (.getTimestamp rs ix))))
 
 (defn run-query
   "Takes a database connection and a query and runs it against the database."
@@ -313,7 +305,6 @@
                 (delete-statement-string
                  (rel/base-relation-name sql-table)
                  crit-s))]
-           (println crit-vals)
            (set-parameters stmt crit-vals)
            (.closeOnCompletion stmt)
            (.executeUpdate stmt)))]
