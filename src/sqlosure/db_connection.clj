@@ -154,21 +154,13 @@
   (fn [^PreparedStatement stmt ix val]
     (.setDate stmt ix (time/to-sql-date val)))
   (fn [^ResultSet rs ix]
-    (try
-      (time/from-sql-date (.getDate rs ix))
-      (catch Exception e
-        ;; In this case, let's hope it's a string...
-        (time/from-sql-time-string (.getString rs ix))))))
+    (time/from-sql-date (.getDate rs ix))))
 
 (define-type-method-implementations t/timestamp%
   (fn [^PreparedStatement stmt ix val]
     (.setTimestamp stmt ix (time/to-sql-timestamp val)))
   (fn [^ResultSet rs ix]
-    (try
-      (time/from-sql-timestamp (.getTimestamp rs ix))
-      (catch Exception e
-        ;; In this case, let's hope it's a string...
-        (time/from-sql-timestamp-string (.getString rs ix))))))
+    (time/from-sql-timestamp (.getTimestamp rs ix))))
 
 (defn run-query
   "Takes a database connection and a query and runs it against the database."
