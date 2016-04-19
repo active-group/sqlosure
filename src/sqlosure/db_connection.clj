@@ -305,7 +305,6 @@
                 (delete-statement-string
                  (rel/base-relation-name sql-table)
                  crit-s))]
-           (println crit-vals)
            (set-parameters stmt crit-vals)
            (.closeOnCompletion stmt)
            (.executeUpdate stmt)))]
