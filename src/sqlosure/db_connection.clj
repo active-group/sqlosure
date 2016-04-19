@@ -113,24 +113,24 @@
   (fn [^ResultSet rs ix] (.getString rs ix)))
 
 (define-type-method-implementations t/string%-nullable
-  (fn [_ ^PreparedStatement stmt ix val] (.setString stmt ix val))
-  (fn [_ ^ResultSet rs ix] (.getString rs ix)))
+  (fn [^PreparedStatement stmt ix val] (.setString stmt ix val))
+  (fn [^ResultSet rs ix] (.getString rs ix)))
 
 (define-type-method-implementations t/integer%
   (fn [^PreparedStatement stmt ix val] (.setInt stmt ix val))
   (fn [^ResultSet rs ix] (.getInt rs ix)))
 
 (define-type-method-implementations t/integer%-nullable
-  (fn [_ ^PreparedStatement stmt ix val] (.setInt stmt ix val))
-  (fn [_ ^ResultSet rs ix] (.getInt rs ix)))
+  (fn [^PreparedStatement stmt ix val] (.setInt stmt ix val))
+  (fn [^ResultSet rs ix] (.getInt rs ix)))
 
 (define-type-method-implementations t/double%
   (fn [^PreparedStatement stmt ix val] (.setDouble stmt ix val))
   (fn [^ResultSet rs ix] (.getDouble rs ix)))
 
 (define-type-method-implementations t/double%-nullable
-  (fn [_ ^PreparedStatement stmt ix val] (.setDouble stmt ix val))
-  (fn [_ ^ResultSet rs ix] (.getDouble rs ix)))
+  (fn [^PreparedStatement stmt ix val] (.setDouble stmt ix val))
+  (fn [^ResultSet rs ix] (.getDouble rs ix)))
 
 (define-type-method-implementations t/boolean%
   (fn [^PreparedStatement stmt ix val] (.setBoolean stmt ix val))
@@ -141,8 +141,8 @@
   (fn [^ResultSet rs ix] (.getBlob rs ix)))
 
 (define-type-method-implementations t/blob%-nullable
-  (fn [_ ^PreparedStatement stmt ix val] (.setBlob stmt ix val))
-  (fn [_ ^ResultSet rs ix] (.getBlob rs ix)))
+  (fn [^PreparedStatement stmt ix val] (.setBlob stmt ix val))
+  (fn [^ResultSet rs ix] (.getBlob rs ix)))
 
 (define-type-method-implementations t/clob%
   (fn [^PreparedStatement stmt ix val] (.setClob stmt ix val))
