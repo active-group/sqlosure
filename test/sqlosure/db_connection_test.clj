@@ -78,6 +78,11 @@
                                 ($<= id ($integer 0)))))
             (is (empty? (db/run-query conn q)))))))))
 
+(defn- time-string->local-date
+  [r ix]
+  (update-in r [ix]
+             #(-> % long java.sql.Date. time/from-sql-date)))
+
 ;; A set of example tests to illustrate one possible way to test with an
 ;; in-memory instance of sqlite3.
 (deftest simple-test
