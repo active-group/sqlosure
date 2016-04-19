@@ -63,8 +63,8 @@
 ;; DONE
 (define-record-type db-operator-data
   (make-db-operator-data base-query transformer-fn) db-operator-data?
-  [base-query db-operator-base-query
-   transformer-fn db-operator-transformer-fn])
+  [base-query db-operator-data-base-query
+   transformer-fn db-operator-data-transformer-fn])
 
 ;; DONE
 (defn make-name-generator
@@ -222,6 +222,8 @@
                    (concat more-queries queries)
                    (concat more-restrictions restrictions))))))))
 
+(declare reify-query-result)
+
 ;; TODO with a high possibility of errors.
 (defn db-query-reified-results
   [db q]
@@ -236,6 +238,10 @@
   (let [results (db-query-reified-results db q)]
     (and (seq? results)
          (ffirst results))))
+
+;; DONE
+(defn take+drop [n lis]
+  [(take n lis) (drop n lis)])
 
 ;;  DONE
 (defn reify-query-result
@@ -259,10 +265,6 @@
                  (cons (rest res) rev)))))))
 
 ;; DONE
-(defn take+drop [n lis]
-  [(take n lis) (drop n lis)])
-
-;; DONE
 (defn rename-query [q generate-name]
   (let [cols (rel/rel-scheme-columns (rel/query-scheme q))
         names (map #((generate-name)) cols)]
@@ -273,34 +275,75 @@
                        q)]))
 
 ;; TODO
-#_(defn dbize-expression
+(defn dbize-expression
   "Returns dbized expression, list of renamed additional queries, and list of
   restrictions on the resulting product."
   [e env underlying generate-name]
-  (let [base-queries '()
-        restrictions '()
-        underlying-scheme (rel/query-scheme underlying)
-        dbized (loop [e e]
-                 (cond
-                   (rel/attribute-ref? e)
-                   (or (get env (rel/attribute-ref-name e)) e)
-                   (rel/const? e)
-                   (let [typ (rel/const-type e)]
-                     (if (and (satisfies? t/base-type-protocol typ)
-                              (db-type-data? (t/-data typ)))
-                       ((db-type-data-value->db-expression-fn (t/-data typ))
-                        (rel/const-val e))
-                       e))
-                   (rel/const-null? e)
-                   (let [typ (rel/null-type e)]
-                     (if (and (satisfies? t/base-type-protocol typ)
-                              (db-type-data? (t/-data typ)))
-                       ((db-type-data-value->db-expression-fn (t/-data typ))
-                        '())
-                       e))
-                   (rel/application? e)
-                   (let [rator (rel/application-rator e)
-                         data (rel/rator-data rator)
-                         base-query (db-operator-base-query data)
-                         rands (rel/application-rands e)
-                         initiate nil])))]))
+  (let [base-queries (atom '())
+        restrictions (atom '())
+        underlying-scheme (rel/query-scheme underlying)]
+    (letfn [(worker [e]
+              (cond
+                (rel/attribute-ref? e)
+                (or (get env (rel/attribute-ref-name e)) e)
+                (rel/const? e)
+                (let [typ (rel/const-type e)]
+                  (if (and (satisfies? t/base-type-protocol typ)
+                           (db-type-data? (t/-data typ)))
+                    ((db-type-data-value->db-expression-fn (t/-data typ))
+                     (rel/const-val e))
+                    e))
+                (rel/const-null? e)
+                (let [typ (rel/null-type e)]
+                  (if (and (satisfies? t/base-type-protocol typ)
+                           (db-type-data? (t/-data typ)))
+                    ((db-type-data-value->db-expression-fn (t/-data typ))
+                     '())
+                    e))
+                (rel/application? e)
+                (let [rator (rel/application-rator e)
+                      data (rel/rator-data rator)
+                      base-query (db-operator-base-query data)
+                      rands (rel/application-rands e)
+                      initiate
+                      (fn []
+                        (apply (db-operator-data-transformer-fn data)
+                               (concat
+                                (map worker rands)
+                                (map
+                                 #(rel/expression-type underlying-scheme %)
+                                 rands))))]
+                  (if base-query
+                    (let [[restriction-fn transform] (initiate)
+                          base-query-refs (if base-query
+                                            (let [[base-query-refs renamed-base-query]
+                                                  (rename-query base-query generate-name)]
+                                              (reset! base-queries (cons renamed-base-query @base-queries))
+                                              base-query-refs)
+                                            '())]
+                      (when restriction-fn
+                        (reset! restrictions (cons (apply restriction-fn base-query-refs) restrictions)))
+                      (apply transform base-query-refs))
+                    (initiate)))
+                (tuple? e)
+                (make-tuple (map worker (tuple-expressions e)))
+                (rel/aggregation? e)
+                (let [expr (worker (rel/aggregation-expr e))]
+                  (if (= :count (rel/aggregation-operator e))
+                    (rel/make-aggregation :count
+                                          (loop [expr expr]
+                                            (if (tuple? expr)
+                                              (recur (first (tuple-expressions expr)))  ;; doesn't matter
+                                              expr)))))
+                (rel/case-expr? e)
+                ;; FIXME: this is incomplete: we should commute this
+                ;; with tuples inside the case if the result type is a
+                ;; DB type
+                (rel/make-case-expr (map (fn [[k v]]
+                                           [(worker k) (worker v)])
+                                         (rel/case-expr-alist ))
+                                    (worker (rel/case-expr-default e)))
+                :else (c/assertion-violation `dbize-expression
+                                             "unknown expression" e)))]
+      (let [dbized (worker e)]
+        [dbized @base-queries @restrictions]))))
