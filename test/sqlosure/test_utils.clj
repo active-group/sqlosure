@@ -54,7 +54,7 @@
     [[:id :int]
      [:first "VARCHAR(32)"]
      [:last "VARCHAR(32)"]
-     [:birthday "DATETIME"]
+     [:birthday "DATE"]
      [:sex :boolean]])))
 
 (def person-table
@@ -67,15 +67,12 @@
 
 (defn create-people
   [db]
-  (dotimes [_ 100]
-    (jdbc/insert!
-     db "person"
-     [:id :first :last :birthday :sex]
-     [(next-person-id)
-      (random-string)
-      (random-string)
-      (random-date)
-      (random-boolean)])))
+  (let [conn (db-connect db)]
+    (dotimes [_ 100]
+      (dbs/insert! conn
+                   person-table
+                   (next-person-id) (random-string) (random-string)
+                   (random-date) (random-boolean)))))
 
 (defn make-movie-table
   [db]
@@ -97,11 +94,11 @@
 
 (defn create-movies
   [db]
-  (dotimes [_ 20]
-    (jdbc/insert!
-     db "movie"
-     [:id :title :release :good]
-     [(next-movie-id) (random-string) (random-date) (random-boolean)])))
+  (let [conn (db-connect db)]
+    (dotimes [_ 20]
+      (dbs/insert!
+       conn movie-table
+       (next-movie-id) (random-string) (random-date) (random-boolean)))))
 
 (defn make-actor-movie-table
   [db]
@@ -119,11 +116,11 @@
 
 (defn create-actors
   [db]
-  (dotimes [_ 30]
-    (jdbc/insert!
-     db "actor_movie"
-     [:actor_id :movie_id]
-     [(rand-int @current-person-id) (rand-int @current-movie-id)])))
+  (let [conn (db-connect db)]
+    (dotimes [_ 30]
+      (dbs/insert! conn actor-movie-table
+                   (rand-int @current-person-id)
+                   (rand-int @current-movie-id)))))
 
 (defn with-actor-db
   "`with-actor-db` takes a db-spec and a function which takes the 'conneted' db
