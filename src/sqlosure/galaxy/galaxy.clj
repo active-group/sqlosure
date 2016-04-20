@@ -1,6 +1,7 @@
 (ns sqlosure.galaxy.galaxy
   (:require [active.clojure.record :refer [define-record-type]]
             [active.clojure.condition :as c]
+            [sqlosure.core :as core :refer :all]
             [sqlosure.relational-algebra :as rel]
             [sqlosure.sql :as sql]
             [sqlosure.type :as t]
@@ -58,7 +59,7 @@
       :or [ordered? false numeric? false]}]
   (t/make-base-type name pred const->datum-fn datum->const-fn
                     :universe sql/sql-universe
-                    (make-db-type-data scheme reifier value->db-expression-fn)))
+                    :data (make-db-type-data scheme reifier value->db-expression-fn)))
 
 ;; DONE
 (define-record-type db-operator-data
