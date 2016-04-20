@@ -111,8 +111,10 @@
                           \"bar\" (! t \"bar\"))
 
   The corresponding SQL statemant would be \"SELECT foo, bar FROM t\"."
-  [alist]
-  (qc/project alist))
+  ([alist-or-relation]
+   (if (qc/relation? alist-or-relation)
+     (return alist-or-relation)
+     (qc/project alist-or-relation))))
 
 (defn order
   "Takes an alist of [[attribute-ref] :descending/:ascending] to order
