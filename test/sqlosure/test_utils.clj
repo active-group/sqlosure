@@ -8,7 +8,7 @@
 
 (defn jdbc-out
   [db q & row-fns]
-  (let [res-seq (jdbc/query db q :as-arrays? :cols-as-is)]
+  (let [res-seq (jdbc/query db q {:as-arrays? :cols-as-is})]
     (set (map (apply comp row-fns) (rest res-seq)))))
 
 (defn sqlosure-out
