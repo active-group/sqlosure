@@ -168,7 +168,7 @@ Replaced alist with hash-map."
 ;;; ----------------------------------------------------------------------------
 
 (define-record-type base-relation
-  ^{:doc "Primitive relations, dpeending on the domain universe."}
+  ^{:doc "Primitive relations, depending on the domain universe."}
   (really-make-base-relation name scheme handle) base-relation?
   [name base-relation-name
    scheme base-relation-scheme
