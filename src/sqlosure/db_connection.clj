@@ -180,7 +180,8 @@
            (.closeOnCompletion stmt)
            (result-set-seq (.executeQuery stmt) col-types)))]
     (if-let [con (jdbc/db-find-connection db)]
-      (run-query-with-params con)
+      (doall
+       (run-query-with-params con))
       (with-open [con (jdbc/get-connection db)]
         (doall ; sorry
          (run-query-with-params con))))))
