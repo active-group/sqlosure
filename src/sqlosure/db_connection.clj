@@ -25,7 +25,7 @@
    ^{:doc "A function to print values in a way the dbms understands."}
    parameterization db-connection-paramaterization])
 
-;; FIXME Is this really still necessary?
+;; FIXME Is this really still necessary? See default-put-combine.
 (defn- sqlite3-put-combine
   "sqlite3 specific printer for combine queries."
   [param op left right]
