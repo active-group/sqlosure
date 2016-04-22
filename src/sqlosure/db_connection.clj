@@ -40,10 +40,7 @@
 (defn- sqlite3-put-literal
   "sqlite3 specific printer for literals."
   [type val]
-  (if (or (= true val) (= false val))
-    (do (if val (print 1) (print 0))
-        [])
-    (put/default-put-literal type val)))
+  (put/default-put-literal type val))
 
 (def sqlite3-sql-put-parameterization
   "Printer for sqlite3."
