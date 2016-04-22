@@ -25,6 +25,7 @@
    ^{:doc "A function to print values in a way the dbms understands."}
    parameterization db-connection-paramaterization])
 
+;; FIXME Is this really still necessary?
 (defn- sqlite3-put-combine
   "sqlite3 specific printer for combine queries."
   [param op left right]
@@ -39,13 +40,13 @@
 
 (def sqlite3-sql-put-parameterization
   "Printer for sqlite3."
-  (put/make-sql-put-parameterization put/default-put-alias sqlite3-put-combine
-                                     put/default-put-literal))
+  (put/make-sql-put-parameterization put/default-put-alias
+                                     sqlite3-put-combine))
 
 (def postgresql-sql-put-parameterization
   "Printer for postgresql."
-  (put/make-sql-put-parameterization put/put-dummy-alias put/default-put-combine
-                                     put/default-put-literal))
+  (put/make-sql-put-parameterization put/put-dummy-alias
+                                     put/default-put-combine))
 
 (def get-from-result-set-method
   (t/make-type-method ::get-from-result-set
