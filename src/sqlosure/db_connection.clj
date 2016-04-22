@@ -37,15 +37,10 @@
   (put/put-sql-select param right)
   (print ")"))
 
-(defn- sqlite3-put-literal
-  "sqlite3 specific printer for literals."
-  [type val]
-  (put/default-put-literal type val))
-
 (def sqlite3-sql-put-parameterization
   "Printer for sqlite3."
   (put/make-sql-put-parameterization put/default-put-alias sqlite3-put-combine
-                                     sqlite3-put-literal))
+                                     put/default-put-literal))
 
 (def postgresql-sql-put-parameterization
   "Printer for postgresql."
