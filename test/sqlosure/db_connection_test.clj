@@ -7,7 +7,9 @@
              [db-connection :as db]
              [relational-algebra :as rel]
              [test-utils :refer [actor-movie-table db-spec jdbc-out movie-table person-table sqlosure-out with-actor-db]]
-             [time :as time]]))
+             [time :as time]]
+            [sqlosure.sql-put :as put]
+            [sqlosure.relational-algebra-sql :as rsql]))
 
 (deftest insert!-test
   (with-actor-db db-spec
@@ -77,6 +79,29 @@
                           ($and ($>= id ($integer -5))
                                 ($<= id ($integer 0)))))
             (is (empty? (db/run-query conn q)))))))))
+
+(deftest update!-test
+  (with-actor-db db-spec
+    (fn [db]
+      (let [conn (db-connect db)
+            vian [-1 "Boris" "Vian" (time/make-date 1920 3 10) false]
+            foucault [-1 "Michel" "Foucault" (time/make-date 1926 10 15) false]
+            person=-1 (query [p (<- person-table)]
+                            (restrict ($= (! p "id") ($integer -1)))
+                            (return p))]
+        (do
+          ;; Insert a new person with id -1.
+          (apply db/insert! conn person-table vian)
+          ;; Make sure he's there.
+          (is (= vian (first (db/run-query conn person=-1))))
+          (db/update! conn person-table
+                      (fn [id _ _ _ _]
+                        ($= id ($integer -1)))
+                      (fn [_ _ _ _ _]
+                        {"first" ($string "Michel")
+                         "last" ($string "Foucault")
+                         "birthday" ($date (time/make-date 1926 10 15))}))
+          (is (= foucault (first (db/run-query conn person=-1)))))))))
 
 (defn- time-string->local-date
   [r ix]

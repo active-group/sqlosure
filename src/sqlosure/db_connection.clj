@@ -37,18 +37,10 @@
   (put/put-sql-select param right)
   (print ")"))
 
-(defn- sqlite3-put-literal
-  "sqlite3 specific printer for literals."
-  [type val]
-  (if (or (= true val) (= false val))
-    (do (if val (print 1) (print 0))
-        [])
-    (put/default-put-literal type val)))
-
 (def sqlite3-sql-put-parameterization
   "Printer for sqlite3."
   (put/make-sql-put-parameterization put/default-put-alias sqlite3-put-combine
-                                     sqlite3-put-literal))
+                                     put/default-put-literal))
 
 (def postgresql-sql-put-parameterization
   "Printer for postgresql."
@@ -180,7 +172,8 @@
            (.closeOnCompletion stmt)
            (result-set-seq (.executeQuery stmt) col-types)))]
     (if-let [con (jdbc/db-find-connection db)]
-      (run-query-with-params con)
+      (doall
+       (run-query-with-params con))
       (with-open [con (jdbc/get-connection db)]
         (doall ; sorry
          (run-query-with-params con))))))
@@ -311,26 +304,64 @@
     (if-let [con (jdbc/db-find-connection db)]
       (run-query-with-params con)
       (with-open [con (jdbc/get-connection db)]
-        (doall (run-query-with-params con))))))
+        (run-query-with-params con)))))
+
+(defn- update-statement-string
+  [table-name set-vals crit-s? crit-vals?]
+  (let [set-vals-string (->> set-vals
+                             (map (fn [[k v]]
+                                    (str k "=?")))
+                            (interpose ", ")
+                            (apply str))
+        set-vals-vals (->> set-vals
+                           (map second)
+                                (map (fn [v]
+                                       [(sql/sql-expr-const-type v)
+                                        (sql/sql-expr-const-val v)])))
+        crit-string (->> crit-s?
+                         first)
+        types+vals (concat set-vals-vals crit-vals?)]
+    [(str "UPDATE " table-name " SET " set-vals-string
+           (when crit-s?
+             (str " WHERE " crit-s?)))
+     types+vals]))
 
 (defn update!
   [conn sql-table criterion-proc alist-first & args]
   (let [name (sql/sql-table-name (rel/base-relation-handle sql-table))
         scheme (rel/query-scheme sql-table)
+        db (db-connection-conn conn)
         attr-exprs (map rel/make-attribute-ref
                         (rel/rel-scheme-columns scheme))
-        alist (into {}
-                    (map (fn [[k v]]
-                           [k (rsql/expression->sql v)])
-                         (if (fn? alist-first)
-                           (apply alist-first attr-exprs)
-                           (cons alist-first args))))]
-    (jdbc/update! (db-connection-conn conn)
-                  name
-                  (into {} (map (fn [[k v]] [k (:val v)]) alist))
-                  (put/sql-expression->string
-                   (db-connection-paramaterization conn)
-                   (rsql/expression->sql (apply criterion-proc attr-exprs))))))
+        alist (map (fn [[k v]]
+                     [k (rsql/expression->sql v)])
+                   (if (fn? alist-first)
+                     (apply alist-first attr-exprs)
+                     (when args
+                       (cons alist-first args)
+                       alist-first)))
+        [crit-s & crit-vals]
+        (put/sql-expression->string
+         (db-connection-paramaterization conn)
+         (rsql/expression->sql (apply criterion-proc attr-exprs)))
+        [update-string update-types+vals]
+        (update-statement-string
+         (rel/base-relation-name sql-table)
+         alist crit-s crit-vals)
+        run-query-with-params
+        (^{:once true} fn* [con]
+         (let [^PreparedStatement stmt
+               (jdbc/prepare-statement
+                con
+                update-string)]
+           (set-parameters stmt update-types+vals)
+           (.closeOnCompletion stmt)
+           (.executeUpdate stmt)))]
+    ;; update-types+vals
+    (if-let [con (jdbc/db-find-connection db)]
+      (run-query-with-params con)
+      (with-open [con (jdbc/get-connection db)]
+        (run-query-with-params con)))))
 
 (defn run-sql
   [conn sql]
