@@ -21,11 +21,10 @@
                  v#)))))
 
 (define-record-type sql-put-parameterization
-  (make-sql-put-parameterization alias-proc combine-proc literal-proc)
+  (make-sql-put-parameterization alias-proc combine-proc)
   sql-put-parameterization?
   [alias-proc sql-put-parameterization-alias-proc
-   combine-proc sql-put-parameterization-combine-proc
-   literal-proc sql-put-parameterization-literal-proc])
+   combine-proc sql-put-parameterization-combine-proc])
 
 (defn put-space
   "Print a single space character."
@@ -51,10 +50,16 @@
          (or alias
              (str (gensym)))))
 
+(defn default-put-literal
+  [type val]
+  (do
+    (print "?")
+    [[type val]]))
+
 (defn put-literal
   "Apply `params` literal-proc to val."
   [param type val]
-  ((sql-put-parameterization-literal-proc param) type val))
+  (default-put-literal type val))
 
 (defn put-alias
   "Apply `params` alias-proc to the alias."
@@ -105,14 +110,6 @@
                                _ (put-alias param alias)]
                            v1)))))
 
-(defn default-put-literal
-  [type val]
-  (if true ;; look wrong in any case: (or (number? val) (string? val) (nil? val) (= true) (= false))
-    (do
-      (print "?")
-      [[type val]])
-    (assertion-violation `default-put-literal (str "unhandeled literal " (pr-str val)))))
-
 (defn default-put-combine
   [param op left right]
   (let [_ (print "(")
@@ -128,7 +125,7 @@
     (concat v1 v2)))
 
 (def default-sql-put-parameterization
-  (make-sql-put-parameterization default-put-alias default-put-combine default-put-literal))
+  (make-sql-put-parameterization default-put-alias default-put-combine))
 
 (declare put-sql-expression)
 
