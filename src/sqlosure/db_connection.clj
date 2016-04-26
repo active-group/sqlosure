@@ -19,36 +19,13 @@
           db-connection as well as backend specific conversion and printer
           functions."}
   db-connection
-  (make-db-connection conn parameterization) db-connection?
+  (make-db-connection conn) db-connection?
   [^{:doc "The database connection map as used by jdbc."}
-   conn db-connection-conn
-   ^{:doc "A function to print values in a way the dbms understands."}
-   parameterization db-connection-paramaterization])
-
-;; FIXME Is this really still necessary? See default-put-combine.
-(defn- sqlite3-put-combine
-  "sqlite3 specific printer for combine queries."
-  [param op left right]
-  (print "SELECT * FROM (")
-  (put/put-sql-select param left)
-  (print (case op
-           :union " UNION "
-           :intersection " INTERSECT "
-           :difference " EXCEPT "))
-  (put/put-sql-select param right)
-  (print ")"))
-
-(def sqlite3-sql-put-parameterization
-  "Printer for sqlite3."
-  (put/make-sql-put-parameterization put/default-put-alias
-                                     sqlite3-put-combine))
-
-(def postgresql-sql-put-parameterization
-  "Printer for postgresql."
-  (put/make-sql-put-parameterization put/put-dummy-alias
-                                     put/default-put-combine))
+   conn db-connection-conn])
 
 (def get-from-result-set-method
+  "Creates the type method `::get-from-result-set` with a default get function
+  using `.getObject` on every input value and type."
   (t/make-type-method ::get-from-result-set
                       (fn [^ResultSet rs ix]
                         (.getObject rs ix))))
@@ -75,12 +52,17 @@
     rows))
 
 (def set-parameter-method
+  "Creates the type method `::set-parameter` with a default set function
+  using `.setObject` on every input value and type."
   (t/make-type-method ::set-parameter
                       (fn [^PreparedStatement stmt ix val]
                         (.setObject stmt ix val))))
 
 (defn- set-parameters
-  "Add the parameters to the given statement."
+  "Add the parameters to the given statement.
+  Uses the approriate jdbc get and set functions depending on the type attached
+  to the value.
+  `param-types+args` is a sequence of vectors `[[$sqlosure-type val] ...]`."
   [stmt param-types+args]
   ;; FIXME: don't do map
   (dorun (map-indexed (fn [ix [ty val]]
@@ -156,14 +138,25 @@
     (time/from-sql-timestamp (.getTimestamp rs ix))))
 
 (defn run-query
-  "Takes a database connection and a query and runs it against the database."
+  "Takes a database connection and a query and runs it against the database.
+
+  Example:
+
+      (def db-spec { ... })  ;; Your db-connection map.
+      (def kv-table (table \"kv\" {\"key\" $integer-t
+                                 \"value\" $string-t}))
+      ;; Get all records from kv-table where \"key\" is less than 10.
+      (run-query (db-connect db-spec)
+                 (query [kv (<- kv-table)]
+                        (restrict ($> (! k \"key\")
+                                    ($integer 10)))
+                        (project {\"value\" (! kv \"value\")})))"
   [conn q & {:keys [optimize?] :or {optimize? true} :as opts-map}]
   (let [qq (if optimize? (o/optimize-query q) q)
         scheme (rel/query-scheme qq)
         col-types (rel/rel-scheme-types scheme)
         asql (rsql/query->sql qq)
-        [sql & param-types+args] (put/sql-select->string
-                                  (db-connection-paramaterization conn) asql)
+        [sql & param-types+args] (put/sql-select->string asql)
         db (db-connection-conn conn)
         run-query-with-params
         (^{:once true} fn* [con]
@@ -182,10 +175,11 @@
 (defn- validate-scheme
   "`validate-scheme` takes two rel-schemes and checks if they obey the following
   rules:
-      - `scheme` must not contain keys not present in `full-scheme`
-      - `scheme` must contain all non-nullable fields present in `full-scheme`
-      - `scheme`'s vals for each key must not differ in type from those in
-        `full-scheme`"
+
+  - `scheme` must not contain keys not present in `full-scheme`
+  - `scheme` must contain all non-nullable fields present in `full-scheme`
+  - `scheme`'s vals for each key must not differ in type from those in
+    `full-scheme`"
   [full-scheme scheme]
   (letfn [(no-extra-keys [ks1 ks2]
             (empty? (set/difference (set ks2) (set ks1))))
@@ -240,17 +234,23 @@
   `sql-table`.
 
   `args` can either be:
-      - a set of values to insert if there is a value for each column. Those
-        must be in the order of the columns in the table.
-      - a rel-scheme, specifying the columns to insert the values into follwed
-        by the desired values.
 
-  If the rel-scheme of the value to insert is explicitly specified it will be
-  checked for:
-      - missing mandatory keys (non-nullable fields)
-      - keys that are not present in the original scheme
-      - type mismatches
-  If this fails, an assertion will be thrown."
+   - a set of values to insert if there is a value for each column. Those
+     must be in the order of the columns in the table.
+   - a rel-scheme, specifying the columns to insert the values into follwed
+     by the desired values.
+
+  Example:
+
+      (def db-spec { ... })  ;; Your db-connection map.
+      ;; For inserts that contain every column of the specified table:
+      (insert! (db-connect db-spec) some-table arg1 arg2 ... argN)
+
+      ;; For inserts that only specify a subset of all columns:
+      (insert! (db-connect db-spec) some-table
+                                    (alist->rel-scheme {\"foo\" $integer-t
+                                                        \"bar\" $string-t}
+                                    integer-value string-value))"
   [conn sql-table & args]
   (let [[scheme vals] (if (and (seq args) (rel/rel-scheme? (first args)))
                         [(first args) (rest args)]
@@ -281,6 +281,21 @@
        crit-s))
 
 (defn delete!
+  "`delete!` takes a db-connection, a sql-table and a criterion function and
+  deletes all entries in `sql-table` that satisfy the criteria.
+  `criterion-proc` is a function that takes as many arguments as the relation
+  has fields. In it's body one can specify the criteria in the same manner as
+  in regular sqlosure queries.
+
+  Example:
+
+      (def db-spec { ... })  ;; Your db-connection map.
+      (def kv-table (table \"kv\" {\"key\" $integer-t
+                                 \"value\" $string-t}))
+      ;; Delete all records where key > 10.
+      (delete! (db-connect db-spec) kv-table
+               (fn [k v]
+                 ($> k ($integer 10))))"
   [conn sql-table criterion-proc]
   (let [name (sql/sql-table-name (rel/base-relation-handle sql-table))
         scheme (rel/base-relation-scheme sql-table)
@@ -288,7 +303,6 @@
         db (db-connection-conn conn)
         [crit-s & crit-vals]
         (put/sql-expression->string
-         (db-connection-paramaterization conn)
          (rsql/expression->sql (apply criterion-proc
                                       (map rel/make-attribute-ref cols))))
         run-query-with-params
@@ -328,6 +342,21 @@
      types+vals]))
 
 (defn update!
+  "`update!` takes a db-connection, a sql-table, a criterion-proc and and map
+  and updates all entries of `sql-table` that satisfy `criterion-proc` with the
+  new key->value pairs specified in `alist-first` function.
+
+  Example:
+
+      (def db-spec { ... })  ;; Your db-connection map.
+      (def kv-table (table \"kv\" {\"key\" $integer-t
+                                 \"value\" $string-t}))
+      ;; Update the \"value\" field all records where key > 10 to \"NEWVAL\".
+      (update! (db-connect db-spec) kv-table
+               (fn [k v]
+                 ($> k ($integer 10)))  ;; Read: \"key\" > 10
+               (fn [k v]
+                 {\"value\" ($string \"NEWVAL\")})"
   [conn sql-table criterion-proc alist-first & args]
   (let [name (sql/sql-table-name (rel/base-relation-handle sql-table))
         scheme (rel/query-scheme sql-table)
@@ -343,7 +372,6 @@
                        alist-first)))
         [crit-s & crit-vals]
         (put/sql-expression->string
-         (db-connection-paramaterization conn)
          (rsql/expression->sql (apply criterion-proc attr-exprs)))
         [update-string update-types+vals]
         (update-statement-string

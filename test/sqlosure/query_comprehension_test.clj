@@ -37,7 +37,6 @@
 (deftest const-restrict-test
   (is (= ["SELECT two AS foo FROM tbl1 WHERE (one = ?)" [string% "foobar"]]
          (sqlosure.sql-put/sql-select->string
-          sqlosure.sql-put/default-sql-put-parameterization
           (query->sql (opt/optimize-query
                        (get-query (monadic
                                    [t1 (embed tbl1)]

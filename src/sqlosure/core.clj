@@ -16,14 +16,7 @@
   "`db-connect` takes a connection map and returns a `db-connection`-record for
   that backend. Dispatches on the `:classname` key in `db-spec`."
   [db-spec]
-  (case (:classname db-spec)
-    "org.postgresql.Driver"
-    (db/make-db-connection db-spec
-                           db/postgresql-sql-put-parameterization)
-    "org.sqlite.JDBC"
-    (db/make-db-connection db-spec
-                           db/sqlite3-sql-put-parameterization)
-    (assertion-violation `db-connect "unsupported db-spec" db-spec)))
+  (db/make-db-connection db-spec))
 
 (defn table
   "Returns a `sqlosure.relational-algebra/base-relation`.
