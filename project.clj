@@ -12,6 +12,8 @@
             [lein-kibit "0.1.2"]
             [lein-codox "0.9.4"]]
 
+  :codox {:metadata {:doc/format :markdown}}
+
   :profiles {:test {:dependencies [[pjstadig/humane-test-output "0.8.0"]]
                     :injections [(require 'pjstadig.humane-test-output)
                                  (pjstadig.humane-test-output/activate!)]}
