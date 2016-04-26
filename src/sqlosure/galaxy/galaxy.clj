@@ -8,23 +8,36 @@
             [sqlosure.db-connection :as db]))
 
 (define-record-type tuple
+  ^{:doc "A tuple holds a (sorted) vector of values."}
   (make-tuple expressions) tuple?
-  [expressions tuple-expressions])
+  [^{:doc "A (sorted) vector of values."}
+   expressions tuple-expressions])
 
 ;; DONE
 (define-record-type db-galaxy
+  ^{:doc "A galaxy is the Clojure representation of a record-type in a
+(relational) database. Galaxies serve as the interface which can be queried just
+as a SQL-table as created by `sqlosure.core/table`."}
   (really-make-db-galaxy name type setup-fn query) db-galaxy?
-  [name db-galaxy-name
-   type db-galaxy-type
+  [^{:doc "The name of the galaxy."} name db-galaxy-name
+   ^{:doc "The type that this galaxy represents."} type db-galaxy-type
    ^{:doc "Takes a db-connection, sets up virgin DB tables."}
    setup-fn db-galaxy-setup-fn
    query db-galaxy-query])
 
 ;; DONE
-(def *db-galaxies* (atom {}))
+(def ^:dynamic *db-galaxies*
+  "`*db-galaxies*` is a map wrapped in an atom that contains all known
+  galaxies as a mapping of galaxy-name -> galaxy-record."
+  (atom {}))
 
 ;; TODO which universe?
 (defn make&install-db-galaxy
+  "`make&install-db-galaxy` takes a `name` for a new galaxy, a `type` that
+  this galaxy represents, the `setup-fn` function to create the corresponding
+  db tables and a `query` (?).
+  It returns a `sqlosure.relational-algebra/base-relation` for this new table
+  and registers the galaxy to `*db-galaxies*`."
   [name type setup-fn query]
   (let [dg (really-make-db-galaxy name type setup-fn query)
         rel (rel/make-base-relation name
@@ -37,7 +50,7 @@
 ;; DONE
 (defn initialize-db-galaxies!
   "Takes a connection and installs all galaxies currently stored in
-  *db-galaxies* to the database."
+  `*db-galaxies*` to the database."
   [conn]
   (dorun (map (fn [glxy]
                 ((db-galaxy-setup-fn (rel/base-relation-handle glxy)) conn))
@@ -53,6 +66,19 @@
 
 ;; TODO Which universe?
 (defn make-db-type
+  "`make-db-type` creates a new `sqlosure.type/base-type` for a db-type in a to
+  be used in a galaxy. The newly created data type will be registered to the
+  sql-universe.
+
+  * `name`: the name of the type
+  * `pred`:  a predicate function for values of that type
+  * `const->datum-fn`
+  * `datum->const-fn`
+  * `scheme`: a `sqlosure.relational-algebra/rel-scheme` for this new type
+  * `reifier`: a function that knows how to reconstruct a value of this type
+               from a query result
+  * `value->db-expression->fn`: a function that knows how to create a db-entry
+                                from a value of this type"
   [name pred const->datum-fn datum->const-fn scheme reifier
    value->db-expression-fn
    & {:keys [ordered? numeric?]
@@ -68,7 +94,10 @@
    transformer-fn db-operator-data-transformer-fn])
 
 ;; DONE
-(defn make-name-generator
+(defn- make-name-generator
+  "Takes a prefix (String) and returns a function that returns the prefix with
+  a \"_n\"-suffix, where n is an integer starting with 0 that gets incremented
+  upon each subsequent call."
   [prefix]
   (let [count (atom 0)]
     (fn []
@@ -77,15 +106,19 @@
         (str prefix "_" c)))))
 
 ;; DONE
-(defn list->product
+(defn- list->product
+  "Takes a list and returns a `sqlosure.relational-algebra/product` for this
+  list."
   [ql]
   (if (empty? ql)
-    (rel/the-empty)
+    rel/the-empty
     (rel/make-product (first ql)
                       (list->product (rest ql)))))
 
 ;; DONE
-(defn apply-restrictions
+(defn- apply-restrictions
+  "Takes a list of restrictions `rl` and a query and applies the restrictions to
+  the query."
   [rl q]
   (if (empty? rl)
     q
@@ -94,18 +127,19 @@
 
 ;; DONE
 (defn restrict-to-scheme
+  "Takes a rel-scheme `scheme` and a query `q` and returns a new
+  `sqlosure.relational-algebra/project`."
   [scheme q]
   (rel/make-project
    (map (fn [k]
-          [k (rel/make-attribute-ref
-              (get (rel/rel-scheme-map scheme) k))])
+          [k (rel/make-attribute-ref (get (rel/rel-scheme-map scheme) k))])
         (rel/rel-scheme-columns scheme))
    q))
 
 ;; DONE
 (defn make-new-names
   "Takes a string `base` and a list `lis` and returns a list of
-  '(\"base_0\", ..., \"base_n\") where = `(count lis)`."
+  '(\"base_0\", ..., \"base_n\") where `n` = `(count lis)`."
   [base lis]
   (loop [i 0
          lis lis
@@ -118,11 +152,12 @@
 
 ;; TODO restrict-outer
 (defn dbize-query*
+  "Returns new query, environment mapping names to tuples."
   [q generate-name]
   (letfn
       [(worker [q generate-name]
          (cond
-           (rel/empty-query? q) rel/the-empty-rel-scheme
+           (rel/empty-query? q) [rel/the-empty-rel-scheme '()]
            (rel/base-relation? q)
            (let [handle (rel/base-relation-handle q)]
              (if (db-galaxy? handle)
@@ -225,7 +260,7 @@
 
 (declare reify-query-result)
 
-;; TODO with a high possibility of errors.
+;; with a high possibility of errors.
 (defn db-query-reified-results
   [db q]
   ;; FIXME what happened to env?
@@ -304,7 +339,7 @@
                 (rel/application? e)
                 (let [rator (rel/application-rator e)
                       data (rel/rator-data rator)
-                      base-query (db-operator-base-query data)
+                      base-query (db-operator-data-base-query data)
                       rands (rel/application-rands e)
                       initiate
                       (fn []
@@ -316,14 +351,18 @@
                                  rands))))]
                   (if base-query
                     (let [[restriction-fn transform] (initiate)
-                          base-query-refs (if base-query
-                                            (let [[base-query-refs renamed-base-query]
-                                                  (rename-query base-query generate-name)]
-                                              (reset! base-queries (cons renamed-base-query @base-queries))
-                                              base-query-refs)
-                                            '())]
+                          base-query-refs
+                          (if base-query
+                            (let [[base-query-refs renamed-base-query]
+                                  (rename-query base-query generate-name)]
+                              (reset! base-queries (cons renamed-base-query
+                                                         @base-queries))
+                              base-query-refs)
+                            '())]
                       (when restriction-fn
-                        (reset! restrictions (cons (apply restriction-fn base-query-refs) restrictions)))
+                        (reset! restrictions
+                                (cons (apply restriction-fn base-query-refs)
+                                      restrictions)))
                       (apply transform base-query-refs))
                     (initiate)))
                 (tuple? e)
@@ -331,11 +370,13 @@
                 (rel/aggregation? e)
                 (let [expr (worker (rel/aggregation-expr e))]
                   (if (= :count (rel/aggregation-operator e))
-                    (rel/make-aggregation :count
-                                          (loop [expr expr]
-                                            (if (tuple? expr)
-                                              (recur (first (tuple-expressions expr)))  ;; doesn't matter
-                                              expr)))))
+                    (rel/make-aggregation
+                     :count
+                     (loop [expr expr]
+                       (if (tuple? expr)
+                         ;; doesn't matter
+                         (recur (first (tuple-expressions expr)))
+                         expr)))))
                 (rel/case-expr? e)
                 ;; FIXME: this is incomplete: we should commute this
                 ;; with tuples inside the case if the result type is a
