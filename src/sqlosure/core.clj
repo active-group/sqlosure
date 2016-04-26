@@ -59,7 +59,7 @@
   "`!` selects an attribute from a relation.
 
       Example: (! t \"id\") corresponds to SQL \"t.id\"."
-  [rel name]
+  [rel & [name]]
   (qc/! rel name))
 
 (defn restrict

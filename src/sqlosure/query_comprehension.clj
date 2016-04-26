@@ -175,13 +175,20 @@ running the query monad."}
   "`!` selects an attribute from a relation.
 
   Example: (! t \"id\") corresponds to SQL \"t.id\"."
-  [rel name]
-  ;; check user args
-  (when-not (relation? rel)
-    (assertion-violation `! (str "not a relation: " rel)))
-  (when-not (contains? (rel/rel-scheme-map (relation-scheme rel)) name)
-    (assertion-violation `! "unkown attribute" rel name))
-  (rel/make-attribute-ref (fresh-name name (relation-alias rel))))
+  [rel name?]
+  (let [alist (rel/rel-scheme-map (relation-scheme rel))
+        name (if name?
+               name
+               (do
+                 (assert (= (count alist) 1))
+                 (ffirst alist)))]
+    ;; check user args
+    (when-not (relation? rel)
+      (assertion-violation `! (str "not a relation: " rel)))
+    (when name?
+      (when-not (contains? (rel/rel-scheme-map (relation-scheme rel)) name)
+        (assertion-violation `! "unkown attribute" rel name)))
+    (rel/make-attribute-ref (fresh-name name (relation-alias rel)))))
 
 ;; A map representing the empty state for building up the query.
 (defn- make-state
