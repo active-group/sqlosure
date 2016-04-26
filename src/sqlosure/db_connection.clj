@@ -19,36 +19,13 @@
           db-connection as well as backend specific conversion and printer
           functions."}
   db-connection
-  (make-db-connection conn parameterization) db-connection?
+  (make-db-connection conn) db-connection?
   [^{:doc "The database connection map as used by jdbc."}
-   conn db-connection-conn
-   ^{:doc "A function to print values in a way the dbms understands."}
-   parameterization db-connection-paramaterization])
-
-;; FIXME Is this really still necessary? See default-put-combine.
-(defn- sqlite3-put-combine
-  "sqlite3 specific printer for combine queries."
-  [param op left right]
-  (print "SELECT * FROM (")
-  (put/put-sql-select param left)
-  (print (case op
-           :union " UNION "
-           :intersection " INTERSECT "
-           :difference " EXCEPT "))
-  (put/put-sql-select param right)
-  (print ")"))
-
-(def sqlite3-sql-put-parameterization
-  "Printer for sqlite3."
-  (put/make-sql-put-parameterization put/default-put-alias
-                                     sqlite3-put-combine))
-
-(def postgresql-sql-put-parameterization
-  "Printer for postgresql."
-  (put/make-sql-put-parameterization put/put-dummy-alias
-                                     put/default-put-combine))
+   conn db-connection-conn])
 
 (def get-from-result-set-method
+  "Creates the type method `::get-from-result-set` with a default get function
+  using `.getObject` on every input type."
   (t/make-type-method ::get-from-result-set
                       (fn [^ResultSet rs ix]
                         (.getObject rs ix))))
@@ -162,8 +139,7 @@
         scheme (rel/query-scheme qq)
         col-types (rel/rel-scheme-types scheme)
         asql (rsql/query->sql qq)
-        [sql & param-types+args] (put/sql-select->string
-                                  (db-connection-paramaterization conn) asql)
+        [sql & param-types+args] (put/sql-select->string asql)
         db (db-connection-conn conn)
         run-query-with-params
         (^{:once true} fn* [con]
@@ -288,7 +264,6 @@
         db (db-connection-conn conn)
         [crit-s & crit-vals]
         (put/sql-expression->string
-         (db-connection-paramaterization conn)
          (rsql/expression->sql (apply criterion-proc
                                       (map rel/make-attribute-ref cols))))
         run-query-with-params
@@ -343,7 +318,6 @@
                        alist-first)))
         [crit-s & crit-vals]
         (put/sql-expression->string
-         (db-connection-paramaterization conn)
          (rsql/expression->sql (apply criterion-proc attr-exprs)))
         [update-string update-types+vals]
         (update-statement-string
