@@ -155,6 +155,23 @@
     (testing "with something other than a query it should fail"
       (is (thrown? Exception (apply-restrictions [] 5))))))
 
+(deftest restrict-to-scheme-test
+  (let [underlying (rel/make-project {"one" (rel/make-attribute-ref "k")}
+                                     kv-table)]
+    (is (= (rel/make-project
+            {"k" (rel/make-attribute-ref "key")
+             "v" (rel/make-attribute-ref "value")}
+            underlying)
+           (restrict-to-scheme (rel/alist->rel-scheme
+                                {"k" "key" 
+                                 "v" "value"})
+                               underlying)))
+    (testing "empty scheme should cause an assertion violation"
+      (is (thrown? Exception (restrict-to-scheme nil underlying))))
+    (testing "invalid query should cause an assertion violation"
+      (is (thrown? Exception (restrict-to-scheme (rel/alist->rel-scheme
+                                                  {"k" "key"}) nil))))))
+
 (comment
 
   (def p1 (make-person 0 "Marco" "Schneider" (time/make-date 1989 10 31) false))

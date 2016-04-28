@@ -133,8 +133,13 @@ as a SQL-table as created by `sqlosure.core/table`."}
 ;; DONE
 (defn restrict-to-scheme
   "Takes a rel-scheme `scheme` and a query `q` and returns a new
-  `sqlosure.relational-algebra/project`."
+  `sqlosure.relational-algebra/project` which wraps the old query in a
+  projection with the mappings of `scheme`."
   [scheme q]
+  (when (empty? scheme)
+    (c/assertion-violation `restrict-to-scheme "empty scheme"))
+  (when-not (rel/query? q)
+    (c/assertion-violation `restrict-to-scheme "unknown query" q))
   (rel/make-project
    (map (fn [k]
           [k (rel/make-attribute-ref (get (rel/rel-scheme-map scheme) k))])
