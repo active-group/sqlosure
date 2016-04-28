@@ -47,13 +47,13 @@ as a SQL-table as created by `sqlosure.core/table`."}
     (swap! *db-galaxies* assoc name rel)
     rel))
 
-;; DONE
+;; DONE + TESTS
 (defn initialize-db-galaxies!
   "Takes a connection and installs all galaxies currently stored in
   `*db-galaxies*` to the database."
   [conn]
-  (dorun (map (fn [glxy]
-                ((db-galaxy-setup-fn (rel/base-relation-handle glxy)) conn))
+  (doall (map (fn [[name glxy]]
+                   ((db-galaxy-setup-fn (rel/base-relation-handle glxy)) conn))
               @*db-galaxies*)))
 
 ;; DONE
@@ -120,10 +120,15 @@ as a SQL-table as created by `sqlosure.core/table`."}
   "Takes a list of restrictions `rl` and a query and applies the restrictions to
   the query."
   [rl q]
-  (if (empty? rl)
-    q
-    (apply-restrictions (rest rl)
-                        (rel/make-restrict (first rl) q))))
+  (cond
+    (nil? q) rel/the-empty
+    (not (rel/query? q)) (c/assertion-violation `apply-restrictions
+                                                "not a query" q)
+    :else
+    (if (empty? rl)
+      q
+      (apply-restrictions (rest rl)
+                          (rel/make-restrict (first rl) q)))))
 
 ;; DONE
 (defn restrict-to-scheme
