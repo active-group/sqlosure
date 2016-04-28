@@ -172,6 +172,25 @@
       (is (thrown? Exception (restrict-to-scheme (rel/alist->rel-scheme
                                                   {"k" "key"}) nil))))))
 
+(deftest make-new-names-test
+  (is (= (list "foo_0" "foo_1" "foo_2")
+         (make-new-names "foo" (range 0 3))))
+  (is (= nil (make-new-names "foo" nil))))
+
+(deftest rename-query-test
+  (let [gen (#'sqlosure.galaxy.galaxy/make-name-generator "dbize")
+        q (rel/make-project {"k" (rel/make-attribute-ref "k")}
+                            kv-table)]
+    (is (= [(list (rel/make-attribute-ref "dbize_0"))
+            (rel/make-project {"dbize_0" (rel/make-attribute-ref "k")}
+                              q)]
+           (rename-query q gen)))
+    (testing "should throw with non-function name-generator"
+      (is (thrown? Exception (rename-query q nil)))
+      (is (thrown? Exception (rename-query q 5))))
+    (testing "should throw if q is not a query"
+      (is (thrown? Exception (rename-query nil gen))))))
+
 (comment
 
   (def p1 (make-person 0 "Marco" "Schneider" (time/make-date 1989 10 31) false))

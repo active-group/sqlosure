@@ -151,12 +151,9 @@ as a SQL-table as created by `sqlosure.core/table`."}
   "Takes a string `base` and a list `lis` and returns a list of
   '(\"base_0\", ..., \"base_n\") where `n` = `(count lis)`."
   [base lis]
-  (loop [i 0
-         lis lis
-         rev '()]
-    (if (empty? lis)
-      (reverse rev)
-      (recur (inc i) (rest lis) (cons (str base "_" i) rev)))))
+  (when-not (empty? lis)
+    (let [gen (make-name-generator base)]
+      (take (count lis) (repeatedly gen)))))
 
 (declare dbize-project dbize-expression)
 
@@ -311,9 +308,20 @@ as a SQL-table as created by `sqlosure.core/table`."}
                  (cons (rest res) rev)))))))
 
 ;; DONE
-(defn rename-query [q generate-name]
+(defn rename-query
+  "Takes a query `q` and a name-generator function `generate-name` and returns
+  the query wrapped in a `sqlosure.relational-algebra/project` with mappings
+  from a newly generated name to the old reference."
+  [q generate-name]
+  (when-not (fn? generate-name)
+    (c/assertion-violation `rename-query
+                           "generate-name is not a function"
+                           generate-name))
+  (when-not (rel/query? q)
+    (c/assertion-violation `rename-query
+                           "unknown query" q))
   (let [cols (rel/rel-scheme-columns (rel/query-scheme q))
-        names (map #((generate-name)) cols)]
+        names (map (fn [_] (generate-name)) cols)]
     [(map rel/make-attribute-ref names)
      (rel/make-project (map (fn [name k]
                               [name (rel/make-attribute-ref k)])
