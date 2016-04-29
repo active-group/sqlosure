@@ -1,11 +1,12 @@
 (ns sqlosure.galaxy.galaxy
-  (:require [active.clojure.record :refer [define-record-type]]
-            [active.clojure.condition :as c]
-            [sqlosure.core :as core :refer :all]
-            [sqlosure.relational-algebra :as rel]
-            [sqlosure.sql :as sql]
-            [sqlosure.type :as t]
-            [sqlosure.db-connection :as db]))
+  (:require [active.clojure
+             [condition :as c]
+             [record :refer [define-record-type]]]
+            [sqlosure
+             [db-connection :as db]
+             [relational-algebra :as rel]
+             [sql :as sql]
+             [type :as t]]))
 
 (define-record-type tuple
   ^{:doc "A tuple holds a (sorted) vector of values."}
@@ -28,7 +29,8 @@ as a SQL-table as created by `sqlosure.core/table`."}
 ;; DONE
 (def ^:dynamic *db-galaxies*
   "`*db-galaxies*` is a map wrapped in an atom that contains all known
-  galaxies as a mapping of galaxy-name -> galaxy-record."
+  galaxies as a mapping of galaxy-name ->
+  `sqlosure.realional-algebra/base-relation`."
   (atom {}))
 
 ;; TODO which universe?
@@ -42,8 +44,8 @@ as a SQL-table as created by `sqlosure.core/table`."}
   (let [dg (really-make-db-galaxy name type setup-fn query)
         rel (rel/make-base-relation name
                                     (rel/alist->rel-scheme {name type})
-                                    sql/sql-universe
-                                    dg)]
+                                    :universe sql/sql-universe
+                                    :handle dg)]
     (swap! *db-galaxies* assoc name rel)
     rel))
 
@@ -93,7 +95,7 @@ as a SQL-table as created by `sqlosure.core/table`."}
   [base-query db-operator-data-base-query
    transformer-fn db-operator-data-transformer-fn])
 
-;; DONE
+;; DONE + TESTS
 (defn- make-name-generator
   "Takes a prefix (String) and returns a function that returns the prefix with
   a \"_n\"-suffix, where n is an integer starting with 0 that gets incremented
@@ -167,6 +169,8 @@ as a SQL-table as created by `sqlosure.core/table`."}
            (rel/empty-query? q) [rel/the-empty-rel-scheme '()]
            (rel/base-relation? q)
            (let [handle (rel/base-relation-handle q)]
+             ;; If the query is a galaxy, we need to extract the underlying
+             ;; query and relation.
              (if (db-galaxy? handle)
                (let [db-query (db-galaxy-query handle)
                      name (db-galaxy-name handle)
@@ -174,10 +178,10 @@ as a SQL-table as created by `sqlosure.core/table`."}
                      new-names (make-new-names name cols)]
                  [(rel/make-project (map (fn [k new-name]
                                            [new-name (rel/make-attribute-ref k)])
-                                         cols new-names))
-                  (list
-                   (cons name
-                         (make-tuple (map rel/make-attribute-ref new-names))))])
+                                         cols new-names)
+                                    db-query)
+                  [name
+                   (make-tuple (map rel/make-attribute-ref new-names))]])
                [q '()]))
            (rel/project? q)
            (let [[alist underlying env]
@@ -336,74 +340,86 @@ as a SQL-table as created by `sqlosure.core/table`."}
   (let [base-queries (atom '())
         restrictions (atom '())
         underlying-scheme (rel/query-scheme underlying)]
-    (letfn [(worker [e]
-              (cond
-                (rel/attribute-ref? e)
-                (or (get env (rel/attribute-ref-name e)) e)
-                (rel/const? e)
-                (let [typ (rel/const-type e)]
-                  (if (and (satisfies? t/base-type-protocol typ)
-                           (db-type-data? (t/-data typ)))
-                    ((db-type-data-value->db-expression-fn (t/-data typ))
-                     (rel/const-val e))
-                    e))
-                (rel/const-null? e)
-                (let [typ (rel/null-type e)]
-                  (if (and (satisfies? t/base-type-protocol typ)
-                           (db-type-data? (t/-data typ)))
-                    ((db-type-data-value->db-expression-fn (t/-data typ))
-                     '())
-                    e))
-                (rel/application? e)
-                (let [rator (rel/application-rator e)
-                      data (rel/rator-data rator)
-                      base-query (db-operator-data-base-query data)
-                      rands (rel/application-rands e)
-                      initiate
-                      (fn []
-                        (apply (db-operator-data-transformer-fn data)
-                               (concat
-                                (map worker rands)
-                                (map
-                                 #(rel/expression-type underlying-scheme %)
-                                 rands))))]
-                  (if base-query
-                    (let [[restriction-fn transform] (initiate)
-                          base-query-refs
-                          (if base-query
-                            (let [[base-query-refs renamed-base-query]
-                                  (rename-query base-query generate-name)]
-                              (reset! base-queries (cons renamed-base-query
-                                                         @base-queries))
-                              base-query-refs)
-                            '())]
-                      (when restriction-fn
-                        (reset! restrictions
-                                (cons (apply restriction-fn base-query-refs)
-                                      restrictions)))
-                      (apply transform base-query-refs))
-                    (initiate)))
-                (tuple? e)
-                (make-tuple (map worker (tuple-expressions e)))
-                (rel/aggregation? e)
-                (let [expr (worker (rel/aggregation-expr e))]
-                  (if (= :count (rel/aggregation-operator e))
-                    (rel/make-aggregation
-                     :count
-                     (loop [expr expr]
-                       (if (tuple? expr)
-                         ;; doesn't matter
-                         (recur (first (tuple-expressions expr)))
-                         expr)))))
-                (rel/case-expr? e)
-                ;; FIXME: this is incomplete: we should commute this
-                ;; with tuples inside the case if the result type is a
-                ;; DB type
-                (rel/make-case-expr (map (fn [[k v]]
-                                           [(worker k) (worker v)])
-                                         (rel/case-expr-alist ))
-                                    (worker (rel/case-expr-default e)))
-                :else (c/assertion-violation `dbize-expression
-                                             "unknown expression" e)))]
+    (letfn
+        [(worker [e]
+           (cond
+             (rel/attribute-ref? e)
+             (or (get env (rel/attribute-ref-name e)) e)
+             (rel/const? e)
+             (let [typ (rel/const-type e)]
+               (if (and (satisfies? t/base-type-protocol typ)
+                        (db-type-data? (t/-data typ)))
+                 ((db-type-data-value->db-expression-fn (t/-data typ))
+                  (rel/const-val e))
+                 e))
+             (rel/const-null? e)
+             (let [typ (rel/null-type e)]
+               (if (and (satisfies? t/base-type-protocol typ)
+                        (db-type-data? (t/-data typ)))
+                 ((db-type-data-value->db-expression-fn (t/-data typ))
+                  (rel/const-val e))
+                 e))
+             (rel/application? e)
+             (let [rator (rel/application-rator e)
+                   data (rel/rator-data rator)
+                   base-query (when (db-operator-data? data)
+                                (db-operator-data-base-query data))
+                   rands (rel/application-rands e)
+                   initiate
+                   (fn []
+                     (apply (db-operator-data-transformer-fn data)
+                            (concat
+                             (map worker rands)
+                             (map
+                              #(rel/expression-type underlying-scheme %)
+                              rands))))]
+               (if (db-operator-data? data)
+                 ;; FIXME this case is not clear (example necessary?).
+                 (if base-query
+                   (let [[restriction-fn transform] (initiate)
+                         base-query-refs
+                         (if base-query
+                           (let [[base-query-refs renamed-base-query]
+                                 (rename-query base-query generate-name)]
+                             (reset! base-queries (cons renamed-base-query
+                                                        @base-queries))
+                             base-query-refs)
+                           '())]
+                     (when restriction-fn
+                       (reset! restrictions
+                               (cons (apply restriction-fn base-query-refs)
+                                     restrictions)))
+                     (apply transform base-query-refs))
+                   (initiate))
+                 ;; Base case, nothing special here.
+                 (apply rel/make-application
+                        rator
+                        (map worker rands))))
+             (tuple? e)
+             (make-tuple (map worker (tuple-expressions e)))
+             (rel/aggregation? e)
+             (let [expr (worker (rel/aggregation-expr e))]
+               (if (= :count (rel/aggregation-operator e))
+                 (rel/make-aggregation
+                  :count
+                  (loop [expr expr]
+                    (if (tuple? expr)
+                      ;; doesn't matter
+                      (recur (first (tuple-expressions expr)))
+                      expr)))
+                 (rel/make-aggregation (rel/aggregation-operator e)
+                                       expr)))
+             ;; TODO aggregation*
+             (rel/case-expr? e)
+             ;; FIXME: this is incomplete: we should commute this
+             ;; with tuples inside the case if the result type is a
+             ;; DB type
+             ;; FIXME Tests!
+             (rel/make-case-expr (map (fn [[k v]]
+                                        [(worker k) (worker v)])
+                                      (rel/case-expr-alist ))
+                                 (worker (rel/case-expr-default e)))
+             :else (c/assertion-violation `dbize-expression
+                                          "unknown expression" e)))]
       (let [dbized (worker e)]
         [dbized @base-queries @restrictions]))))

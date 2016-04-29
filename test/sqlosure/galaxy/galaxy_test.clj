@@ -7,9 +7,12 @@
              [db-connection :as db]
              [relational-algebra :as rel]
              [sql :as sql]
-             [time :as time]
-             [test-utils :as utils]]
+             [universe :as universe]]
             [sqlosure.galaxy.galaxy :refer :all]))
+
+(defn name-generator
+  [n]
+  (#'sqlosure.galaxy.galaxy/make-name-generator n))
 
 ;; -----------------------------------------------------------------------------
 ;; -- SETUP CEREMONY
@@ -55,8 +58,23 @@
 (def $kv-t (make-db-type "kv" kv? kv-k key->kv kv-scheme db->kv
                          kv->db-expression))
 
+(defn $kv
+  [k v]
+  (rel/make-const $kv-t (make-kv k v)))
+
 (def kv-galaxy (make&install-db-galaxy "kv" $kv-t install-kv-db-tables!
                                        kv-table))
+
+(def $kv-k (rel/make-monomorphic-combinator "kv-k"
+                                            [$kv-t]
+                                            $integer-t
+                                            kv-k
+                                            :universe sql/sql-universe
+                                            :data
+                                            (make-db-operator-data
+                                             nil
+                                             (fn [k & args]
+                                               (first (tuple-expressions k))))))
 
 (defn with-kv-db
   "Takes a db-spec and a function that takes a (db-connect spec) connection.
@@ -70,15 +88,123 @@
        install-kv-db-tables!
        kv-table)
       (initialize-db-galaxies! conn)
-      (println @*db-galaxies*)
       (func conn))))
 
-(with-kv-db utils/db-spec
-  (fn [conn]
-    (db/insert! conn kv-table 1 "foo")
-    (db/insert! conn kv-table 2 "bar")
-    (db/run-query conn (query [kv (<- kv-table)]
-                              (project kv)))))
+#_(deftest dbize-project-test
+  (let [alist [["k" (rel/make-attribute-ref "k")]
+               ["v" (rel/make-attribute-ref "v")]]]
+    (testing ""
+      (is (= 
+             (dbize-project
+              alist kv-table
+              (#'sqlosure.galaxy.galaxy/make-name-generator "dbize")))))))
+
+(deftest dbize-query-test
+  (testing "galaxy query"
+    (is (= [(rel/make-project {"kv_0" (rel/make-attribute-ref "k")
+                               "kv_1" (rel/make-attribute-ref "v")}
+                              kv-table)
+            ["kv"
+             (make-tuple
+              (map rel/make-attribute-ref ["kv_0" "kv_1"]))]]
+           (dbize-query kv-galaxy)))
+    ;; FIXME
+    #_(is (= [(rel/make-project
+             {"kv_0" (rel/make-attribute-ref "k")}
+             (rel/make-project {"k" (rel/make-attribute-ref "k")}
+                               kv-table))
+            ["kv"
+             (make-tuple
+              (list (rel/make-attribute-ref "kv_0")))]]
+           (dbize-query
+            (rel/make-project {"k" (rel/make-attribute-ref "k")} kv-galaxy))))))
+
+(def ... nil)
+
+(deftest dbize-expression-test
+  (testing "attribute-ref"
+    (testing "with empty environment"
+      (is (= [(rel/make-attribute-ref "foo") '() '()]
+             (dbize-expression (rel/make-attribute-ref "foo")
+                               nil
+                               kv-table
+                               (name-generator "dbize")))))
+    (testing "with environment lookup"
+      (is (= [(rel/make-attribute-ref "bar") '() '()]
+             (dbize-expression (rel/make-attribute-ref "foo")
+                               {"foo" (rel/make-attribute-ref "bar")}
+                               kv-table
+                               (name-generator "dbize"))))))
+  (testing "const"
+    (testing "with non-db-type"
+      (is (= [($integer 5) '() '()]
+             (dbize-expression ($integer 5)
+                               nil kv-table (name-generator "dbize"))))
+      (is (= [($double 2.0) '() '()]
+             (dbize-expression ($double 2.0)
+                               {"foo" (rel/make-attribute-ref "bar")}
+                               kv-table (name-generator "dbize"))))
+      (testing "with nullable type"
+        (is (= [($integer-null 42) '() '()]
+               (dbize-expression ($integer-null 42)
+                                 nil kv-table (name-generator "dbize"))))))
+    (testing "with db-type"
+      (is (= [(make-tuple [($integer 0) ($string "foo")]) '() '()]
+             (dbize-expression ($kv 0 "foo")
+                               nil kv-table (name-generator "dbize"))))))
+  (testing "application"
+    (testing "with 'regular' operator"
+      (let [plus (universe/universe-lookup-rator sql/sql-universe '+)
+            app1 (rel/make-application plus ($integer 23) ($integer 42))
+            app2 (rel/make-application plus (rel/make-attribute-ref "foo")
+                                       ($integer 42))]
+        (is (= [app1 '() '()]
+               (dbize-expression app1 nil kv-table
+                                 (name-generator "dbize"))))
+        (is (= [(rel/make-application plus ($integer 23) ($integer 42)) '() '()]
+               (dbize-expression app2 {"foo" ($integer 23)} kv-table
+                                 (name-generator "dbize"))))))
+    (testing "with 'db-type' operator"
+      (testing "without db-operator-data-query"
+        (is (= [($integer 0) '() '()]
+               (dbize-expression
+                ($kv-k ($kv 0 "foo")) nil kv-table (name-generator "dbize"))))
+        ;; A little more complex
+        (is (= [($= ($integer 5) ($integer 0)) '() '()]
+               (dbize-expression
+                ($= ($integer 5)
+                    ($kv-k ($kv 0 "foo")))
+                nil kv-table (name-generator "dbize"))))))
+    (testing "tuple"
+      (is (= [(make-tuple [($integer 5)
+                           (rel/make-attribute-ref "not found")
+                           (make-tuple
+                            [($integer 0) ($string "foo")])])
+              '() '()]
+             (dbize-expression
+              (make-tuple [(rel/make-attribute-ref "five")
+                           (rel/make-attribute-ref "not found")
+                           ($kv 0 "foo")])
+              {"five" ($integer 5)}
+              kv-table (name-generator "dbize"))))
+      (is (= [(make-tuple [(make-tuple [($integer 0) ($string "foo")])
+                           ($integer 1)])
+              '() '()]
+             (dbize-expression
+              (make-tuple [($kv 0 "foo")
+                           ($kv-k ($kv 1 "bar"))])
+              nil kv-table (name-generator "dbize")))))
+    (testing "aggregate"
+      (is (= [($count (rel/make-attribute-ref "k"))
+              '() '()]
+             (dbize-expression
+              ($count (rel/make-attribute-ref "k"))
+              nil kv-table (name-generator "dbize"))))
+      (is (= [($sum (rel/make-attribute-ref "bar")) '() '()]
+             (dbize-expression
+              ($sum (rel/make-attribute-ref "foo"))
+              {"foo" (rel/make-attribute-ref "bar")}
+              kv-table (name-generator "foo")))))))
 
 ;; -----------------------------------------------------------------------------
 ;; -- ACTUAL TESTING
@@ -101,6 +227,7 @@
             (reset! *db-galaxies* nil)))))))
 
 (defn- all
+  "Is every element in a sequence true?"
   [coll]
   (every? true? coll))
 
@@ -190,80 +317,3 @@
       (is (thrown? Exception (rename-query q 5))))
     (testing "should throw if q is not a query"
       (is (thrown? Exception (rename-query nil gen))))))
-
-(comment
-
-  (def p1 (make-person 0 "Marco" "Schneider" (time/make-date 1989 10 31) false))
-
-  (def $person-id
-    (rel/make-monomorphic-combinator "person-id"
-                                     (list $person-t)
-                                     $integer-t
-                                     person-id
-                                     :universe sql/sql-universe))
-
-  (define-record-type person
-    (make-person id first last birthday sex) person?
-    [id person-id
-     first person-first
-     last person-last
-     birthday person-birthday
-     ^{:doc "false == male"}
-     sex person-sex])
-
-  (def person-scheme
-    (rel/alist->rel-scheme {"id" $integer-t
-                            "first" $string-t
-                            "last" $string-t
-                            "birthday" $date-t
-                            "sex" $boolean-t}))
-
-  (def person-table
-    (table "person" (rel/rel-scheme-map person-scheme)))
-
-  (defn install-person-db-tables!
-    [db]
-    (jdbc/db-do-prepared
-     db
-     (jdbc/create-table-ddl
-      [[:id "INT"]
-       [:first "TEXT"]
-       [:last "TEXT"]
-       [:birthday "DATE"]
-       [:sex "BOOLEAN"]])))
-
-  (defn id->person
-    [db id]
-    (db/run-query
-     db
-     (query [p (<- person-table)]
-            (restrict ($= (! p "id")
-                          ($integer id)))
-            (project p))))
-
-  (defn db->person
-    [db id]
-    (when-let [p (id->person db id)]
-      (apply make-person (first p))))
-
-  (defn person->db-expression
-    [p]
-    (make-tuple [($integer (person-id p))
-                 ($string (person-first p))
-                 ($string (person-last p))
-                 ($date (person-birthday p))
-                 ($boolean (person-sex p))]))
-
-  (def $person-t (make-db-type "person" person?
-                               person-id id->person
-                               person-scheme
-                               db->person
-                               person->db-expression))
-
-  (def person-galaxy
-    (make&install-db-galaxy
-     "person" $person-t
-     (fn [db] (install-person-db-tables! db))
-     person-table))
-
-  )
