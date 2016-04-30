@@ -286,12 +286,12 @@
   (let [underlying (rel/make-project {"one" (rel/make-attribute-ref "k")}
                                      kv-table)]
     (is (= (rel/make-project
-            {"k" (rel/make-attribute-ref "key")
-             "v" (rel/make-attribute-ref "value")}
+            {"k" (rel/make-attribute-ref "k")
+             "v" (rel/make-attribute-ref "v")}
             underlying)
            (restrict-to-scheme (rel/alist->rel-scheme
-                                {"k" "key" 
-                                 "v" "value"})
+                                {"k" $integer
+                                 "v" $string})
                                underlying)))
     (testing "empty scheme should cause an assertion violation"
       (is (thrown? Exception (restrict-to-scheme nil underlying))))
