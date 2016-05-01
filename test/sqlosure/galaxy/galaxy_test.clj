@@ -10,13 +10,12 @@
              [universe :as universe]]
             [sqlosure.galaxy.galaxy :refer :all]))
 
+(def ... nil)
+
 (defn name-generator
   [n]
   (#'sqlosure.galaxy.galaxy/make-name-generator n))
 
-;; -----------------------------------------------------------------------------
-;; -- SETUP CEREMONY
-;; -----------------------------------------------------------------------------
 (define-record-type ^{:doc "A simple key->value type."} kv
   (make-kv k v) kv?
   [k kv-k v kv-v])
@@ -90,36 +89,103 @@
       (initialize-db-galaxies! conn)
       (func conn))))
 
-#_(deftest dbize-project-test
-  (let [alist [["k" (rel/make-attribute-ref "k")]
-               ["v" (rel/make-attribute-ref "v")]]]
-    (testing ""
-      (is (= 
-             (dbize-project
-              alist kv-table
-              (#'sqlosure.galaxy.galaxy/make-name-generator "dbize")))))))
+(deftest dbize-project-test
+  (testing "project with base-relation"
+    (is (= [[["k" (rel/make-attribute-ref "k")]]
+            kv-table '()]
+           (dbize-project
+            {"k" (rel/make-attribute-ref "k")}
+            kv-table
+            (name-generator "foo")))))
+  (testing "project with galaxy query"
+    (is (= [[["k" (rel/make-attribute-ref "k")]]
+            (rel/make-project {"kv_0" (rel/make-attribute-ref "k")
+                               "kv_1" (rel/make-attribute-ref "v")}
+                              kv-table) '()]
+           (dbize-project {"k" (rel/make-attribute-ref "k")}
+                          kv-galaxy (name-generator "foo"))))))
 
 (deftest dbize-query-test
-  (testing "galaxy query"
-    (is (= [(rel/make-project {"kv_0" (rel/make-attribute-ref "k")
-                               "kv_1" (rel/make-attribute-ref "v")}
-                              kv-table)
-            ["kv"
-             (make-tuple
-              (map rel/make-attribute-ref ["kv_0" "kv_1"]))]]
-           (dbize-query kv-galaxy)))
-    ;; FIXME
-    #_(is (= [(rel/make-project
-             {"kv_0" (rel/make-attribute-ref "k")}
-             (rel/make-project {"k" (rel/make-attribute-ref "k")}
+  (testing "empty query"
+    (is (= [rel/the-empty-rel-scheme '()] (dbize-query rel/the-empty))))
+  (testing "base-relation"
+    (testing "'regular' base-relation"
+      (is (= [kv-table '()]  ;; Shouldn't change anything.
+             (dbize-query kv-table))))
+    (testing "galaxy"
+      (is (= [(rel/make-project {"kv_0" (rel/make-attribute-ref "k")
+                                 "kv_1" (rel/make-attribute-ref "v")}
+                                kv-table)
+              ["kv" (make-tuple (mapv rel/make-attribute-ref ["kv_0" "kv_1"]))]]
+             (dbize-query kv-galaxy)))))
+  (testing "project"
+    (is (= [(rel/make-project
+             {"k" (rel/make-attribute-ref "k")}
+             (rel/make-project {"kv_0" (rel/make-attribute-ref "k")
+                                "kv_1" (rel/make-attribute-ref "v")}
                                kv-table))
-            ["kv"
-             (make-tuple
-              (list (rel/make-attribute-ref "kv_0")))]]
+            '()]
            (dbize-query
-            (rel/make-project {"k" (rel/make-attribute-ref "k")} kv-galaxy))))))
-
-(def ... nil)
+            (rel/make-project {"k" (rel/make-attribute-ref "k")}
+                              kv-galaxy)))))
+  (testing "restrict"
+    (let [r #(rel/make-restrict ($= % ($integer 0)) kv-table)]
+      (is (= [(rel/make-project
+                {"k" (rel/make-attribute-ref "k")
+                 "v" (rel/make-attribute-ref "v")}
+                (r (rel/make-attribute-ref "k"))) '()]
+             (dbize-query (r (rel/make-attribute-ref "k")))))
+      (is (= [(rel/make-project
+               {"k" (rel/make-attribute-ref "k")
+                "v" (rel/make-attribute-ref "v")}
+               (r ($integer 0))) '()]
+             (dbize-query (r ($kv-k ($kv 0 "foo"))))))))
+  (testing "combine"
+    (let [c #(rel/make-combine :union %1 %2)]
+      (is (= [(c (rel/make-project
+                  {"k" (rel/make-attribute-ref "k")}
+                  (rel/make-project {"kv_0" (rel/make-attribute-ref "k")
+                                     "kv_1" (rel/make-attribute-ref "v")}
+                                    kv-table))
+                 (rel/make-project
+                  {"k" (rel/make-attribute-ref "k")
+                   "v" (rel/make-attribute-ref "v")}
+                  (rel/make-restrict ($= ($string "foo")
+                                         (rel/make-attribute-ref "v"))
+                                     kv-table)))
+              '()]
+             (dbize-query (c (rel/make-project {"k" (rel/make-attribute-ref "k")}
+                                               kv-galaxy)
+                             (rel/make-restrict ($= ($string "foo")
+                                                    (rel/make-attribute-ref "v"))
+                                                kv-table)))))))
+  (testing "order"
+    (is (= [(rel/make-order
+             [[(rel/make-attribute-ref "k") :ascending]]
+             (rel/make-project {"kv_0" (rel/make-attribute-ref "k")
+                                "kv_1" (rel/make-attribute-ref "v")}
+                               kv-table))
+            ["kv" (make-tuple (mapv rel/make-attribute-ref ["kv_0" "kv_1"]))]]
+           (dbize-query (rel/make-order
+                         {(rel/make-attribute-ref "k") :ascending}
+                         kv-galaxy)))))
+  (testing "top"
+    (is (= [(rel/make-top 0 10 kv-table) '()]
+           (dbize-query (rel/make-top 0 10 kv-table))))
+    (is (= [(rel/make-top
+             0 10
+             (rel/make-project {"kv_0" (rel/make-attribute-ref "k")
+                                "kv_1" (rel/make-attribute-ref "v")}
+                               kv-table))
+            ["kv" (make-tuple (mapv rel/make-attribute-ref ["kv_0" "kv_1"]))]]
+           (dbize-query (rel/make-top 0 10 kv-galaxy)))))
+  (testing "anything else should fail"
+    (is (thrown? Exception (dbize-query nil)))
+    (is (thrown? Exception
+                 (dbize-query (rel/make-project
+                               {"k" (rel/make-attribute-ref "k")}
+                               ;; Underlying query must not be nil.
+                               nil))))))
 
 (deftest dbize-expression-test
   (testing "attribute-ref"

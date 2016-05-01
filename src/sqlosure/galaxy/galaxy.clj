@@ -89,13 +89,11 @@ as a SQL-table as created by `sqlosure.core/table`."}
                     :universe sql/sql-universe
                     :data (make-db-type-data scheme reifier value->db-expression-fn)))
 
-;; DONE
 (define-record-type db-operator-data
   (make-db-operator-data base-query transformer-fn) db-operator-data?
   [base-query db-operator-data-base-query
    transformer-fn db-operator-data-transformer-fn])
 
-;; DONE + TESTS
 (defn- make-name-generator
   "Takes a prefix (String) and returns a function that returns the prefix with
   a \"_n\"-suffix, where n is an integer starting with 0 that gets incremented
@@ -107,7 +105,6 @@ as a SQL-table as created by `sqlosure.core/table`."}
         (swap! count inc)
         (str prefix "_" c)))))
 
-;; DONE
 (defn- list->product
   "Takes a list and returns a `sqlosure.relational-algebra/product` for this
   list."
@@ -117,7 +114,6 @@ as a SQL-table as created by `sqlosure.core/table`."}
     (rel/make-product (first ql)
                       (list->product (rest ql)))))
 
-;; DONE
 (defn- apply-restrictions
   "Takes a list of restrictions `rl` and a query and applies the restrictions to
   the query."
@@ -147,7 +143,6 @@ as a SQL-table as created by `sqlosure.core/table`."}
         (rel/rel-scheme-columns scheme))
    q))
 
-;; DONE
 (defn make-new-names
   "Takes a string `base` and a list `lis` and returns a list of
   '(\"base_0\", ..., \"base_n\") where `n` = `(count lis)`."
@@ -159,6 +154,7 @@ as a SQL-table as created by `sqlosure.core/table`."}
 (declare dbize-project dbize-expression)
 
 ;; TODO restrict-outer
+;; FIXME write tests for queries + environments!
 (defn dbize-query*
   "Returns new query, environment mapping names to tuples."
   [q generate-name]
@@ -215,8 +211,12 @@ as a SQL-table as created by `sqlosure.core/table`."}
                                 (seq restrictions))
                           (c/assertion-violation
                            `dbize-query "object values used in order query")
-                          (cons exp v))))
-                    (rel/order-alist q)))
+                          ;; NOTE This implicitly turns a map into an alist.
+                          ;;      This is not the only playe, but Is this okay
+                          ;;      here?
+                          [exp v])))
+                    (rel/order-alist q))
+               underlying)
               env])
            (rel/top? q)
            (let [[underlying env] (worker (rel/top-query q) generate-name)]
@@ -225,23 +225,23 @@ as a SQL-table as created by `sqlosure.core/table`."}
            :else (c/assertion-violation `dbize-query "unknown query" q)))]
     (worker q generate-name)))
 
-;; DONE
 (defn dbize-query
+  "Takes a sqlosure query and returns a 'flattened' representation of the same
+  query."
   [q]
   (dbize-query* q (make-name-generator "dbize")))
 
-;; DONE may very well contain errors
 (defn dbize-project
   [alist q-underlying generate-name]
   (let [[underlying env] (dbize-query* q-underlying generate-name)]
     ;; NOTE is it wise to loop through a map (may be unsorted)?
     (loop [alist alist
-           rev '()
+           names []
            bindings '()
            queries '()
            restrictions '()]
       (if (empty? alist)
-        [(reverse rev)
+        [names
          (apply-restrictions restrictions
                              (list->product (cons underlying queries)))
          bindings]
@@ -252,10 +252,9 @@ as a SQL-table as created by `sqlosure.core/table`."}
             (let [exprs (tuple-expressions exp)
                   new-names (make-new-names name exprs)]
               (recur (rest alist)
-                     (concat (reverse (map (fn [cexp new-name]
+                     (conj names (reverse (map (fn [cexp new-name]
                                              [new-name cexp]))
-                                      exprs new-names)
-                             rev)
+                                      exprs new-names))
                      (cons
                       (cons name
                             (make-tuple (map rel/make-attribute-ref new-names)))
@@ -263,10 +262,10 @@ as a SQL-table as created by `sqlosure.core/table`."}
                      (concat more-queries queries)
                      (concat more-restrictions restrictions)))
             (recur (rest alist)
-                   (cons (cons name exp) rev)
-                   bindings
-                   (concat more-queries queries)
-                   (concat more-restrictions restrictions))))))))
+                   (conj names [name exp])
+                   bindings queries restrictions
+                   #_(concat more-queries queries)
+                   #_(concat more-restrictions restrictions))))))))
 
 (declare reify-query-result)
 
