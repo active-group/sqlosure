@@ -271,4 +271,4 @@
   representation. Uses the default printer from `sqlosure.sql-put`."
   [q]
   (->> q opt/optimize-query rsql/query->sql
-       (put/sql-select->string put/default-sql-put-parameterization)))
+       put/sql-select->string))
