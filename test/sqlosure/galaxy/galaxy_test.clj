@@ -1,5 +1,6 @@
 (ns sqlosure.galaxy.galaxy-test
   (:require [active.clojure.record :refer [define-record-type]]
+            [active.clojure.monad :refer [return]]
             [clojure.java.jdbc :as jdbc]
             [clojure.test :refer [deftest is testing]]
             [sqlosure
@@ -7,10 +8,16 @@
              [db-connection :as db]
              [relational-algebra :as rel]
              [sql :as sql]
+             [query-comprehension :as qc]
              [universe :as universe]]
-            [sqlosure.galaxy.galaxy :refer :all]))
+            [sqlosure.galaxy.galaxy :refer :all]
+            [sqlosure.optimization :as opt]))
 
 (def ... nil)
+
+(def db-spec {:classname "org.sqlite.JDBC"
+              :subprotocol "sqlite"
+              :subname ":memory:"})
 
 (defn name-generator
   [n]
@@ -77,7 +84,7 @@
 
 (defn with-kv-db
   "Takes a db-spec and a function that takes a (db-connect spec) connection.
-  Sets up "
+  Sets up a kv-galaxy + tables, etc."
   [spec func]
   (jdbc/with-db-connection [db spec]
     (let [conn (db-connect db)]
@@ -101,7 +108,9 @@
     (is (= [[["k" (rel/make-attribute-ref "k")]]
             (rel/make-project {"kv_0" (rel/make-attribute-ref "k")
                                "kv_1" (rel/make-attribute-ref "v")}
-                              kv-table) '()]
+                              kv-table)
+            {"kv" (make-tuple
+                   (mapv rel/make-attribute-ref ["kv_0" "kv_1"]))}]
            (dbize-project {"k" (rel/make-attribute-ref "k")}
                           kv-galaxy (name-generator "foo"))))))
 
@@ -116,9 +125,18 @@
       (is (= [(rel/make-project {"kv_0" (rel/make-attribute-ref "k")
                                  "kv_1" (rel/make-attribute-ref "v")}
                                 kv-table)
-              ["kv" (make-tuple (mapv rel/make-attribute-ref ["kv_0" "kv_1"]))]]
+              ["kv"
+               (make-tuple (mapv rel/make-attribute-ref ["kv_0" "kv_1"]))]]
              (dbize-query kv-galaxy)))))
   (testing "project"
+    ;; NOTE This is an important case! -- Why?
+    #_(is (= [(rel/make-project
+             {"k" (rel/make-attribute-ref "k")
+              "v" (rel/make-attribute-ref "v")}
+             (rel/make-project {}))]
+           (rel/make-project {"k" (rel/make-attribute-ref "k")
+                              "v" (rel/make-attribute-ref "v")}
+                             kv-galaxy)))
     (is (= [(rel/make-project
              {"k" (rel/make-attribute-ref "k")}
              (rel/make-project {"kv_0" (rel/make-attribute-ref "k")
@@ -383,3 +401,11 @@
       (is (thrown? Exception (rename-query q 5))))
     (testing "should throw if q is not a query"
       (is (thrown? Exception (rename-query nil gen))))))
+
+#_(deftest db-query-reified-results-test
+  (with-kv-db db-spec
+    (fn [conn]
+      (db/insert! conn kv-galaxy 0 "foo")
+      (testing "'regular' query"
+        (is (= [0 "foo"] (db/db-query-reified-results conn (query [kv (<- kv-table)]
+                                                                  (project kv)))))))))

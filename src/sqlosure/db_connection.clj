@@ -235,10 +235,10 @@
   returns it's input."
   [table-or-galaxy]
   (assert (rel/base-relation? table-or-galaxy))
-  (if (rel/db-galaxy? (rel/base-relation-handle table-or-galaxy))
+  (if (glxy/db-galaxy? (rel/base-relation-handle table-or-galaxy))
     (-> table-or-galaxy
         rel/base-relation-handle
-        rel/db-galaxy-query)
+        glxy/db-galaxy-query)
     table-or-galaxy))
 
 (defn insert!

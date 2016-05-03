@@ -39,7 +39,7 @@ as a SQL-table as created by `sqlosure.core/table`."}
   It returns a `sqlosure.relational-algebra/base-relation` for this new table
   and registers the galaxy to `*db-galaxies*`."
   [name type setup-fn query]
-  (let [dg (rel/really-make-db-galaxy name type setup-fn query)
+  (let [dg (really-make-db-galaxy name type setup-fn query)
         rel (rel/make-base-relation name
                                     (rel/alist->rel-scheme {name type})
                                     :universe sql/sql-universe
@@ -53,7 +53,7 @@ as a SQL-table as created by `sqlosure.core/table`."}
   `*db-galaxies*` to the database."
   [conn]
   (doall (map (fn [[name glxy]]
-                ((rel/db-galaxy-setup-fn (rel/base-relation-handle glxy)) conn))
+                ((db-galaxy-setup-fn (rel/base-relation-handle glxy)) conn))
               @*db-galaxies*)))
 
 ;; DONE
@@ -164,9 +164,9 @@ as a SQL-table as created by `sqlosure.core/table`."}
            (let [handle (rel/base-relation-handle q)]
              ;; If the query is a galaxy, we need to extract the underlying
              ;; query and relation.
-             (if (rel/db-galaxy? handle)
-               (let [db-query (rel/db-galaxy-query handle)
-                     name (rel/db-galaxy-name handle)
+             (if (db-galaxy? handle)
+               (let [db-query (db-galaxy-query handle)
+                     name (db-galaxy-name handle)
                      cols (rel/rel-scheme-columns (rel/query-scheme db-query))
                      new-names (make-new-names name cols)]
                  [(rel/make-project (map (fn [k new-name]
@@ -261,9 +261,9 @@ as a SQL-table as created by `sqlosure.core/table`."}
                      (concat more-restrictions restrictions)))
             (recur (rest alist)
                    (conj names [name exp])
-                   bindings queries restrictions
-                   #_(concat more-queries queries)
-                   #_(concat more-restrictions restrictions))))))))
+                   bindings ;; queries restrictions
+                   (concat more-queries queries)
+                   (concat more-restrictions restrictions))))))))
 
 (defn take+drop
   "Takes an integer `n` and a list and returns a vector with
