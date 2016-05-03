@@ -412,3 +412,19 @@
 (defn run-sql
   [conn sql]
   (jdbc/execute! (db-connection-conn conn) sql))
+
+;; GALAXY STUFF
+;; with a high possibility of errors.
+(defn db-query-reified-results
+  [db q]
+  ;; FIXME what happened to env?
+  (let [[db-q _?_] (glxy/dbize-query q)
+        db-res (run-query db db-q)]
+    (glxy/reify-query-result db-res (rel/query-scheme q))))
+
+;; TODO
+(defn db-query-reified-result
+  [db q]
+  (let [results (db-query-reified-results db q)]
+    (and (seq? results)
+         (ffirst results))))
