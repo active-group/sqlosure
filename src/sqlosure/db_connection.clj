@@ -11,8 +11,9 @@
              [sql :as sql]
              [sql-put :as put]
              [time :as time]
-             [type :as t]])
-    (:import [java.sql PreparedStatement ResultSet]))
+             [type :as t]]
+            [sqlosure.galaxy.galaxy :as glxy])
+  (:import [java.sql PreparedStatement ResultSet]))
 
 (define-record-type
   ^{:doc "`db-connection` serves as a container for storing the current
@@ -227,6 +228,19 @@
          (apply str (interpose ", " (rel/rel-scheme-columns scheme))) ") "
          "VALUES (" values ")")))
 
+(defn extract-table
+  "Takes a `sqlosure.relational-algebra/base-relation` and checks, whether its
+  handle is a sql-table or a galaxy. In case of a galaxy, it extracts the
+  underlying query (which in turn should be a base-relation). Otherwise, it just
+  returns it's input."
+  [table-or-galaxy]
+  (assert (rel/base-relation? table-or-galaxy))
+  (if (rel/db-galaxy? (rel/base-relation-handle table-or-galaxy))
+    (-> table-or-galaxy
+        rel/base-relation-handle
+        rel/db-galaxy-query)
+    table-or-galaxy))
+
 (defn insert!
   "`insert!` takes a db-connection and an sql-table and some rest `args` and
   attempts to insert them into the connected databases table.
@@ -252,9 +266,12 @@
                                                         \"bar\" $string-t}
                                     integer-value string-value))"
   [conn sql-table & args]
-  (let [[scheme vals] (if (and (seq args) (rel/rel-scheme? (first args)))
+  (let [;; Check if the queried table is a galaxy. If so, replace it with ther
+        ;; actual table reference.
+        sql-table* (extract-table sql-table)
+        [scheme vals] (if (and (seq args) (rel/rel-scheme? (first args)))
                         [(first args) (rest args)]
-                        [(rel/query-scheme sql-table) args])
+                        [(rel/query-scheme sql-table*) args])
         db (db-connection-conn conn)
         run-query-with-params
         (^{:once true} fn* [con]
