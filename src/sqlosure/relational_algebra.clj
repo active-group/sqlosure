@@ -1,16 +1,15 @@
-(ns ^{:doc "Implementation of relational algebra based on Mike Sperbers
-relational-algebra.scm.
-Replaced alist with hash-map."
-      :author "Marco Schneider, based on Mike Sperbers schemeql2"}
-    sqlosure.relational-algebra
-  (:require [sqlosure.universe :as u]
-            [sqlosure.type :as t]
-            [sqlosure.utils :refer [third fourth]]
-            [clojure.set :refer [difference union intersection]]
-            [active.clojure.record :refer [define-record-type]]
-            [active.clojure.condition :as c]
-            [active.clojure.condition :refer [assertion-violation]]
-            [active.clojure.lens :as lens]))
+(ns ^{:doc "Implementation of relational algebra based on Mike Sperbers\nrelational-algebra.scm.\nReplaced alist with hash-map."}
+ sqlosure.relational-algebra
+  (:require [active.clojure
+             [condition :as c :refer [assertion-violation]]
+             [lens :as lens]
+             [record :refer [define-record-type]]]
+            [clojure.set :refer [difference union]]
+            [sqlosure
+             [relational-algebra :as rel]
+             [type :as t]
+             [universe :as u]
+             [utils :refer [fourth third]]]))
 
 (define-record-type rel-scheme
   (^:private really-make-rel-scheme columns map grouped) rel-scheme?
@@ -170,10 +169,12 @@ Replaced alist with hash-map."
 (define-record-type base-relation
   ^{:doc "Primitive relations, dpeending on the domain universe."}
   (really-make-base-relation name scheme handle) base-relation?
-  [name base-relation-name
+  [^{:doc "The name of this relation (string)."}
+   name base-relation-name
+   ^{:doc "The schema (mapping column-names->types) of this relation."}
    scheme base-relation-scheme
-   handle base-relation-handle  ;; Domain specific handle.
-   ])
+   ^{:doc "Domain specific handle. Can either be a SQL-table or a galaxy."}
+   handle base-relation-handle])
 
 (defn make-base-relation
   "Returns a new base relation.
@@ -272,13 +273,17 @@ Replaced alist with hash-map."
     (attach-rel-scheme-cache
      (really-really-make-project alist query)
      (fn [env]
-       (alist->rel-scheme (map (fn [[k v]]
-                                 (let [typ (expression-type (compose-environments (rel-scheme->environment base-scheme) env)
-                                                             v)]
-                                   (when (t/product-type? typ)
-                                     (assertion-violation `really-make-project "non-product type" k v typ))
-                                   [k typ]))
-                               alist))))))
+       (alist->rel-scheme
+        (map
+         (fn [[k v]]
+           (let [typ (expression-type
+                      (compose-environments
+                       (rel-scheme->environment base-scheme) env) v)]
+             (when (t/product-type? typ)
+               (assertion-violation `really-make-project
+                                    "non-product type" k v typ))
+             [k typ]))
+         alist))))))
 
 (defn make-project
   [alist query]
@@ -772,7 +777,8 @@ Replaced alist with hash-map."
       (assertion-violation `datum->expression "invalid datum" d))))
 
 (defn make-monomorphic-rator
-  [name domain-types range-type proc & {:keys [universe data]}]
+  [name domain-types range-type proc & {:keys [universe data]
+                                        :or {universe nil data nil}}]
   (make-rator name
               (fn [fail & arg-types]
                 (when fail
@@ -796,7 +802,8 @@ Replaced alist with hash-map."
       (pred v1 v2))))
 
 (defn make-monomorphic-combinator
-  [name domains range proc & {:keys [universe data]}]
+  [name domains range proc & {:keys [universe data]
+                              :or {universe nil data nil}}]
   (let [rator (make-monomorphic-rator name domains range proc
                                       :universe universe :data data)]
     (fn [& exprs]

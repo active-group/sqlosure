@@ -3,7 +3,6 @@
              [condition :as c]
              [record :refer [define-record-type]]]
             [sqlosure
-             [db-connection :as db]
              [relational-algebra :as rel]
              [sql :as sql]
              [type :as t]]))
@@ -14,7 +13,6 @@
   [^{:doc "A (sorted) vector of values."}
    expressions tuple-expressions])
 
-;; DONE
 (define-record-type db-galaxy
   ^{:doc "A galaxy is the Clojure representation of a record-type in a
 (relational) database. Galaxies serve as the interface which can be queried just
@@ -41,7 +39,7 @@ as a SQL-table as created by `sqlosure.core/table`."}
   It returns a `sqlosure.relational-algebra/base-relation` for this new table
   and registers the galaxy to `*db-galaxies*`."
   [name type setup-fn query]
-  (let [dg (really-make-db-galaxy name type setup-fn query)
+  (let [dg (rel/really-make-db-galaxy name type setup-fn query)
         rel (rel/make-base-relation name
                                     (rel/alist->rel-scheme {name type})
                                     :universe sql/sql-universe
@@ -55,7 +53,7 @@ as a SQL-table as created by `sqlosure.core/table`."}
   `*db-galaxies*` to the database."
   [conn]
   (doall (map (fn [[name glxy]]
-                   ((db-galaxy-setup-fn (rel/base-relation-handle glxy)) conn))
+                ((rel/db-galaxy-setup-fn (rel/base-relation-handle glxy)) conn))
               @*db-galaxies*)))
 
 ;; DONE
@@ -166,18 +164,18 @@ as a SQL-table as created by `sqlosure.core/table`."}
            (let [handle (rel/base-relation-handle q)]
              ;; If the query is a galaxy, we need to extract the underlying
              ;; query and relation.
-             (if (db-galaxy? handle)
-               (let [db-query (db-galaxy-query handle)
-                     name (db-galaxy-name handle)
+             (if (rel/db-galaxy? handle)
+               (let [db-query (rel/db-galaxy-query handle)
+                     name (rel/db-galaxy-name handle)
                      cols (rel/rel-scheme-columns (rel/query-scheme db-query))
                      new-names (make-new-names name cols)]
                  [(rel/make-project (map (fn [k new-name]
                                            [new-name (rel/make-attribute-ref k)])
                                          cols new-names)
                                     db-query)
-                  [name
-                   (make-tuple (map rel/make-attribute-ref new-names))]])
-               [q '()]))
+                  {name
+                   (make-tuple (map rel/make-attribute-ref new-names))}])
+               [q {}]))
            (rel/project? q)
            (let [[alist underlying env]
                  (dbize-project (rel/project-alist q) (rel/project-query q)
@@ -237,7 +235,7 @@ as a SQL-table as created by `sqlosure.core/table`."}
     ;; NOTE is it wise to loop through a map (may be unsorted)?
     (loop [alist alist
            names []
-           bindings '()
+           bindings []
            queries '()
            restrictions '()]
       (if (empty? alist)
@@ -252,13 +250,13 @@ as a SQL-table as created by `sqlosure.core/table`."}
             (let [exprs (tuple-expressions exp)
                   new-names (make-new-names name exprs)]
               (recur (rest alist)
-                     (conj names (reverse (map (fn [cexp new-name]
-                                             [new-name cexp]))
-                                      exprs new-names))
-                     (cons
-                      (cons name
-                            (make-tuple (map rel/make-attribute-ref new-names)))
-                      bindings)
+                     (concat names (map (fn [cexp new-name]
+                                          [new-name cexp])
+                                        exprs new-names))
+                     (conj
+                      bindings
+                      [name
+                       (make-tuple (map rel/make-attribute-ref new-names))])
                      (concat more-queries queries)
                      (concat more-restrictions restrictions)))
             (recur (rest alist)
@@ -267,28 +265,12 @@ as a SQL-table as created by `sqlosure.core/table`."}
                    #_(concat more-queries queries)
                    #_(concat more-restrictions restrictions))))))))
 
-(declare reify-query-result)
-
-;; with a high possibility of errors.
-(defn db-query-reified-results
-  [db q]
-  ;; FIXME what happened to env?
-  (let [[db-q _] (dbize-query q)
-        db-res (db/run-query db db-q)]
-    (reify-query-result db-res (rel/query-scheme q))))
-
-;; TODO
-(defn db-query-reified-result
-  [db q]
-  (let [results (db-query-reified-results db q)]
-    (and (seq? results)
-         (ffirst results))))
-
-;; DONE
-(defn take+drop [n lis]
+(defn take+drop
+  "Takes an integer `n` and a list and returns a vector with
+  `[first n elems, remainder]`."
+  [n lis]
   [(take n lis) (drop n lis)])
 
-;;  DONE
 (defn reify-query-result
   [res scheme]
   (loop [cols (rel/rel-scheme-columns scheme)
@@ -309,7 +291,6 @@ as a SQL-table as created by `sqlosure.core/table`."}
                  (rest res)
                  (cons (rest res) rev)))))))
 
-;; DONE
 (defn rename-query
   "Takes a query `q` and a name-generator function `generate-name` and returns
   the query wrapped in a `sqlosure.relational-algebra/project` with mappings
@@ -330,7 +311,6 @@ as a SQL-table as created by `sqlosure.core/table`."}
                             names cols)
                        q)]))
 
-;; TODO
 (defn dbize-expression
   "Returns dbized expression, list of renamed additional queries, and list of
   restrictions on the resulting product."
@@ -408,6 +388,10 @@ as a SQL-table as created by `sqlosure.core/table`."}
                  (rel/make-aggregation (rel/aggregation-operator e)
                                        expr)))
              ;; TODO aggregation*
+             (rel/aggregation*? e)
+             (do (println "NOT YET IMPLEMENTED")
+                 (c/assertion-violation `dbize-expression "NOT YET IMPLEMENTED"
+                                        e))
              (rel/case-expr? e)
              ;; FIXME: this is incomplete: we should commute this
              ;; with tuples inside the case if the result type is a
@@ -415,7 +399,7 @@ as a SQL-table as created by `sqlosure.core/table`."}
              ;; FIXME Tests!
              (rel/make-case-expr (map (fn [[k v]]
                                         [(worker k) (worker v)])
-                                      (rel/case-expr-alist ))
+                                      (rel/case-expr-alist e))
                                  (worker (rel/case-expr-default e)))
              :else (c/assertion-violation `dbize-expression
                                           "unknown expression" e)))]
