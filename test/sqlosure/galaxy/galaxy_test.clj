@@ -1,6 +1,5 @@
 (ns sqlosure.galaxy.galaxy-test
   (:require [active.clojure.record :refer [define-record-type]]
-            [active.clojure.monad :refer [return]]
             [clojure.java.jdbc :as jdbc]
             [clojure.test :refer [deftest is testing]]
             [sqlosure
@@ -8,10 +7,8 @@
              [db-connection :as db]
              [relational-algebra :as rel]
              [sql :as sql]
-             [query-comprehension :as qc]
              [universe :as universe]]
-            [sqlosure.galaxy.galaxy :refer :all]
-            [sqlosure.optimization :as opt]))
+            [sqlosure.galaxy.galaxy :refer :all]))
 
 (def ... nil)
 
@@ -98,35 +95,35 @@
 
 (deftest dbize-project-test
   (testing "project with base-relation"
-    (is (= [[["k" (rel/make-attribute-ref "k")]]
-            kv-table '()]
+    (is (= [[["k" (rel/make-attribute-ref "k")]] kv-table {}]
            (dbize-project
             {"k" (rel/make-attribute-ref "k")}
             kv-table
             (name-generator "foo")))))
   (testing "project with galaxy query"
-    (is (= [[["k" (rel/make-attribute-ref "k")]]
+    (is (= [[["kv_0" (rel/make-attribute-ref "kv_0")]
+             ["kv_1" (rel/make-attribute-ref "kv_1")]]
             (rel/make-project {"kv_0" (rel/make-attribute-ref "k")
                                "kv_1" (rel/make-attribute-ref "v")}
                               kv-table)
-            {"kv" (make-tuple
-                   (mapv rel/make-attribute-ref ["kv_0" "kv_1"]))}]
-           (dbize-project {"k" (rel/make-attribute-ref "k")}
-                          kv-galaxy (name-generator "foo"))))))
-
+            {"kv" (make-tuple (mapv rel/make-attribute-ref ["kv_0" "kv_1"]))}]
+           (dbize-project {"kv" (rel/make-attribute-ref "kv")}
+                          kv-galaxy (name-generator "dbize"))))))
+(dbize-project {"kv" (rel/make-attribute-ref "kv")}
+               kv-galaxy (name-generator "dbize"))
 (deftest dbize-query-test
   (testing "empty query"
-    (is (= [rel/the-empty-rel-scheme '()] (dbize-query rel/the-empty))))
+    (is (= [rel/the-empty-rel-scheme {}] (dbize-query rel/the-empty))))
   (testing "base-relation"
     (testing "'regular' base-relation"
-      (is (= [kv-table '()]  ;; Shouldn't change anything.
+      (is (= [kv-table {}] ;; Shouldn't change anything.
              (dbize-query kv-table))))
     (testing "galaxy"
-      (is (= [(rel/make-project {"kv_0" (rel/make-attribute-ref "k")
-                                 "kv_1" (rel/make-attribute-ref "v")}
+      (is (= [(rel/make-project [["kv_0" (rel/make-attribute-ref "k")]
+                                 ["kv_1" (rel/make-attribute-ref "v")]]
                                 kv-table)
-              ["kv"
-               (make-tuple (mapv rel/make-attribute-ref ["kv_0" "kv_1"]))]]
+              {"kv"
+               (make-tuple (map rel/make-attribute-ref ["kv_0" "kv_1"]))}]
              (dbize-query kv-galaxy)))))
   (testing "project"
     ;; NOTE This is an important case! -- Why?
@@ -138,40 +135,40 @@
                               "v" (rel/make-attribute-ref "v")}
                              kv-galaxy)))
     (is (= [(rel/make-project
-             {"k" (rel/make-attribute-ref "k")}
-             (rel/make-project {"kv_0" (rel/make-attribute-ref "k")
-                                "kv_1" (rel/make-attribute-ref "v")}
+             [["k" (rel/make-attribute-ref "k")]]
+             (rel/make-project [["kv_0" (rel/make-attribute-ref "k")]
+                                ["kv_1" (rel/make-attribute-ref "v")]]
                                kv-table))
-            '()]
+            {"kv" (make-tuple (map rel/make-attribute-ref ["kv_0" "kv_1"]))}]
            (dbize-query
             (rel/make-project {"k" (rel/make-attribute-ref "k")}
                               kv-galaxy)))))
   (testing "restrict"
     (let [r #(rel/make-restrict ($= % ($integer 0)) kv-table)]
       (is (= [(rel/make-project
-                {"k" (rel/make-attribute-ref "k")
-                 "v" (rel/make-attribute-ref "v")}
-                (r (rel/make-attribute-ref "k"))) '()]
+               [["k" (rel/make-attribute-ref "k")]
+                ["v" (rel/make-attribute-ref "v")]]
+                (r (rel/make-attribute-ref "k"))) {}]
              (dbize-query (r (rel/make-attribute-ref "k")))))
       (is (= [(rel/make-project
-               {"k" (rel/make-attribute-ref "k")
-                "v" (rel/make-attribute-ref "v")}
-               (r ($integer 0))) '()]
+               [["k" (rel/make-attribute-ref "k")]
+                ["v" (rel/make-attribute-ref "v")]]
+               (r ($integer 0))) {}]
              (dbize-query (r ($kv-k ($kv 0 "foo"))))))))
   (testing "combine"
     (let [c #(rel/make-combine :union %1 %2)]
       (is (= [(c (rel/make-project
-                  {"k" (rel/make-attribute-ref "k")}
-                  (rel/make-project {"kv_0" (rel/make-attribute-ref "k")
-                                     "kv_1" (rel/make-attribute-ref "v")}
+                  [["k" (rel/make-attribute-ref "k")]]
+                  (rel/make-project [["kv_0" (rel/make-attribute-ref "k")]
+                                     ["kv_1" (rel/make-attribute-ref "v")]]
                                     kv-table))
                  (rel/make-project
-                  {"k" (rel/make-attribute-ref "k")
-                   "v" (rel/make-attribute-ref "v")}
+                  [["k" (rel/make-attribute-ref "k")]
+                   ["v" (rel/make-attribute-ref "v")]]
                   (rel/make-restrict ($= ($string "foo")
                                          (rel/make-attribute-ref "v"))
                                      kv-table)))
-              '()]
+              {"kv" (make-tuple (map rel/make-attribute-ref ["kv_0" "kv_1"]))}]
              (dbize-query (c (rel/make-project {"k" (rel/make-attribute-ref "k")}
                                                kv-galaxy)
                              (rel/make-restrict ($= ($string "foo")
@@ -180,22 +177,22 @@
   (testing "order"
     (is (= [(rel/make-order
              [[(rel/make-attribute-ref "k") :ascending]]
-             (rel/make-project {"kv_0" (rel/make-attribute-ref "k")
-                                "kv_1" (rel/make-attribute-ref "v")}
+             (rel/make-project [["kv_0" (rel/make-attribute-ref "k")]
+                                ["kv_1" (rel/make-attribute-ref "v")]]
                                kv-table))
-            ["kv" (make-tuple (mapv rel/make-attribute-ref ["kv_0" "kv_1"]))]]
+            {"kv" (make-tuple (mapv rel/make-attribute-ref ["kv_0" "kv_1"]))}]
            (dbize-query (rel/make-order
                          {(rel/make-attribute-ref "k") :ascending}
                          kv-galaxy)))))
   (testing "top"
-    (is (= [(rel/make-top 0 10 kv-table) '()]
+    (is (= [(rel/make-top 0 10 kv-table) {}]
            (dbize-query (rel/make-top 0 10 kv-table))))
     (is (= [(rel/make-top
              0 10
-             (rel/make-project {"kv_0" (rel/make-attribute-ref "k")
-                                "kv_1" (rel/make-attribute-ref "v")}
+             (rel/make-project [["kv_0" (rel/make-attribute-ref "k")]
+                                ["kv_1" (rel/make-attribute-ref "v")]]
                                kv-table))
-            ["kv" (make-tuple (mapv rel/make-attribute-ref ["kv_0" "kv_1"]))]]
+            {"kv" (make-tuple (mapv rel/make-attribute-ref ["kv_0" "kv_1"]))}]
            (dbize-query (rel/make-top 0 10 kv-galaxy)))))
   (testing "anything else should fail"
     (is (thrown? Exception (dbize-query nil)))
@@ -401,11 +398,3 @@
       (is (thrown? Exception (rename-query q 5))))
     (testing "should throw if q is not a query"
       (is (thrown? Exception (rename-query nil gen))))))
-
-#_(deftest db-query-reified-results-test
-  (with-kv-db db-spec
-    (fn [conn]
-      (db/insert! conn kv-galaxy 0 "foo")
-      (testing "'regular' query"
-        (is (= [0 "foo"] (db/db-query-reified-results conn (query [kv (<- kv-table)]
-                                                                  (project kv)))))))))

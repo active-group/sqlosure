@@ -1,4 +1,4 @@
-(ns ^{:doc "Implementation of relational algebra based on Mike Sperbers\nrelational-algebra.scm.\nReplaced alist with hash-map."}
+(ns ^{:doc "Implementation of relational algebra."}
  sqlosure.relational-algebra
   (:require [active.clojure
              [condition :as c :refer [assertion-violation]]
@@ -6,7 +6,6 @@
              [record :refer [define-record-type]]]
             [clojure.set :refer [difference union]]
             [sqlosure
-             [relational-algebra :as rel]
              [type :as t]
              [universe :as u]
              [utils :refer [fourth third]]]))

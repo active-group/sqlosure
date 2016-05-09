@@ -159,7 +159,7 @@ as a SQL-table as created by `sqlosure.core/table`."}
   (letfn
       [(worker [q generate-name]
          (cond
-           (rel/empty-query? q) [rel/the-empty-rel-scheme '()]
+           (rel/empty-query? q) [rel/the-empty-rel-scheme {}]
            (rel/base-relation? q)
            (let [handle (rel/base-relation-handle q)]
              ;; If the query is a galaxy, we need to extract the underlying
@@ -169,16 +169,22 @@ as a SQL-table as created by `sqlosure.core/table`."}
                      name (db-galaxy-name handle)
                      cols (rel/rel-scheme-columns (rel/query-scheme db-query))
                      new-names (make-new-names name cols)]
+                 ;; What's goining on here?
+                 ;; We basically split up the value reference into 'real' cols
+                 ;; and assign new names to it.
                  [(rel/make-project (map (fn [k new-name]
                                            [new-name (rel/make-attribute-ref k)])
                                          cols new-names)
                                     db-query)
+                  ;; We keep a reference of the name to a tuple containing the
+                  ;; 'real' column names to replace them when necessary.
                   {name
                    (make-tuple (map rel/make-attribute-ref new-names))}])
-               [q {}]))
+               [q {}]))  ;; Nothing to do here, just keep the old query.
            (rel/project? q)
            (let [[alist underlying env]
-                 (dbize-project (rel/project-alist q) (rel/project-query q)
+                 (dbize-project (rel/project-alist q)
+                                (rel/project-query q)
                                 generate-name)]
              [(rel/make-project alist underlying) env])
            (rel/restrict? q)
@@ -197,7 +203,7 @@ as a SQL-table as created by `sqlosure.core/table`."}
            (let [[dq1 env1] (worker (rel/combine-query-1 q) generate-name)
                  [dq2 env2] (worker (rel/combine-query-2 q) generate-name)]
              [(rel/make-combine (rel/combine-rel-op q) dq1 dq2)
-              (concat env1 env2)])
+              (merge env1 env2)])
            (rel/order? q)
            (let [[underlying env] (worker (rel/order-query q) generate-name)]
              [(rel/make-order
@@ -235,7 +241,7 @@ as a SQL-table as created by `sqlosure.core/table`."}
     ;; NOTE is it wise to loop through a map (may be unsorted)?
     (loop [alist alist
            names []
-           bindings []
+           bindings env
            queries '()
            restrictions '()]
       (if (empty? alist)
@@ -253,10 +259,10 @@ as a SQL-table as created by `sqlosure.core/table`."}
                      (concat names (map (fn [cexp new-name]
                                           [new-name cexp])
                                         exprs new-names))
-                     (conj
+                     (assoc
                       bindings
-                      [name
-                       (make-tuple (map rel/make-attribute-ref new-names))])
+                      name
+                      (make-tuple (map rel/make-attribute-ref new-names)))
                      (concat more-queries queries)
                      (concat more-restrictions restrictions)))
             (recur (rest alist)
@@ -281,9 +287,11 @@ as a SQL-table as created by `sqlosure.core/table`."}
       (let [typ (get (rel/rel-scheme-map scheme) (first cols))]
         (if (and (satisfies? t/base-type-protocol typ)
                  (db-type-data? (t/-data typ)))
-          (let [scheme (db-type-data-scheme (t/-data typ))
-                reifier (db-type-data-reifier (t/-data typ))
-                [prefix suffix] (take+drop (count (rel/rel-scheme-columns scheme)) res)]
+          (let [data (t/-data typ)
+                scheme (db-type-data-scheme data)
+                reifier (db-type-data-reifier data)
+                [prefix suffix] (take+drop
+                                 (count (rel/rel-scheme-columns scheme)) res)]
             (recur (rest cols)
                    suffix
                    (cons (apply reifier prefix) rev)))
