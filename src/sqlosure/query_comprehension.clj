@@ -42,12 +42,23 @@ running the query monad."}
   [new]
   (put-state-component! ::query new))
 
+(defn extract-scheme
+  [query]
+  (if (rel/base-relation? query)
+    (let [handle (rel/base-relation-handle query)]
+      (if (glxy/db-galaxy? handle)
+        (-> handle
+            glxy/db-galaxy-query
+            rel/query-scheme)
+        (rel/query-scheme query)))
+    (rel/query-scheme query)))
+
 (defn- add-to-product
   [make-product transform-scheme q]
   (monadic
    [alias new-alias]
    [query current-query]
-   (let [scheme (transform-scheme (rel/query-scheme q))
+   (let [scheme (transform-scheme (extract-scheme q))
          columns (rel/rel-scheme-columns scheme)
          fresh (map (fn [k] (fresh-name k alias)) columns)
          project-alist (map (fn [k fresh]
@@ -67,38 +78,60 @@ running the query monad."}
   [q]
   (add-to-product rel/make-left-outer-product rel/rel-scheme-nullable q))
 
+(defn !
+  "`!` selects an attribute from a relation.
+
+  Example: (! t \"id\") corresponds to SQL \"t.id\"."
+  [rel name?]
+  (let [alist (rel/rel-scheme-map (relation-scheme rel))
+        the-name (if name?
+                   name?
+                   (do
+                     (assert (= (count alist) 1))
+                     (ffirst alist)))]
+    ;; check user args
+    (when-not (relation? rel)
+      (assertion-violation `! (str "not a relation: " rel)))
+    (when name?
+      (when-not (contains? (rel/rel-scheme-map (relation-scheme rel)) the-name)
+        (assertion-violation `! "unkown attribute" rel the-name)))
+    (rel/make-attribute-ref (fresh-name the-name (relation-alias rel)))))
+
 (defn- project0
   "Project the some columns of the current query."
-  [alist extend?]
+  [rel-or-alist extend?]
   (monadic
    [alias new-alias]
    [query current-query]
    (let [query' ((if extend? rel/make-extend rel/make-project)
                  (map (fn [[k v]] [(fresh-name k alias) v])
-                      alist)
+                      rel-or-alist)
                  query)])
    (set-query! query')
    (return (make-relation
             alias
-            (let [scheme (rel/query-scheme query)
+            (let [scheme (extract-scheme query)
                   env (rel/rel-scheme->environment scheme)]
               (rel/alist->rel-scheme
                (map (fn [[k v]]
                       [k (rel/expression-type env v)])
-                    alist)))))))
+                    rel-or-alist)))))))
 
 (defn project
   "Project some columns of the current query. Returns the resulting state.
 
-  Example: (monadic [t (<- embed t-table)]
-                    (project {\"foo\" (! t \"foo\")
-                              \"bar\" (! t \"bar\"))
+  Example:
 
-  The corresponding SQL statemant would be \"SELECT foo, bar FROM t\"."
-  [alist]
-  (project0 alist true))
+      (monadic [t (<- embed t-table)]
+               (project {\"foo\" (! t \"foo\")
+                         \"bar\" (! t \"bar\"))
 
-(defn project-only ;; FIXME: temporary solution? Can't detect automatically what's needed?
+  The corresponding SQL statemant would be `SELECT foo, bar FROM t`."
+  [rel-or-alist]
+  (project0 rel-or-alist true))
+
+(defn project-only ;; FIXME: temporary solution? Can't detect automatically
+                   ;; what's needed?
   "Project the some columns of the current query."
   [alist]
   (project0 alist false))
@@ -170,27 +203,9 @@ running the query monad."}
                                     refs)
                                old))))
 
-(defn !
-  "`!` selects an attribute from a relation.
 
-  Example: (! t \"id\") corresponds to SQL \"t.id\"."
-  [rel name?]
-  (let [alist (rel/rel-scheme-map (relation-scheme rel))
-        the-name (if name?
-               name?
-               (do
-                 (assert (= (count alist) 1))
-                 (ffirst alist)))]
-    ;; check user args
-    (when-not (relation? rel)
-      (assertion-violation `! (str "not a relation: " rel)))
-    (when name?
-      (when-not (contains? (rel/rel-scheme-map (relation-scheme rel)) the-name)
-        (assertion-violation `! "unkown attribute" rel the-name)))
-    (rel/make-attribute-ref (fresh-name the-name (relation-alias rel)))))
-
-;; A map representing the empty state for building up the query.
 (defn- make-state
+  "A map representing the empty state for building up the query."
   [query alias]
   {:pre [(integer? alias)]}
   {::query query
@@ -238,8 +253,8 @@ running the query monad."}
    (return [(rel/make-project alist query) scheme])))
 
 (defn- build-query!
-  "Monadic command to create the final query from the given relation and the current monad
-  state, and return it and the scheme."
+  "Monadic command to create the final query from the given relation and the
+  current monad state, and return it and the scheme."
   [rel]
   (monadic
    [[query scheme] (build-query+scheme! rel)]
