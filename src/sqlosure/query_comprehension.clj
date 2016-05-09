@@ -42,23 +42,12 @@ running the query monad."}
   [new]
   (put-state-component! ::query new))
 
-(defn extract-scheme
-  [query]
-  (if (rel/base-relation? query)
-    (let [handle (rel/base-relation-handle query)]
-      (if (glxy/db-galaxy? handle)
-        (-> handle
-            glxy/db-galaxy-query
-            rel/query-scheme)
-        (rel/query-scheme query)))
-    (rel/query-scheme query)))
-
 (defn- add-to-product
   [make-product transform-scheme q]
   (monadic
    [alias new-alias]
    [query current-query]
-   (let [scheme (transform-scheme (extract-scheme q))
+   (let [scheme (transform-scheme (rel/query-scheme q))
          columns (rel/rel-scheme-columns scheme)
          fresh (map (fn [k] (fresh-name k alias)) columns)
          project-alist (map (fn [k fresh]
@@ -110,7 +99,7 @@ running the query monad."}
    (set-query! query')
    (return (make-relation
             alias
-            (let [scheme (extract-scheme query)
+            (let [scheme (rel/query-scheme query)
                   env (rel/rel-scheme->environment scheme)]
               (rel/alist->rel-scheme
                (map (fn [[k v]]

@@ -228,6 +228,10 @@
          (apply str (interpose ", " (rel/rel-scheme-columns scheme))) ") "
          "VALUES (" values ")")))
 
+(defn rel-is-galaxy?
+  [rel]
+  (glxy/db-galaxy? (rel/base-relation-handle rel)))
+
 (defn extract-table
   "Takes a `sqlosure.relational-algebra/base-relation` and checks, whether its
   handle is a sql-table or a galaxy. In case of a galaxy, it extracts the
@@ -235,7 +239,7 @@
   returns it's input."
   [table-or-galaxy]
   (assert (rel/base-relation? table-or-galaxy))
-  (if (glxy/db-galaxy? (rel/base-relation-handle table-or-galaxy))
+  (if (rel-is-galaxy? table-or-galaxy)
     (-> table-or-galaxy
         rel/base-relation-handle
         glxy/db-galaxy-query)
@@ -268,6 +272,8 @@
   [conn sql-table & args]
   (let [;; Check if the queried table is a galaxy. If so, replace it with ther
         ;; actual table reference.
+        ;; FIXME This may become unnecessary as soon as we're able to insert
+        ;; real records instead of a list of arguments into galaxies.
         sql-table* (extract-table sql-table)
         [scheme vals] (if (and (seq args) (rel/rel-scheme? (first args)))
                         [(first args) (rest args)]
