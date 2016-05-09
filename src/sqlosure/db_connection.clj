@@ -419,8 +419,9 @@
   [db q]
   ;; FIXME what happened to env?
   (let [[db-q _?_] (glxy/dbize-query q)
-        db-res (run-query db db-q)]
-    (glxy/reify-query-result db-res (rel/query-scheme q))))
+        db-res (run-query db db-q)
+        scheme (rel/query-scheme q)]
+    (mapv (fn [res] (glxy/reify-query-result res scheme)) db-res)))
 
 ;; TODO
 (defn db-query-reified-result

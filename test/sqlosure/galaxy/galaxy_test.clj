@@ -50,15 +50,18 @@
                           (project kv))))
 
 (defn db->kv
-  [db k]
-  (let [kv (key->kv db k)]
-    (when kv (apply make-kv (first kv)))))
+  [kv]
+  (apply make-kv kv))
 
 (defn kv->db-expression
   [kv]
   (make-tuple [($integer (kv-k kv)) ($string (kv-v kv))]))
 
-(def $kv-t (make-db-type "kv" kv? kv-k key->kv kv-scheme db->kv
+(def $kv-t (make-db-type "kv" kv?
+                         nil
+                         nil
+                         kv-scheme
+                         db->kv
                          kv->db-expression))
 
 (defn $kv
@@ -78,6 +81,18 @@
                                              nil
                                              (fn [k & args]
                                                (first (tuple-expressions k))))))
+
+(def $kv-v (rel/make-monomorphic-combinator
+            "kv-v"
+            [$kv-t]
+            $string-t
+            kv-v
+            :universe sql/sql-universe
+            :data
+            (make-db-operator-data
+             nil
+             (fn [key & args]
+               (second (tuple-expressions key))))))
 
 (defn with-kv-db
   "Takes a db-spec and a function that takes a (db-connect spec) connection.
@@ -398,3 +413,25 @@
       (is (thrown? Exception (rename-query q 5))))
     (testing "should throw if q is not a query"
       (is (thrown? Exception (rename-query nil gen))))))
+
+(with-kv-db db-spec
+  (fn [conn]
+    (let [count-query (query [kv (<- kv-galaxy)]
+                             (project {"count" ($count (! kv))}))
+          project-all-query (query [kv (<- kv-galaxy)]
+                                   (project kv))
+          restrict-query (query [kv (<- kv-galaxy)]
+                                (restrict ($or ($< ($kv-k (! kv))
+                                                   ($integer 1))
+                                               ($= ($kv-k (! kv))
+                                                   ($integer 42))))
+                                (project kv))]
+      (db/insert! conn kv-table 0 "foo")
+      (db/insert! conn kv-galaxy 1 "bar")
+      (db/insert! conn kv-galaxy (make-kv 42 "baz"))
+      (filter #(even? (kv-k %))) (db/db-query-reified-results conn restrict-query))))
+
+(put-query (first (dbize-query (query [kv (<- kv-galaxy)]
+                                      (restrict ($= ($kv-v (! kv))
+                                                    ($string "foo")))
+                                      (project kv)))))

@@ -278,6 +278,9 @@ as a SQL-table as created by `sqlosure.core/table`."}
   [(take n lis) (drop n lis)])
 
 (defn reify-query-result
+  "`reify-query-result` takes one result-record of a query and the (non-dbized)
+  scheme of the query ran and applies the necessary reification to the resulting
+  values."
   [res scheme]
   (loop [cols (rel/rel-scheme-columns scheme)
          res res
@@ -294,10 +297,10 @@ as a SQL-table as created by `sqlosure.core/table`."}
                                  (count (rel/rel-scheme-columns scheme)) res)]
             (recur (rest cols)
                    suffix
-                   (cons (apply reifier prefix) rev)))
+                   (cons (reifier prefix) rev)))
           (recur (rest cols)
                  (rest res)
-                 (cons (rest res) rev)))))))
+                 (cons (first res) rev)))))))
 
 (defn rename-query
   "Takes a query `q` and a name-generator function `generate-name` and returns
@@ -357,7 +360,10 @@ as a SQL-table as created by `sqlosure.core/table`."}
                             (concat
                              (map worker rands)
                              (map
-                              #(rel/expression-type underlying-scheme %)
+                              (fn [rand]
+                                (rel/expression-type
+                                 (rel/rel-scheme->environment underlying-scheme)
+                                 rand))
                               rands))))]
                (if (db-operator-data? data)
                  ;; FIXME this case is not clear (example necessary?).
@@ -374,7 +380,7 @@ as a SQL-table as created by `sqlosure.core/table`."}
                      (when restriction-fn
                        (reset! restrictions
                                (cons (apply restriction-fn base-query-refs)
-                                     restrictions)))
+                                     @restrictions)))
                      (apply transform base-query-refs))
                    (initiate))
                  ;; Base case, nothing special here.
