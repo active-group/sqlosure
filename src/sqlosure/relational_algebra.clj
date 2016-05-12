@@ -333,9 +333,12 @@
     (really-make-restrict exp query)
     (fn [env]
       (let [scheme (query-scheme query env)]
-        (when (not= t/boolean% (expression-type (compose-environments (rel-scheme->environment scheme) env)
-                                                 exp))
-          (assertion-violation `make-restrict "not a boolean condition" exp query env))
+        (when (not= t/boolean%
+                    (expression-type (compose-environments
+                                      (rel-scheme->environment scheme) env)
+                                     exp))
+          (assertion-violation `make-restrict
+                               "not a boolean condition" exp query env))
         scheme))))
 
 (define-record-type ^{:doc "Restrict a left outer product.

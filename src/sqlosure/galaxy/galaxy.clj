@@ -77,8 +77,8 @@ as a SQL-table as created by `sqlosure.core/table`."}
   * `scheme`: a `sqlosure.relational-algebra/rel-scheme` for this new type
   * `reifier`: a function that knows how to reconstruct a value of this type
                from a query result
-  * `value->db-expression->fn`: a function that knows how to create a db-entry
-                                from a value of this type"
+  * `value->db-expression-fn`: a function that knows how to create a db-entry
+                               from a value of this type"
   [name pred const->datum-fn datum->const-fn scheme reifier
    value->db-expression-fn
    & {:keys [ordered? numeric?]
