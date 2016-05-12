@@ -7,10 +7,9 @@
              [db-connection :as db]
              [relational-algebra :as rel]
              [sql :as sql]
+             [time :as time]
              [universe :as universe]]
-            [sqlosure.galaxy.galaxy :refer :all]
-            [active.clojure.condition :as c]
-            [sqlosure.time :as time]))
+            [sqlosure.galaxy.galaxy :refer :all]))
 
 (def ... nil)
 

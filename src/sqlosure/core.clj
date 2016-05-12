@@ -30,6 +30,35 @@
                         (rel/alist->rel-scheme map)
                         :universe universe?)))
 
+(defmacro define-table+scheme
+  "Convinience macro. Takes a `?name` (symbol) and a map `?scheme` from
+  column-name->sqlosure-type and defines two values, one for the rel-scheme and
+  one for the table.
+  Example:
+
+      ;; Define the table and scheme for a simple key->value type.
+      (define-table+scheme kv {\"k\" $integer-t
+                               \"v\" $string-t})
+
+  Which will expand to in:
+
+      (def kv-scheme
+        (sqlosure.relational-algebra/alist->rel-scheme {\"k\" $integer-t
+                                                        \"v\" $string-t}))
+
+      (def kv-table
+        (sqlosure.sql/make-sql-table
+          \"kv\"
+          (sqlosure.relational-algebra/alist->rel-scheme {\"k\" $integer-t
+                                                          \"v\" $string-t})))
+  "
+  [?name ?scheme]
+  `(do
+     (def ~(symbol (str ?name "-scheme"))
+       (rel/alist->rel-scheme ~?scheme))
+     (def ~(symbol (str ?name "-table"))
+       (table ~(str ?name) ~?scheme))))
+
 (defmacro query
   "`query` takes a series of relational algebra statements (projection,
   selection, grouping, etc.) and returns an executable relational algebra query.
