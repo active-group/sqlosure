@@ -21,17 +21,19 @@ as a SQL-table as created by `sqlosure.core/table`."}
   [^{:doc "The name of the galaxy."} name db-galaxy-name
    ^{:doc "The type that this galaxy represents."} type db-galaxy-type
    ^{:doc "Takes a db-connection, sets up virgin DB tables."}
+   ^{:doc "A function to set up a database table. This function will be called
+by `initialize-db-galaxies!`."}
    setup-fn db-galaxy-setup-fn
+   ^{:doc "The base query to access the underlying data (regularly, this would
+be a `sqlosure.relatinal-algebra/base-relation`."}
    query db-galaxy-query])
 
-;; DONE
 (def ^:dynamic *db-galaxies*
   "`*db-galaxies*` is a map wrapped in an atom that contains all known
   galaxies as a mapping of galaxy-name ->
   `sqlosure.realional-algebra/base-relation`."
   (atom {}))
 
-;; TODO which universe?
 (defn make&install-db-galaxy
   "`make&install-db-galaxy` takes a `name` for a new galaxy, a `type` that
   this galaxy represents, the `setup-fn` function to create the corresponding
@@ -47,7 +49,6 @@ as a SQL-table as created by `sqlosure.core/table`."}
     (swap! *db-galaxies* assoc name rel)
     rel))
 
-;; DONE + TESTS
 (defn initialize-db-galaxies!
   "Takes a connection and installs all galaxies currently stored in
   `*db-galaxies*` to the database."
@@ -56,15 +57,22 @@ as a SQL-table as created by `sqlosure.core/table`."}
                 ((db-galaxy-setup-fn (rel/base-relation-handle glxy)) conn))
               @*db-galaxies*)))
 
-;; DONE
 (define-record-type db-type-data
+  ^{:doc "`db-type-data` is a container for the necessary functions to work with
+arbitrary data-types as db-types."}
   (make-db-type-data scheme reifier value->db-expression-fn)
   db-type-data?
-  [scheme db-type-data-scheme
+  [^{:doc "A `sqlosure.relational-algebra/rel-scheme`."}
+   scheme db-type-data-scheme
+   ^{:doc "A function that takes the result of a query to the underlying table
+and transforms it into it's data-representation (for example, a db-record to a
+Clojure record, etc.)."}
    reifier db-type-data-reifier
+   ^{:doc "A function that takes the data-representation of the value and
+returns a db-representation of the value (for example, a Clojure record to a
+`sqlosure.galaxy/tuple`)."}
    value->db-expression-fn db-type-data-value->db-expression-fn])
 
-;; TODO Which universe?
 (defn make-db-type
   "`make-db-type` creates a new `sqlosure.type/base-type` for a db-type in a to
   be used in a galaxy. The newly created data type will be registered to the
@@ -88,12 +96,19 @@ as a SQL-table as created by `sqlosure.core/table`."}
                     :data (make-db-type-data scheme reifier value->db-expression-fn)))
 
 (define-record-type db-operator-data
+  ^{:doc "Used to define the `sqlosure.relational-algebra/rator-data` component
+of an operator. This enables you to define your own functions for arbitrary
+(db-)types."}
   (make-db-operator-data base-query transformer-fn) db-operator-data?
-  [base-query db-operator-data-base-query
+  [^{:doc "A query to lift another value to this context (for underlying values,
+especially components of a more complex product-type."}
+   base-query db-operator-data-base-query
+   ^{:doc "A fuction that takes a result and extracs/transforms it the way this
+operator is intended to work."}
    transformer-fn db-operator-data-transformer-fn])
 
 (defn- make-name-generator
-  "Takes a prefix (String) and returns a function that returns the prefix with
+  "Takes a `prefix` (String) and returns a function that returns the prefix with
   a \"_n\"-suffix, where n is an integer starting with 0 that gets incremented
   upon each subsequent call."
   [prefix]
@@ -153,7 +168,7 @@ as a SQL-table as created by `sqlosure.core/table`."}
 
 ;; TODO restrict-outer
 ;; FIXME write tests for queries + environments!
-(defn dbize-query*
+(defn- dbize-query*
   "Returns new query, environment mapping names to tuples."
   [q generate-name]
   (letfn
@@ -179,7 +194,7 @@ as a SQL-table as created by `sqlosure.core/table`."}
                   ;; We keep a reference of the name to a tuple containing the
                   ;; 'real' column names to replace them when necessary.
                   {name
-                   (make-tuple (map rel/make-attribute-ref new-names))}])
+                   (make-tuple (mapv rel/make-attribute-ref new-names))}])
                [q {}]))  ;; Nothing to do here, just keep the old query.
            (rel/project? q)
            (let [[alist underlying env]
@@ -262,7 +277,7 @@ as a SQL-table as created by `sqlosure.core/table`."}
                      (assoc
                       bindings
                       name
-                      (make-tuple (map rel/make-attribute-ref new-names)))
+                      (make-tuple (mapv rel/make-attribute-ref new-names)))
                      (concat more-queries queries)
                      (concat more-restrictions restrictions)))
             (recur (rest alist)
@@ -271,7 +286,7 @@ as a SQL-table as created by `sqlosure.core/table`."}
                    (concat more-queries queries)
                    (concat more-restrictions restrictions))))))))
 
-(defn take+drop
+(defn- take+drop
   "Takes an integer `n` and a list and returns a vector with
   `[first n elems, remainder]`."
   [n lis]
@@ -388,7 +403,7 @@ as a SQL-table as created by `sqlosure.core/table`."}
                         rator
                         (map worker rands))))
              (tuple? e)
-             (make-tuple (map worker (tuple-expressions e)))
+             (make-tuple (mapv worker (tuple-expressions e)))
              (rel/aggregation? e)
              (let [expr (worker (rel/aggregation-expr e))]
                (if (= :count (rel/aggregation-operator e))

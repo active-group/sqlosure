@@ -1,20 +1,20 @@
-(ns ^{:doc "Structured representation of SQL Link to relational algebra"
-      :author "Marco Schneider, based on Mike Sperbers schemeql2"}
+(ns ^{:doc "Structured representation of SQL Link to relational algebra"}
     sqlosure.sql
-  (:require [sqlosure.relational-algebra :refer :all]
-            [sqlosure.universe :refer [make-universe make-derived-universe]]
-            [sqlosure.type :refer [boolean% numeric-type? ordered-type? type=? make-set-type null% any%
-                                   non-nullable-type]]
-            [active.clojure.record :refer [define-record-type]]
-            [active.clojure.condition :refer [assertion-violation]]
-            [active.clojure.lens :as lens]
-            [clojure.string :as string]))
+  (:require [active.clojure
+             [condition :refer [assertion-violation]]
+             [record :refer [define-record-type]]]
+            [clojure.string :as string]
+            [sqlosure
+             [relational-algebra :refer :all]
+             [type :refer [boolean% make-set-type non-nullable-type null% numeric-type? ordered-type? type=?]]
+             [universe :refer [make-derived-universe make-universe]]]))
 
 (define-record-type sql-table
+  ^{:doc "Represents a sql-table."}
   (really-make-sql-table name scheme) sql-table?
-  [name sql-table-name  ;; (sql-table -> string)
-   scheme sql-table-scheme  ;; (sql-table -> rel-scheme)
-   ])
+  [^{:doc "The name of the table (`string`)."} name sql-table-name
+   ^{:doc "The scheme of the table (`sqlosure.relational-algebra/rel-scheme`)."}
+   scheme sql-table-scheme])
 
 ;; FIXME: clean up public api: (sql-table-name (make-sql-table "abc" ...)) would break, e.g. 
 (defn make-sql-table
@@ -47,6 +47,8 @@
   [;; [ string ]
    ;; DISTINCT, ALL, etc.
    ;; FIXME: right now, this is never actually used.
+   ;; SELECT
+   ^{:doc "Seq of strings containing options such as `DISTINCT`, etc."}
    options sql-select-options
    ;; list [sql-column sql-expr]
    ;; [] is for '*'
