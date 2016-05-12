@@ -416,20 +416,21 @@
         (run-query-with-params con)))))
 
 (defn run-sql
+  "Takes a db-connection `conn` and a raw SQL query and executes it (calling out
+  to jdbc's execute function)."
   [conn sql]
   (jdbc/execute! (db-connection-conn conn) sql))
 
-;; GALAXY STUFF
-;; with a high possibility of errors.
 (defn db-query-reified-results
+  "Takes a db-connetion `conn` and a query `q` and runs the query against the
+  connected database. The result is returnd reified, which means all data is
+  transformed in the shape specified by it's corresponding data type."
   [db q]
-  ;; FIXME what happened to env?
-  (let [[db-q _?_] (glxy/dbize-query q)
+  (let [[db-q _] (glxy/dbize-query q)
         db-res (run-query db db-q)
         scheme (rel/query-scheme q)]
-    (mapv (fn [res] (glxy/reify-query-result res scheme)) db-res)))
+    (mapv #(glxy/reify-query-result % scheme) db-res)))
 
-;; TODO
 (defn db-query-reified-result
   [db q]
   (let [results (db-query-reified-results db q)]
