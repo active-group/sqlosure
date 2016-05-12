@@ -4,7 +4,7 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.7.0"]
-                 [org.clojure/java.jdbc "0.6.0-alpha2"]
+                 [org.clojure/java.jdbc "0.6.0"]
                  ;; Refer to your required driver here.
                  [org.postgresql/postgresql "9.4.1208"]
                  [active-clojure "0.12.0"]]
