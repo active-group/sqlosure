@@ -20,7 +20,8 @@
   (-const->datum [this val] "Convert value to datum.")
   (-datum->const [this datum] "Convert datum to value.")
   (-method-map-atom [this] "Get us an an atom pointing to a map of type-specific methods.")
-  (-data [this] "Domain-specific data, for outside use."))
+  (-data [this] "Domain-specific data, for outside use.")
+  (-to-string [this] "(SQL-)String representation for this datatype (e.g. 'TEXT')."))
 
 (defn nullable-type?
   "Is type nullable?"
@@ -64,7 +65,7 @@
 (define-record-type atomic-type
   (make-atomic-type name nullable? numeric? ordered? predicate
                     const->datum-fn datum->const-fn
-                    method-map-atom data)
+                    method-map-atom data string-representation)
   atomic-type?
   [name atomic-type-name
    nullable? atomic-type-nullable?
@@ -74,23 +75,27 @@
    const->datum-fn atomic-type-const->datum-fn
    datum->const-fn atomic-type-datum->const-fn
    method-map-atom atomic-type-method-map-atom
-   data atomic-type-data]
+   data atomic-type-data
+   string-representation atomic-type-string-representation]
   base-type-protocol
   (-name [_] name)
   (-contains? [_ val] (predicate val))
   (-nullable? [_] nullable?)
   (-nullable [_] (make-atomic-type name true numeric? ordered? predicate
                                    const->datum-fn datum->const-fn
-                                   method-map-atom data))
+                                   method-map-atom data
+                                   string-representation))
   (-non-nullable [_] (make-atomic-type name false numeric? ordered? predicate
                                        const->datum-fn datum->const-fn
-                                       method-map-atom data))
+                                       method-map-atom data
+                                       string-representation))
   (-numeric? [_] numeric?)
   (-ordered? [_] ordered?)
   (-const->datum [_ val] (const->datum-fn val))
   (-datum->const [_ datum] (datum->const-fn datum))
   (-method-map-atom [_] method-map-atom)
-  (-data [_] data))
+  (-data [_] data)
+  (-to-string [_] string-representation))
 
 (defmethod print-method atomic-type [r, ^Writer w]
   (.write w "#")
@@ -113,14 +118,15 @@
   If :universe is supplied, the new type will be registered in the universe and
   this function returns a vector containing `[type universe]`."
   [name predicate const->datum-proc datum->const-proc
-   & {:keys [universe numeric? ordered? data]
-      :or [universe nil numeric? false ordered? false data nil]}]
+   & {:keys [universe numeric? ordered? data as-string]
+      :or [universe nil numeric? false ordered? false data nil as-string nil]}]
   (let [t (make-atomic-type name false
                             (boolean numeric?) (boolean ordered?)
                             predicate
                             const->datum-proc datum->const-proc
                             (atom {})
-                            data)]
+                            data
+                            as-string)]
     (when universe
       (register-type! universe name t))
     t))
@@ -259,21 +265,25 @@
 
 ;; Some base types
 (def string% (make-base-type 'string string? identity identity
-                             :ordered? true))
+                             :ordered? true
+                             :as-string "TEXT"))
 (def integer% (make-base-type 'integer integer? identity identity
-                              :numeric? true :ordered? true))
+                              :numeric? true :ordered? true
+                              :as-string "INTEGER"))
 (def double% (make-base-type 'double double? identity identity
-                              :numeric? true :ordered? true))
-(def boolean% (make-base-type 'boolean boolean? identity identity))
+                             :numeric? true :ordered? true
+                             :as-string "DOUBLE"))
+(def boolean% (make-base-type 'boolean boolean? identity identity
+                              :as-string "BOOLEAN"))
 
 ;; Used to represent the type of sql NULL. Corresponds to nil in Clojure.
 (def null% (make-base-type 'unknown nil? identity identity))  ;; FIXME Does this have any real purpose?
 (def any% (make-base-type 'any (constantly true) identity identity))
 
 (def date% (make-base-type 'date date? identity identity
-                           :ordered? true))
+                           :ordered? true :as-string "DATE"))
 (def timestamp% (make-base-type 'timestamp timestamp? identity identity
-                                :ordered? true))
+                                :ordered? true :as-string "TIMESTAMP"))
 
 (def blob% (make-base-type 'blob byte-array? 'lose 'lose))
 (def clob% (make-base-type 'clob char-array? 'lose 'lose))
@@ -282,6 +292,8 @@
 (def integer%-nullable (make-nullable-type integer%))
 (def double%-nullable (make-nullable-type double%))
 (def blob%-nullable (make-nullable-type blob%))
+(def date%-nullable (make-nullable-type date%))
+(def timestamp%-nullable (make-nullable-type timestamp%))
 
  ;; Serialization
 

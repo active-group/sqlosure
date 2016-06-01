@@ -89,24 +89,33 @@
   (fn [^ResultSet rs ix] (.getString rs ix)))
 
 (define-type-method-implementations t/string%-nullable
-  (fn [^PreparedStatement stmt ix val] (.setString stmt ix val))
-  (fn [^ResultSet rs ix] (.getString rs ix)))
+  (fn [^PreparedStatement stmt ix val] (if (nil? val)
+                                         (.setNull stmt ix java.sql.Types/VARCHAR)
+                                         (.setString stmt ix val)))
+  (fn [^ResultSet rs ix] (let [v (.getString rs ix)]
+                           (when-not (.wasNull rs) v))))
 
 (define-type-method-implementations t/integer%
   (fn [^PreparedStatement stmt ix val] (.setInt stmt ix val))
   (fn [^ResultSet rs ix] (.getInt rs ix)))
 
 (define-type-method-implementations t/integer%-nullable
-  (fn [^PreparedStatement stmt ix val] (.setInt stmt ix val))
-  (fn [^ResultSet rs ix] (.getInt rs ix)))
+  (fn [^PreparedStatement stmt ix val] (if (nil? val)
+                                         (.setNull stmt ix java.sql.Types/INTEGER)
+                                         (.setInt stmt ix val)))
+  (fn [^ResultSet rs ix] (let [v (.getInt rs ix)]
+                           (when-not (.wasNull rs) v))))
 
 (define-type-method-implementations t/double%
   (fn [^PreparedStatement stmt ix val] (.setDouble stmt ix val))
   (fn [^ResultSet rs ix] (.getDouble rs ix)))
 
 (define-type-method-implementations t/double%-nullable
-  (fn [^PreparedStatement stmt ix val] (.setDouble stmt ix val))
-  (fn [^ResultSet rs ix] (.getDouble rs ix)))
+  (fn [^PreparedStatement stmt ix val] (if (nil? val)
+                                         (.setNull stmt ix java.sql.Types/DOUBLE)
+                                         (.setDouble stmt ix val)))
+  (fn [^ResultSet rs ix] (let [v (.getDouble rs ix)]
+                           (when-not (.wasNull rs) v))))
 
 (define-type-method-implementations t/boolean%
   (fn [^PreparedStatement stmt ix val] (.setBoolean stmt ix val))
@@ -117,7 +126,9 @@
   (fn [^ResultSet rs ix] (.getBlob rs ix)))
 
 (define-type-method-implementations t/blob%-nullable
-  (fn [^PreparedStatement stmt ix val] (.setBlob stmt ix val))
+  (fn [^PreparedStatement stmt ix val] (if (nil? val)
+                                         (.setNull stmt ix java.sql.Types/BLOB)
+                                         (.setBlob stmt ix val)))
   (fn [^ResultSet rs ix] (.getBlob rs ix)))
 
 (define-type-method-implementations t/clob%
@@ -132,9 +143,27 @@
   (fn [^ResultSet rs ix]
     (time/from-sql-date (.getDate rs ix))))
 
+(define-type-method-implementations t/date%-nullable
+  ;; NOTE `val` here is a `java.time.LocalDate` which has to be coerced to and
+  ;;      from `java.sql.Date` first.
+  (fn [^PreparedStatement stmt ix val]
+    (if (nil? val)
+      (.setNull stmt ix java.sql.Types/DATE)
+      (.setDate stmt ix (time/to-sql-date val))))
+  (fn [^ResultSet rs ix]
+    (time/from-sql-date (.getDate rs ix))))
+
 (define-type-method-implementations t/timestamp%
   (fn [^PreparedStatement stmt ix val]
     (.setTimestamp stmt ix (time/to-sql-timestamp val)))
+  (fn [^ResultSet rs ix]
+    (time/from-sql-timestamp (.getTimestamp rs ix))))
+
+(define-type-method-implementations t/timestamp%-nullable
+  (fn [^PreparedStatement stmt ix val]
+    (if (nil? val)
+      (.setNull stmt ix java.sql.Types/TIMESTAMP)
+      (.setTimestamp stmt ix (time/to-sql-timestamp val))))
   (fn [^ResultSet rs ix]
     (time/from-sql-timestamp (.getTimestamp rs ix))))
 
