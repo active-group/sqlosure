@@ -53,11 +53,12 @@
                                                           \"v\" $string-t})))
   "
   [?name ?scheme]
-  `(do
-     (def ~(symbol (str ?name "-scheme"))
-       (rel/alist->rel-scheme ~?scheme))
-     (def ~(symbol (str ?name "-table"))
-       (table ~(str ?name) ~?scheme))))
+  (let [?dehyphenated (clojure.string/replace (str ?name) #"\-" "_")]
+    `(do
+       (def ~(symbol (str ?name "-scheme"))
+         (rel/alist->rel-scheme ~?scheme))
+       (def ~(symbol (str ?name "-table"))
+         (table ~?dehyphenated ~?scheme)))))
 
 (defmacro query
   "`query` takes a series of relational algebra statements (projection,
@@ -258,7 +259,6 @@
 (def $in sql/in$)
 (def $between sql/between$)
 
-
 ;; -----------------------------------------------------------------------------
 ;; -- Shortcuts for types and type constructors.
 ;; -----------------------------------------------------------------------------
@@ -291,6 +291,8 @@
 (def $string-null-t t/string%-nullable)
 (def $integer-null-t t/integer%-nullable)
 (def $double-null-t t/double%-nullable)
+(def $date-null-t (t/-nullable t/date%))
+(def $timestamp-null-t (t/-nullable t/timestamp%))
 
 ;; -----------------------------------------------------------------------------
 ;; -- Helper
