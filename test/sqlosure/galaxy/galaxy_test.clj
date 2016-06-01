@@ -681,32 +681,6 @@ values to use in the queries.")
   "Now, instead of querying the tables, we don't need to care about constructing
 and reconstructing records from the result sets.")
 
-(def rowohlt (make-publisher "Rowohlt" "Berlin"))
-(def kiwi (make-publisher "Kipenheuer & Witsch" "Köln"))
-(def herrndorf (make-person "Wolfgang" "Herrndorf" (time/make-date 1965 6 12)
-                            "Köln"))
-(def arbeit-und-struktur (make-book "978-3-87134-781-8"
-                                    herrndorf
-                                    "Arbeit und Struktur"
-                                    (time/make-date 2013 1 1)
-                                    rowohlt))
-
-(with-book-db db-spec
-  (fn []
-    (db/db-query-reified-results @*conn* (query [books (<- book-galaxy)]
-                                                (project books)))
-    #_(let [[pers pub] (first (db/db-query-reified-results
-                             @*conn*
-                             (query [pers (<- person-galaxy)
-                                     pubs (<- publisher-galaxy)]
-                                    (restrict ($= ($person-lname (! pers))
-                                                  ($string "Herrndorf")))
-                                    (restrict ($= ($publisher-name (! pubs))
-                                                  ($string "Rowohlt")))
-                                    (project {"author" (! pers)
-                                              "publisher" (! pubs)}))))]
-         pub)))
-
 (def $publisher-operates-from
   (rel/make-monomorphic-combinator "publisher-operates-from" [$publisher-t]
                                    $string-t
@@ -744,3 +718,160 @@ and reconstructing records from the result sets.")
                                           nil
                                           (fn [book & _]
                                             (get (tuple-expressions book) 2)))))
+
+
+(def rowohlt (make-publisher "Rowohlt" "Berlin"))
+(def kiwi (make-publisher "Kipenheuer & Witsch" "Köln"))
+(def herrndorf (make-person "Wolfgang" "Herrndorf" (time/make-date 1965 6 12)
+                            "Köln"))
+(def arbeit-und-struktur (make-book "978-3-87134-781-8"
+                                    herrndorf
+                                    "Arbeit und Struktur"
+                                    (time/make-date 2013 1 1)
+                                    rowohlt))
+
+(with-book-db db-spec
+  (fn []
+    (db/db-query-reified-results
+     @*conn* (query [books (<- book-galaxy)]
+                    (restrict ($= ($book-title (! books))
+                                  ($string "Arbeit und Struktur")))
+                    (project books)))))
+
+;; SET TYPE
+
+(define-record-type string-v
+  (make-string-v id v) string-v?
+  [id string-v-id
+   v string-v-v])
+
+(define-record-type int-v
+  (make-int-v id v) int-v?
+  [id int-v-id
+   v int-v-v])
+
+(comment "with a cool name, this could be something like"
+         (define-set-type string-v int-v)
+         "which could then expand to"
+         (define-record-type string-v-int-v
+           (make-string-v-int-v id id_0 id_1) string-v-int-v?
+           [id string-v-int-v-id
+            id_0 string-v-int-v-id_0
+            id_1 string-v-int-v-id_1])
+         )
+
+(define-record-type int-or-string
+  (really-make-int-or-string id i s) int-or-string?
+  [id int-or-string-id
+   i int-or-string-i
+   s int-or-string-s])
+
+(defn make-int-or-string
+  [id i-or-s]
+  (if (integer? i-or-s)
+    (really-make-int-or-string id i-or-s nil)
+    (really-make-int-or-string id nil i-or-s)))
+
+(defn extract-typed-value
+  [int-or-s]
+  (let [id (int-or-string-id int-or-s)
+        i (int-or-string-i int-or-s)
+        s (int-or-string-s int-or-s)]
+    (if i (make-int-v id i) (make-string-v id s))))
+
+(define-table+scheme int-or-string {"id" $integer-t
+                                    "i" $integer-null-t
+                                    "s" $integer-null-t})
+
+(define-table+scheme integer {"id" $integer-t
+                              "val" $integer-t})
+
+(define-table+scheme string {"id" $integer-t
+                             "val" $string-t})
+
+(defn db->i-or-s
+  [i-or-s]
+  (let [[id i s] i-or-s
+        v (first (if i
+                   (db/run-query @*conn* (query [is (<- integer-table)]
+                                                (restrict ($= (! is "id")
+                                                              ($integer id)))
+                                                (project is)))
+                   (db/run-query @*conn* (query [ss (<- string-table)]
+                                                (restrict ($= (! ss "id")
+                                                              ($integer id)))
+                                                (project ss)))))]
+    (extract-typed-value (make-int-or-string id (second v)))))
+
+(defn i-or-s->db
+  [i-or-s]
+  (make-tuple [($integer (int-or-string-id i-or-s))
+               ($integer-null-t (int-or-string-i i-or-s))
+               ($integer-null-t (int-or-string-s i-or-s))]))
+
+(defn key->i-or-s
+  [k]
+  nil)
+
+(def $int-or-string-t
+  (make-db-type "int-or-string" int-or-string? int-or-string-id
+                key->i-or-s int-or-string-scheme
+                db->i-or-s i-or-s->db))
+
+(defn install-i-or-s-tables!
+  [db]
+  (doall
+   [(jdbc/db-do-prepared (db/db-connection-conn db)
+                          (jdbc/create-table-ddl
+                           "int_or_string"
+                           [["id" "INTEGER"] ["i" "INTEGER"] ["s" "INTEGER"]]))
+    (jdbc/db-do-prepared (db/db-connection-conn db)
+                         (jdbc/create-table-ddl
+                          "integer"
+                          [["id" "INTEGER"] ["val" "INTEGER"]]))
+    (jdbc/db-do-prepared (db/db-connection-conn db)
+                         (jdbc/create-table-ddl
+                          "string"
+                          [["id" "INTEGER"] ["val" "TEXT"]]))]))
+
+(def int-or-string-galaxy
+  (make&install-db-galaxy "int_or_string"
+                          $int-or-string-t
+                          install-i-or-s-tables!
+                          int-or-string-table))
+
+(defn with-i-or-s-db
+  [spec func]
+  (jdbc/with-db-connection [db spec]
+    (let [conn (db-connect db)]
+      (reset! *db-galaxies* nil)
+      (reset! *conn* conn)
+      (make&install-db-galaxy "int_or_string"
+                              $int-or-string-t
+                              install-i-or-s-tables!
+                              int-or-string-table)
+      (initialize-db-galaxies! @*conn*)
+
+      (db/insert! @*conn* int-or-string-table 0 nil 0)
+      (db/insert! @*conn* int-or-string-table 1 nil 1)
+      (db/insert! @*conn* int-or-string-table 2 2 nil)
+      (db/insert! @*conn* int-or-string-table 3 nil 3)
+      (db/insert! @*conn* int-or-string-table 4 4 nil)
+
+      (db/insert! @*conn* integer-table 2 42)
+      (db/insert! @*conn* integer-table 4 23)
+
+      (db/insert! @*conn* string-table 0 "foo")
+      (db/insert! @*conn* string-table 1 "bar")
+      (db/insert! @*conn* string-table 3 "baz")
+      (func))))
+
+(with-i-or-s-db db-spec
+  (fn []
+    #_(db/run-query @*conn* (query [strings (<- string-table)]
+                                 (restrict ($= (! strings "id")
+                                               ($integer 0)))
+                                 (project strings)))
+    (db/db-query-reified-results @*conn*
+                                 (query [ios (<- int-or-string-galaxy)]
+                                        (project ios)))))
