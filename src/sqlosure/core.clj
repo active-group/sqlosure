@@ -161,6 +161,9 @@
   ([n] (qc/top nil n))
   ([offset n] (qc/top offset n)))
 
+(defn union
+  [& prods]
+  (apply qc/union prods))
 
 ;; -----------------------------------------------------------------------------
 ;; -- Shortcuts for aggretations functions.
