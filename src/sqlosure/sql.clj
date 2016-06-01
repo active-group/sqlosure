@@ -50,18 +50,14 @@
    ;; SELECT
    ^{:doc "Seq of strings containing options such as `DISTINCT`, etc."}
    options sql-select-options
-   ;; list [sql-column sql-expr]
-   ;; [] is for '*'
-   ;; nil means open - can still add some
-   ;; result
+   ^{:doc "Attributes that are projected from the select
+(`([sql-column sql-expr])`). `[]` stands for `*`."}
    (attributes sql-select-attributes sql-select-attributes-lens)
-   ;; true if the select represents a nullary relation. In this case,
-   ;; attributes should contain a single dummy attribute.
-   ;; TODO / FIXME: Is this comment still true?
+   ^{:doc "Is the selection nulllary? (`boolean`)."}
    (nullary? sql-select-nullary? sql-select-nullary?-lens)
-   ;; [ [alias sql-select-talbe] ]
    ;; FROM
-   (tables sql-select-tables sql-select-tables-lens) ;; (vec-of ["alias" sql-select-table])
+   ^{:doc "Which tables to select from (`[[alias sql-select-table]]`)."}
+   (tables sql-select-tables sql-select-tables-lens)
    ;; [ sql-expr ]
    ;; WHERE
    ;; [ sql-expr ]
@@ -69,14 +65,13 @@
    (outer-tables sql-select-outer-tables sql-select-outer-tables-lens)
    (criteria sql-select-criteria sql-select-criteria-lens)
    (outer-criteria sql-select-outer-criteria sql-select-outer-criteria-lens)
-
-   ^{:doc "set of SQL column names or `nil`."}
+   ^{:doc "set of SQL column names or `nil` (`#{string}`)."}
    (group-by sql-select-group-by sql-select-group-by-lens)
-
    ^{:doc "List of SQL expressions or nil."}
    (having sql-select-having sql-select-having-lens)
    ;; [ {sql-expr sql-order} ]
    ;; ORDER BY
+   ^{:doc "A map of expressions -> ordering (`{sql-expr sql-order}`)."}
    (order-by sql-select-order-by sql-select-order-by-lens)
    ;; [ string ]
    ;; TOP n, etc.
