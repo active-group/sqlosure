@@ -19,16 +19,23 @@
   [db-spec]
   (db/make-db-connection db-spec))
 
+(defn- symbol->value
+  [sym]
+  (when-let [v (first (remove nil? (map #(ns-resolve % sym) (all-ns))))]
+    (var-get v)))
+
 (defn table
   "Returns a `sqlosure.relational-algebra/base-relation`.
   `sql-name` ist the name of the table in the DBMS, `map` is a map of column-name
   -> sqlosure.type-type. `opts` may contain a :universe key and a universe
   (defaults to `nil`)."
-  [sql-name map & opts]
+  [sql-name m & opts]
   (let [opts-m (apply hash-map opts)
-        universe? (get opts-m :universe)]
+        universe? (get opts-m :universe)
+        mmap (into {} (map (fn [[k v]]
+                             [k (symbol->value v)]) m))]
     (sql/make-sql-table sql-name
-                        (rel/alist->rel-scheme map)
+                        (rel/alist->rel-scheme mmap)
                         :universe universe?)))
 
 (defmacro define-table+scheme
@@ -57,7 +64,13 @@
   (let [?dehyphenated (clojure.string/replace (str ?name) #"\-" "_")]
     `(do
        (def ~(symbol (str ?name "-scheme"))
-         (rel/alist->rel-scheme ~?scheme))
+         ~(rel/alist->rel-scheme
+           (into {} (map (fn [[k v]]
+                           (if (symbol? v)
+                             [k (symbol->value v)]
+                             [k v]))
+                         ?scheme))
+           ?scheme))
        (def ~(symbol (str ?name "-table"))
          (table ~?dehyphenated ~?scheme)))))
 
