@@ -10,7 +10,8 @@
              [relational-algebra-sql :as rsql]
              [sql :as sql]
              [sql-put :as put]
-             [type :as t]]))
+             [type :as t]]
+            [sqlosure.galaxy.galaxy :as glxy]))
 
 (defn db-connect
   "`db-connect` takes a connection map and returns a `db-connection`-record for
@@ -303,6 +304,13 @@
 (defn put-query
   "`put-query` takes a (relational algebra) query and returns it's (SQL-) string
   representation. Uses the default printer from `sqlosure.sql-put`."
-  [q]
-  (->> q opt/optimize-query rsql/query->sql
-       put/sql-select->string))
+  [q & [opts]]
+  (println opts)
+  (let [s (->> q opt/optimize-query
+               glxy/dbize-query
+               first
+               rsql/query->sql
+               put/sql-select->string)]
+    (when (get opts :println)
+      (println (first s)))
+    s))
