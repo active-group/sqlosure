@@ -111,6 +111,7 @@
 
 (define-product-type person {"fname" $string-t
                              "lname" $string-t
+                             "sex" $boolean-t
                              "birthday" $date-t})
 
 (defn with-person-db
@@ -119,18 +120,56 @@
     (let [conn (db-connect db)]
       (reset! *db-galaxies* nil)
       (reset! *conn* conn)
-      (make&install-db-galaxy "person" $person-t install-person-table! person-table)
+      (make&install-db-galaxy "person" $person-t install-person-table!
+                              person-table)
       (initialize-db-galaxies! @*conn*)
 
       ;; Insert a few values
-      (db/insert! @*conn* person-table 0 "Marco" "Schneider" (time/make-date 1989 10 31))
-      #_(db/insert! @*conn* person-table "Helen" "Ahner" (time/make-date 1990 10 15))
+      (db/insert! @*conn* person-table 0 "Marco" "Schneider"
+                  false (time/make-date 1989 10 31))
+      (db/insert! @*conn* person-table 1 "Helen" "Ahner"
+                  true (time/make-date 1990 10 15))
+      (db/insert! @*conn* person-table 2 "Frederike" "Guggemos"
+                  true (time/make-date 1989 12 4))
+      (db/insert! @*conn* person-table 3 "Tim" "Rach"
+                  false (time/make-date 1991 6 2))
 
       (func))))
 
+(def $sex=female
+  (fn [ps]
+    ($= ($person-sex (! ps))
+        ($boolean true))))
+
+(def $can-buy-alcohol
+  (fn [ps]
+    ($> ($person-birthday (! ps))
+        ($date
+         (.minusYears (java.time.LocalDate/now)
+                      18)))))
+
+(def $older-than
+  (fn [years ps]
+    ($> ($person-birthday (! ps)) ($date (.minusYears (time/make-date)
+                                                      years)))))
+
+(def $women-older-than
+  (fn [years ps]
+    ($and ($= ($person-sex (! ps)) ($boolean true))
+          ($older-than years ps))))
+
 (with-person-db db-spec
   (fn []
-    #_(db/run-query @*conn* (query [ps (<- person-table)]
-                                   (project ps)))
-    (db/db-query-reified-results @*conn* (query [ps (<- person-table)]
-                                                (project ps)))))
+    (db/db-query-reified-results
+     @*conn*
+     (query [ps (<- person-galaxy)]
+            (restrict ($women-older-than 25 ps))
+            (order {($person-fname (! ps)) :descending})
+            (top 1)
+            (project {"name" ($person-fname (! ps))})))
+    (put-query
+     (query [ps (<- person-galaxy)]
+            (restrict ($women-older-than 25 ps))
+            (order {($person-fname (! ps)) :descending})
+            (top 1)
+            (project {"name" ($person-fname (! ps))})))))
