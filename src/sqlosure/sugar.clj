@@ -7,15 +7,18 @@
              [core :refer :all]
              [db-connection :as db]
              [relational-algebra :as rel]
+             [sql :as sql]
              [type :as t]]
             [sqlosure.galaxy.galaxy :as glxy]))
 
-(def ... nil)
-
 (defn cons-id-field
   [m]
-  (into {} (cons {"id" '$integer-t} m)))
+  (into {} (cons {"id" '$integer-t}
+                 (map (fn [[k v]]
+                        [(name k) v]) m))))
 
+;; NOTE This seems hella hacky -- there must be another way for this and all
+;;      it's uses.
 (defn- symbol->value
   [sym]
   (when-let [v (first (remove nil? (map #(ns-resolve % sym) (all-ns))))]
@@ -33,22 +36,32 @@
   [vs ts]
   (let [bools (map (fn [ix v t] [ix ((t/atomic-type-predicate t) v)])
                    (range 0 (count vs)) vs ts)]
-    (or (every? true? (map second bools))
-        (let [idx (ffirst (filter #(-> % second false?) bools))]
-          [idx (get vs idx) (get ts idx)]))))
+    (if (every? #(satisfies? t/base-type-protocol %) ts)
+      (cond
+        (= (count vs) (count ts))
+        (or (every? true? (map second bools))
+            (let [idx (ffirst (filter #(-> % second false?) bools))]
+              [idx (get vs idx) (get ts idx)]))
+        :else (c/assertion-violation `check-types
+                                     "sequences of unequal length" vs ts))
+      (c/assertion-violation `check-types
+                             "types vector contains non-sqlosure type values"
+                             ts))))
 
 (defn make-db->val
   [constructor]
-  (fn [& vs]
+  (fn [vs]
     (apply constructor vs)))
 
 (defn make-val->db
   [ts]
+  (c/assert (every? #(satisfies? t/base-type-protocol %) ts) "invalid type(s).")
   (fn [v]
     (glxy/make-tuple (into [] (mapv (fn [v' t]
                                       (rel/make-const t v')) 
                                     (vals v) ts)))))
 
+;; TODO Write tests.
 (defmacro define-db-type
   [nom pred ts]
   (let [db-type-name# (symbol (str "$" nom "-t"))
@@ -68,19 +81,31 @@
 (defn make-selector
   "Args:
 
-  * `t`: the (db-)type this selector is for.
-  * `field`: which field to select"
+  * `selector-name`: The name of this selector (SQL-name)
+  * `in-type`: Type that goes into the generated function
+  * `out-type`: Type that is returned by this function
+  * `selector`: How to select the value from a record (data level)
+  * `idx`: Position of the value in the tuple returned from the query-monad"
   [selector-name in-type out-type selector idx]
-  (rel/make-monomorphic-combinator selector-name
-                                   [in-type]
-                                   out-type
-                                   selector
-                                   :data
-                                   (glxy/make-db-operator-data
-                                    nil
-                                    (fn [rec & args]
-                                      (get (glxy/tuple-expressions rec) idx)))))
+  (let [rator (rel/make-rator selector-name
+                              (fn [fail arg-typ]
+                                (when-not (= arg-typ
+                                             (if (symbol? in-type)
+                                               (symbol->value in-type)
+                                               in-type))
+                                  fail)
+                                (if (symbol? out-type)
+                                  (symbol->value out-type)))
+                              selector
+                              :universe sql/sql-universe
+                              :data (glxy/make-db-operator-data
+                                     nil
+                                     (fn [rec & _]
+                                       (get (glxy/tuple-expressions rec) idx))))]
+    (fn [rand]
+      (rel/make-application rator rand))))
 
+;; TODO Write tests.
 (defmacro define-constructor
   "Define a type-checking constructor function.
 
@@ -108,30 +133,53 @@
                                        (type (get res# 1))
                                        " (" (get res# 1) ")")))))))
 
-
+;; TODO Write tests. (really?)
 (defn zip
   [xs ys]
   (mapv (fn [x y] [x y]) xs ys))
 
-(defn make-db-installer
+(defn db-installer-strings
+  [fields types]
+  (c/assert (and (seq fields) (seq types)) "fields and types must not be empty")
+  (into [] (for [[f t] (zip fields types)]
+             [(name f) (t/-to-string
+                        (if (symbol? t) (symbol->value t) t))])))
+
+;; TODO Write tests.
+(defn make-db-installer!
   [nom fields types]
   (fn [db]
     (jdbc/db-do-prepared (db/db-connection-conn db)
                          (jdbc/create-table-ddl
                           nom
-                          (into [] (for [[f t] (zip fields types)]
-                                     [(name f) (t/-to-string (symbol->value t))]))))))
+                          (db-installer-strings fields types)))))
 
-(defmacro define-galaxy
-  [?nom ?t ?fields ?types ?table]
-  `(do
-     (def ~(symbol (str "install-" ?nom "-table!"))
-       ~(make-db-installer (name ?nom)
-                           ?fields ?types))
-     (def ~(symbol (str ?nom "-galaxy"))
-       ~(glxy/make&install-db-galaxy (str ?nom) ?t
-                                     (symbol (str "install-" ?nom "-table!"))
-                                     ?table))))
+(defn- table*
+  [sql-name the-map & opts]
+  (let [opts-m (apply hash-map opts)
+        universe? (get opts-m :universe)]
+    (sql/make-sql-table
+     (clojure.string/replace (str sql-name) #"\-" "_")
+     (rel/alist->rel-scheme
+      (into {} (map (fn [[k t]]
+                      [k (symbol->value t)])
+                    the-map)))
+     :universe universe?)))
+
+(defn- scheme*
+  [sql-name the-map]
+  (rel/alist->rel-scheme (into {} (map (fn [[k t]]
+                                         [k (symbol->value t)])
+                                       the-map))))
+
+(defn- galaxy*
+  [nom fields types]
+  (let [nom* (str nom)]
+    (glxy/make&install-db-galaxy
+     nom*
+     (symbol->value (symbol (str "$" nom "-t")))
+     (symbol->value (symbol (str "install-" nom "-table!")))
+     (symbol->value (symbol (str nom "-table"))))))
 
 (defmacro define-product-type
   "Args:
@@ -148,7 +196,6 @@
         ?args-vec# (mapv #(-> % name symbol) ?fields#)
         ?sel-names# (mapv #(symbol (str ?name "-" (name %))) ?fields#)
         ?sql-sel-names# (mapv #(symbol (str "$" ?name "-" (name %))) ?fields#)]
-    (println (type (first ?types#)))
     `(do
        (define-record-type ~?name
          ~(apply list (symbol (str "really-make-" ?name))
@@ -157,11 +204,14 @@
          ~(into [] (apply concat (for [[k _] ?map-with-id#]
                                    [(symbol (name k))
                                     (symbol (str ?name "-" (name k)))]))))
-       (define-table+scheme ~?name ~?map-with-id#)
+       (def ~(symbol (str ?name "-table")) ~(table* ?name ?map-with-id#))
+       (def ~(symbol (str ?name "-scheme")) ~(scheme* ?name ?map-with-id#))
        (define-constructor ~?name ~?fields# ~?types#)
        (define-db-type ~?name (symbol (str ~?name "?")) ~?types#)
-       (define-galaxy ~?name (symbol (str ~?name "-t")) ~?fields# ~?types#
-         (symbol (str ~?name "-table")))
+       (def ~(symbol (str "install-" ?name "-table!"))
+         ~(make-db-installer! ?name ?fields# ?types#))
+       (def ~(symbol (str ?name "-galaxy")) ~(galaxy* ?name ?fields# ?types#))
+       ;; Create a set of query-monad accessor functions.
        ~@(for [i (range 0 (count ?sel-names#))]
            `(def ~(get ?sql-sel-names# i)
               ~(make-selector (str (get ?sel-names# i))
