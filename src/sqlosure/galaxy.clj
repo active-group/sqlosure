@@ -93,6 +93,7 @@ returns a db-representation of the value (for example, a Clojure record to a
       :or [ordered? false numeric? false]}]
   (t/make-base-type name pred const->datum-fn datum->const-fn
                     :universe sql/sql-universe
+                    :galaxy-type? true
                     :data
                     (make-db-type-data scheme reifier value->db-expression-fn)))
 

@@ -23,7 +23,9 @@
     "Get us an an atom pointing to a map of type-specific methods.")
   (-data [this] "Domain-specific data, for outside use.")
   (-to-string [this]
-    "(SQL-)String representation for this datatype (e.g. 'TEXT')."))
+    "(SQL-)String representation for this datatype (e.g. 'TEXT').")
+  (-galaxy-type? [this]
+    "True, if this type is a user defined type represented by a galaxy."))
 
 (defn nullable-type?
   "Is type nullable?"
@@ -67,7 +69,7 @@
 (define-record-type atomic-type
   (make-atomic-type name nullable? numeric? ordered? predicate
                     const->datum-fn datum->const-fn
-                    method-map-atom data string-representation)
+                    method-map-atom data string-representation galaxy-type?)
   atomic-type?
   [name atomic-type-name
    nullable? atomic-type-nullable?
@@ -78,7 +80,8 @@
    datum->const-fn atomic-type-datum->const-fn
    method-map-atom atomic-type-method-map-atom
    data atomic-type-data
-   string-representation atomic-type-string-representation]
+   string-representation atomic-type-string-representation
+   galaxy-type? atomic-type-galaxy-type?]
   base-type-protocol
   (-name [_] name)
   (-contains? [_ val] (predicate val))
@@ -86,18 +89,21 @@
   (-nullable [_] (make-atomic-type name true numeric? ordered? predicate
                                    const->datum-fn datum->const-fn
                                    method-map-atom data
-                                   string-representation))
+                                   string-representation
+                                   galaxy-type?))
   (-non-nullable [_] (make-atomic-type name false numeric? ordered? predicate
                                        const->datum-fn datum->const-fn
                                        method-map-atom data
-                                       string-representation))
+                                       string-representation
+                                       galaxy-type?))
   (-numeric? [_] numeric?)
   (-ordered? [_] ordered?)
   (-const->datum [_ val] (const->datum-fn val))
   (-datum->const [_ datum] (datum->const-fn datum))
   (-method-map-atom [_] method-map-atom)
   (-data [_] data)
-  (-to-string [_] string-representation))
+  (-to-string [_] string-representation)
+  (-galaxy-type? [_] galaxy-type?))
 
 (defmethod print-method atomic-type [r, ^Writer w]
   (.write w "#")
@@ -120,15 +126,17 @@
   If :universe is supplied, the new type will be registered in the universe and
   this function returns a vector containing `[type universe]`."
   [name predicate const->datum-proc datum->const-proc
-   & {:keys [universe numeric? ordered? data as-string]
-      :or [universe nil numeric? false ordered? false data nil as-string nil]}]
+   & {:keys [universe numeric? ordered? data as-string galaxy-type?]
+      :or [universe nil numeric? false ordered? false data nil as-string nil
+           galaxy-type? false]}]
   (let [t (make-atomic-type name false
                             (boolean numeric?) (boolean ordered?)
                             predicate
                             const->datum-proc datum->const-proc
                             (atom {})
                             data
-                            as-string)]
+                            as-string
+                            galaxy-type?)]
     (when universe
       (register-type! universe name t))
     t))

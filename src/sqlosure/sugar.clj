@@ -52,7 +52,7 @@
       (c/assertion-violation
        `check-types "types vector contains non-sqlosure type values" ts)
       (u/count= vs ts)
-      (or (u/all? (map second bools))
+      (or (u/and? (map second bools))
           (let [idx (ffirst (filter #(-> % second false?) bools))]
             [idx (get vs idx) (get ts idx)]))
       :else
