@@ -33,7 +33,7 @@
   (let [opts-m (apply hash-map opts)
         universe? (get opts-m :universe)
         mmap (into {} (map (fn [[k v]]
-                             [k (symbol->value v)]) m))]
+                             [k (if (symbol? v) (symbol->value v) v)]) m))]
     (sql/make-sql-table sql-name
                         (rel/alist->rel-scheme mmap)
                         :universe universe?)))
