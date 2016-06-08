@@ -6,10 +6,11 @@
             [sqlosure
              [core :refer :all]
              [db-connection :as db]
+             [galaxy :as glxy]
              [relational-algebra :as rel]
              [sql :as sql]
-             [type :as t]]
-            [sqlosure.galaxy.galaxy :as glxy]))
+             [type :as t]
+             [utils :as utils]]))
 
 (defn cons-id-field
   [m]
@@ -133,15 +134,10 @@
                                        (type (get res# 1))
                                        " (" (get res# 1) ")")))))))
 
-;; TODO Write tests. (really?)
-(defn zip
-  [xs ys]
-  (mapv (fn [x y] [x y]) xs ys))
-
 (defn db-installer-strings
   [fields types]
   (c/assert (and (seq fields) (seq types)) "fields and types must not be empty")
-  (into [] (for [[f t] (zip fields types)]
+  (into [] (for [[f t] (utils/zip fields types)]
              [(name f) (t/-to-string
                         (if (symbol? t) (symbol->value t) t))])))
 

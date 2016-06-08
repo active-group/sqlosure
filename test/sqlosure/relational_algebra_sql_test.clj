@@ -1,12 +1,12 @@
 (ns sqlosure.relational-algebra-sql-test
-  (:require [sqlosure.relational-algebra-sql :refer :all]
-            [sqlosure.sql :refer :all]
-            [sqlosure.relational-algebra :refer :all]
-            [sqlosure.type :refer :all]
-            [sqlosure.universe :refer [make-universe]]
-            [clojure.pprint :refer [pprint]]
+  (:require [active.clojure.lens :as lens]
             [clojure.test :refer :all]
-            [active.clojure.lens :as lens]))
+            [sqlosure
+             [relational-algebra :refer :all]
+             [relational-algebra-sql :refer :all]
+             [sql :refer :all]
+             [type :refer :all]
+             [universe :refer [make-universe]]]))
 
 (def test-universe (make-sql-universe))
 

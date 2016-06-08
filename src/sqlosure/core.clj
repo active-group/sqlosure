@@ -4,14 +4,14 @@
              [monad :refer :all]]
             [sqlosure
              [db-connection :as db]
+             [galaxy :as glxy]
              [optimization :as opt]
              [query-comprehension :as qc]
              [relational-algebra :as rel]
              [relational-algebra-sql :as rsql]
              [sql :as sql]
              [sql-put :as put]
-             [type :as t]]
-            [sqlosure.galaxy.galaxy :as glxy]))
+             [type :as t]]))
 
 (defn db-connect
   "`db-connect` takes a connection map and returns a `db-connection`-record for

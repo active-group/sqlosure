@@ -1,6 +1,6 @@
 (ns sqlosure.time-test
-  (:require [sqlosure.time :refer :all]
-            [clojure.test :refer :all]))
+  (:require [clojure.test :refer :all]
+            [sqlosure.time :refer :all]))
 
 (def d1 (java.time.LocalDate/of 1989 10 31))
 (def t1 (java.time.LocalDateTime/of 1989 10 31 0 0))

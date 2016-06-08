@@ -1,10 +1,11 @@
 (ns sqlosure.relational-algebra-sql
-  (:require [sqlosure.relational-algebra :as rel]
-            [sqlosure.sql :as sql]
-            [sqlosure.type :as t]
+  (:require [active.clojure
+             [condition :as c]
+             [lens :as lens]]
             [clojure.set :as set]
-            [active.clojure.condition :as c]
-            [active.clojure.lens :as lens]))
+            [sqlosure
+             [relational-algebra :as rel]
+             [sql :as sql]]))
 
 (defn x->sql-select
   [sql]

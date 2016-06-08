@@ -1,12 +1,14 @@
 (ns sqlosure.sql-put-test
-  (:require [sqlosure.sql-put :refer :all]
-            [sqlosure.sql :refer :all]
-            [sqlosure.relational-algebra-sql :refer :all]
-            [sqlosure.relational-algebra :refer :all]
-            [sqlosure.type :refer [string% integer% double% boolean%]]
-            [clojure.test :refer :all]
-            [clojure.string :as s]
-            [active.clojure.lens :as lens]))
+  (:require [active.clojure.lens :as lens]
+            [clojure
+             [string :as s]
+             [test :refer :all]]
+            [sqlosure
+             [relational-algebra :refer :all]
+             [relational-algebra-sql :refer :all]
+             [sql :refer :all]
+             [sql-put :refer :all]
+             [type :refer [boolean% double% integer% string%]]]))
 
 (def tbl1 (make-sql-table "tbl1"
                           {"one" string%

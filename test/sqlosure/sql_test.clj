@@ -1,10 +1,10 @@
 (ns sqlosure.sql-test
-  (:require [sqlosure.sql :refer :all]
-            [sqlosure.relational-algebra :refer :all]
-            [sqlosure.universe :as u :refer [make-universe universe? universe-base-relation-table]]
-            [sqlosure.type :refer [integer% double% string%]]
-            [clojure.test :refer :all]
-            [clojure.pprint :refer [pprint]]))
+  (:require [clojure.test :refer :all]
+            [sqlosure
+             [relational-algebra :refer :all]
+             [sql :refer :all]
+             [type :refer [double% integer% string%]]
+             [universe :as u :refer [make-universe]]]))
 
 (deftest make-sql-table-test
   (let [test-universe (make-universe)

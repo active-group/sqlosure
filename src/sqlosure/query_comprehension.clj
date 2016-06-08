@@ -3,7 +3,6 @@
              [condition :refer [assertion-violation]]
              [monad :refer :all]
              [record :refer [define-record-type]]]
-            [sqlosure.galaxy.galaxy :as glxy]
             [sqlosure.relational-algebra :as rel]))
 
 (define-record-type relation

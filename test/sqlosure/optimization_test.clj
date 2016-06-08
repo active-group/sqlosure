@@ -1,12 +1,11 @@
 (ns sqlosure.optimization-test
-  (:require [sqlosure.optimization :refer :all]
-            [sqlosure.sql :refer :all]
-            [sqlosure.type :refer :all]
-            [sqlosure.relational-algebra :refer :all]
-            [sqlosure.universe :refer [make-universe]]
-            [clojure.test :refer :all]
-            [clojure.pprint :refer [pprint]]
-            [sqlosure.sql :as sql]))
+  (:require [clojure.test :refer :all]
+            [sqlosure
+             [optimization :refer :all]
+             [relational-algebra :refer :all]
+             [sql :as sql :refer :all]
+             [type :refer :all]
+             [universe :refer [make-universe]]]))
 
 (def tbl1 (make-base-relation 'tbl1
                               (alist->rel-scheme [["one" string%]

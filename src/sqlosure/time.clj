@@ -1,9 +1,9 @@
 (ns sqlosure.time
-  (:require [sqlosure.type :refer [date? timestamp?]]
-            [active.clojure.condition :refer [assertion-violation]])
-  (:import [java.time Instant LocalDate LocalDateTime ZoneId]
-           [java.sql Date Timestamp]
-           [java.text SimpleDateFormat]))
+  (:require [active.clojure.condition :refer [assertion-violation]]
+            [sqlosure.type :refer [date? timestamp?]])
+  (:import [java.sql Date Timestamp]
+           java.text.SimpleDateFormat
+           [java.time Instant LocalDate LocalDateTime ZoneId]))
 
 (defn make-date
   "Wrapper around some common 'constructor' calls of LocalDate."

@@ -583,7 +583,6 @@
                   (cond
                     (contains? #{:sum :avg :std-dev :std-dev-p :var :var-p} op)
                     (when-not (t/numeric-type? t) (assertion-violation `expression-type "not a numeric type" op t))
-                    
                     (contains? #{:min :max} op)
                     (when-not (t/ordered-type? t) (assertion-violation `expression-type "not an ordered type" op t)))
                   t)))

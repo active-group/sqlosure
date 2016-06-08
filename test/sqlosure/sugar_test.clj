@@ -4,15 +4,11 @@
             [sqlosure
              [core :refer :all]
              [db-connection :as db]
+             [galaxy :as glxy :refer [*db-galaxies* initialize-db-galaxies! make&install-db-galaxy]]
              [relational-algebra :as rel]
              [sql :as sql]
              [sugar :refer :all]
-             [time :as time]]
-            [sqlosure.galaxy.galaxy
-             :as
-             glxy
-             :refer
-             [*db-galaxies* initialize-db-galaxies! make&install-db-galaxy]]))
+             [time :as time]]))
 
 (deftest cons-id-field-test
   (testing "empty-ish sequences"
@@ -158,7 +154,7 @@
     ($and ($= ($person-sex (! ps)) ($boolean true))
           ($older-than years ps))))
 
-(with-person-db db-spec
+#_(with-person-db db-spec
   (fn []
     (db/db-query-reified-results
      @*conn*

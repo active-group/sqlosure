@@ -1,8 +1,9 @@
 (ns sqlosure.type-test
-  (:require [sqlosure.type :refer :all]
-            [sqlosure.universe :as u]
-            [sqlosure.time :as time]
-            [clojure.test :refer :all]))
+  (:require [clojure.test :refer :all]
+            [sqlosure
+             [time :as time]
+             [type :refer :all]
+             [universe :as u]]))
 
 (deftest make-base-type-test
   (let [test-universe (u/make-universe)

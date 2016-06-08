@@ -1,6 +1,6 @@
 (ns sqlosure.universe-test
-  (:require [sqlosure.universe :refer :all]
-            [clojure.test :refer :all]))
+  (:require [clojure.test :refer :all]
+            [sqlosure.universe :refer :all]))
 
 (deftest make-universe-test
   (let [test-universe @(make-universe)]

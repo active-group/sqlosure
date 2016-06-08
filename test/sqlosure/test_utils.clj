@@ -1,6 +1,5 @@
 (ns sqlosure.test-utils
   (:require [clojure.java.jdbc :as jdbc]
-            [clojure.walk :refer [stringify-keys]]
             [sqlosure
              [core :refer :all]
              [db-connection :as dbs]

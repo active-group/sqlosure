@@ -6,7 +6,7 @@
             [clojure.string :as string]
             [sqlosure
              [relational-algebra :refer :all]
-             [type :refer [boolean% make-set-type non-nullable-type null% numeric-type? ordered-type? type=?]]
+             [type :as t]
              [universe :refer [make-derived-universe make-universe]]]))
 
 (define-record-type sql-table
@@ -204,7 +204,7 @@
   [type sql-expr-const-type
    val sql-expr-const-val])
 
-(def the-sql-null (make-sql-expr-const null% nil))
+(def the-sql-null (make-sql-expr-const t/null% nil))
 
 (define-record-type sql-expr-tuple
   (make-sql-expr-tuple expressions) sql-expr-tuple?
@@ -231,23 +231,23 @@
   (make-derived-universe sql-universe))
 
 (defn check-numerical [t fail]
-  (if (numeric-type? t)
+  (if (t/numeric-type? t)
     true
     (fail 'numerical-type t)))
 
 (defn check-ordered [t fail]
-  (if (ordered-type? t)
+  (if (t/ordered-type? t)
     true
     (fail 'ordered-type t)))
 
-(def not$ (make-monomorphic-combinator 'not [boolean%] boolean%
+(def not$ (make-monomorphic-combinator 'not [t/boolean%] t/boolean%
                                        not
                                        :universe sql-universe
                                        :data op-not))
 
 (def is-null?$
   (let [rator (make-rator "IS NULL"
-                          (fn [fail arg-type] boolean%)
+                          (fn [fail arg-type] t/boolean%)
                           nil?
                           :universe sql-universe
                           :data op-null?)]
@@ -256,7 +256,7 @@
 
 (def is-not-null?$
   (let [rator (make-rator "IS NOT NULL"
-                          (fn [fail arg-type] boolean%)
+                          (fn [fail arg-type] t/boolean%)
                           some?
                           :universe sql-universe
                           :data op-not-null?)]
@@ -264,8 +264,8 @@
       (make-application rator rand))))
 
 (def or$ (make-monomorphic-combinator 'or
-                                      [boolean% boolean%]
-                                      boolean%
+                                      [t/boolean% t/boolean%]
+                                      t/boolean%
                                       (fn [a b]
                                         (or a b (when-not (or (empty? a)
                                                               (empty? b))
@@ -274,8 +274,8 @@
                                       :data op-or))
 
 (def and$ (make-monomorphic-combinator 'and
-                                       [boolean% boolean%]
-                                       boolean%
+                                       [t/boolean% t/boolean%]
+                                       t/boolean%
                                        (fn [a b]
                                          (and (not-empty a) (not-empty b) a b))
                                        :universe sql-universe
@@ -288,9 +288,9 @@
                               (do
                                 (check-ordered t1 fail)
                                 (check-ordered t2 fail)
-                                (when-not (type=? (non-nullable-type t1) (non-nullable-type t2))
+                                (when-not (t/type=? (t/non-nullable-type t1) (t/non-nullable-type t2))
                                   (fail t1 t2))))
-                            boolean%)
+                            t/boolean%)
                           (null-lift-binary-predicate clj)
                           :universe sql-universe
                           :data op)]
@@ -366,9 +366,9 @@
 (def =$
   (let [rator (make-rator '=
                           (fn [fail t1 t2]
-                            (when (and fail (not (type=? (non-nullable-type t1) (non-nullable-type t2))))
+                            (when (and fail (not (t/type=? (t/non-nullable-type t1) (t/non-nullable-type t2))))
                               (fail t1 t2))
-                            boolean%)
+                            t/boolean%)
                           =
                           :universe sql-universe
                           :data op-=)]
@@ -384,7 +384,7 @@
                                 ;; (check-numerical t1 fail)
                                 ;; (check-numerical t2 fail)
                                 ))
-                            boolean%)
+                            t/boolean%)
                           = ;; TODO: not really =
                           :universe sql-universe
                           :data op-like)]
@@ -403,9 +403,9 @@
 (def in$
   (let [rator (make-rator 'in
                           (fn [fail t1 t2]
-                            (when (and fail (not (type=? (make-set-type t1) t2)))
-                              (fail (make-set-type t1) t2))
-                            boolean%)
+                            (when (and fail (not (t/type=? (t/make-set-type t1) t2)))
+                              (fail (t/make-set-type t1) t2))
+                            t/boolean%)
                           contains?
                           :universe sql-universe
                           :data op-in)]
@@ -418,7 +418,7 @@
                             (when (and fail (or (not= t2 t3)
                                                 (not (attribute-ref? t1))))
                               (fail t1 t2 t3))
-                            boolean%)
+                            t/boolean%)
                           nil
                           :universe sql-universe
                           :data op-between)]

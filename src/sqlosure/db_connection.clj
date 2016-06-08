@@ -5,14 +5,14 @@
             [clojure.java.jdbc :as jdbc]
             [clojure.set :as set]
             [sqlosure
+             [galaxy :as glxy]
              [optimization :as o]
              [relational-algebra :as rel]
              [relational-algebra-sql :as rsql]
              [sql :as sql]
              [sql-put :as put]
              [time :as time]
-             [type :as t]]
-            [sqlosure.galaxy.galaxy :as glxy])
+             [type :as t]])
   (:import [java.sql PreparedStatement ResultSet]))
 
 (define-record-type

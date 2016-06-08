@@ -1,6 +1,5 @@
 (ns ^{:doc "A universe defines a the context needed to access a particular
-application domain."
-      :author "Marco Schneider, based on Mike Sperbers schemeql2"}
+application domain."}
     sqlosure.universe
   (:require [active.clojure.record :refer [define-record-type]]))
 
