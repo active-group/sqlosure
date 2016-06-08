@@ -128,7 +128,8 @@
   (really-make-rel-scheme-cache fun (atom {})))
 
 (defn rel-scheme-cache-scheme
-  "Compute a relational scheme from a cache, using the cached version if possible."
+  "Compute a relational scheme from a cache, using the cached version if
+  possible."
   [cache env]
   (let [atom (rel-scheme-cache-map-atom cache)]
     (or (get @atom env)
@@ -140,7 +141,8 @@
   "Attach a rel-scheme cache to query.
 
   - `query` is the query
-  - `fun` is a function accepting an environment, yielding the scheme of the query"
+  - `fun` is a function accepting an environment, yielding the scheme of the
+  query"
   [query fun]
   (with-meta query {::rel-scheme-cache (make-rel-scheme-cache fun)}))
 
@@ -217,10 +219,12 @@
 (define-record-type rator
   (really-make-rator name range-type-proc proc data) rator?
   [name rator-name
-   range-type-proc rator-range-type-proc  ;; Gets applied to fail, arg types, yields range type.
-   proc rator-proc  ;; Procedure with a Clojure implementation of the operator.
-   data rator-data  ;; Domain-specific data, for outside use.
-   ])
+   ^{:doc "Gets applied to fail, arg types, yields range type."}
+   range-type-proc rator-range-type-proc
+   ^{:doc "Procedure with a Clojure implementation of the operator."}
+   proc rator-proc
+   ^{:doc "Domain-specific data, for outside use."}
+   data rator-data])
 
 (defn make-rator
   [name range-type-proc proc & {:keys [universe data]}]
@@ -357,10 +361,12 @@
    (really-make-restrict-outer exp query)
    (fn [env]
      (let [scheme (query-scheme query env)]
-       (when (not= t/boolean% (expression-type
-                               (compose-environments (rel-scheme->environment scheme) env)
-                               exp))
-            (assertion-violation `make-restrict-outer "not a boolean condition" exp query env))
+       (when (not= t/boolean%
+                   (expression-type
+                    (compose-environments (rel-scheme->environment scheme) env)
+                    exp))
+         (assertion-violation
+          `make-restrict-outer "not a boolean condition" exp query env))
        scheme))))
 
 (define-record-type combine
@@ -393,7 +399,9 @@
                       a2 (rel-scheme-map r2)]
                   (doseq [[k _] a1]
                     (when (contains? a2 k)
-                      (assertion-violation `make-combine "duplicate column name" rel-op query-1 query-2)))
+                      (assertion-violation
+                       `make-combine "duplicate column name"
+                       rel-op query-1 query-2)))
                   (rel-scheme-concat r1 r2))
        
        :left-outer-product
@@ -403,7 +411,8 @@
              a2 (rel-scheme-map r2)]
          (doseq [[k _] a1]
            (when (contains? a2 k)
-             (assertion-violation `make-combine "duplicate column name" rel-op query-1 query-2)))
+             (assertion-violation
+              `make-combine "duplicate column name" rel-op query-1 query-2)))
          (rel-scheme-concat r1 r2))
 
        :quotient (let [s1 (query-scheme query-1 env)
@@ -414,14 +423,17 @@
                    (doseq [[k v] a2]
                      (when-let [p2 (get a1 v)]
                        (when-not (t/type=? v p2)
-                         (assertion-violation `make-combine "types don't match" rel-op k v p2 query-1 query-2))))
+                         (assertion-violation
+                          `make-combine "types don't match"
+                          rel-op k v p2 query-1 query-2))))
                    (rel-scheme-difference s1 s2))
 
        (:union :intersection :difference)
        (let [s1 (query-scheme query-1 env)]
          (when-not (rel-scheme=? s1
                                  (query-scheme query-2 env))
-           (assertion-violation `make-combine "scheme mismatch" rel-op s1 query-2))
+           (assertion-violation
+            `make-combine "scheme mismatch" rel-op s1 query-2))
          s1)))))
                
 (defn make-left-outer-product [query-1 query-2]
@@ -465,7 +477,8 @@
 
 ;; Top n entries.
 (define-record-type top
-  ^{:doc "The top `count` entries, optionally starting at `offset`, defaulting to 0."}
+  ^{:doc "The top `count` entries, optionally starting at `offset`, defaulting
+to 0."}
   (really-make-top offset count query) top?
   [offset top-offset
    count top-count
@@ -505,8 +518,8 @@
   (make-tuple expressions) tuple?
   [expressions tuple-expressions])
 
-(def ^{:private true} aggregations-op #{:count :count-all :sum :avg :min :max :std-dev
-                                        :std-dev-p :var :var-p})
+(def ^{:private true} aggregations-op
+  #{:count :count-all :sum :avg :min :max :std-dev :std-dev-p :var :var-p})
 
 (defn aggregations-op? [k]
   (contains? aggregations-op k))
@@ -525,7 +538,9 @@
   (cond
     (empty? expr) (really-make-aggregation* op)
     (= 1 (count expr)) (apply really-make-aggregation op expr)
-    :else (assertion-violation `make-aggregation "invalid number of expressions (must be 0 or 1)" expr)))
+    :else
+    (assertion-violation
+     `make-aggregation "invalid number of expressions (must be 0 or 1)" expr)))
 
 (define-record-type case-expr
   (make-case-expr alist default) case-expr?
@@ -541,17 +556,19 @@
   [query set-subquery-query])
 
 (defn fold-expression
-  [on-attribute-ref on-const on-null on-application on-tuple on-aggregation on-aggregation*
-   on-case on-scalar-subquery on-set-subquery expr]
-  (let [next-step #(fold-expression on-attribute-ref on-const on-null on-application
-                               on-tuple on-aggregation on-aggregation* on-case
-                               on-scalar-subquery on-set-subquery %)]
+  [on-attribute-ref on-const on-null on-application on-tuple on-aggregation
+   on-aggregation* on-case on-scalar-subquery on-set-subquery expr]
+  (let [next-step #(fold-expression on-attribute-ref on-const on-null
+                                    on-application on-tuple on-aggregation
+                                    on-aggregation* on-case on-scalar-subquery
+                                    on-set-subquery %)]
     (cond
       (attribute-ref? expr) (on-attribute-ref (attribute-ref-name expr))
       (const? expr) (on-const (const-type expr) (const-val expr))
       (const-null? expr) (on-null (null-type expr))
       (application? expr) (on-application (application-rator expr)
-                                          (map next-step (application-rands expr)))
+                                          (map next-step
+                                               (application-rands expr)))
       (tuple? expr) (on-tuple (map next-step (tuple-expressions expr)))
       (aggregation? expr) (on-aggregation (aggregation-operator expr)
                                           (next-step (aggregation-expr expr)))
@@ -570,22 +587,27 @@
   mappings of the env)."
   [env expr]
   (fold-expression
-   (fn [name] (or (lookup-env name env)
-                  (assertion-violation `expression-type "unknown attribute" name env)))
+   (fn [name]
+     (or (lookup-env name env)
+         (assertion-violation `expression-type "unknown attribute" name env)))
    (fn [ty val] ty)
    identity
-   (fn [rator rands] (apply (rator-range-type-proc rator) query-scheme-fail rands))
+   (fn [rator rands]
+     (apply (rator-range-type-proc rator) query-scheme-fail rands))
    t/make-product-type
    ;; aggregation
-   (fn [op t] (if (= :count op)
-                t/integer%
-                (do
-                  (cond
-                    (contains? #{:sum :avg :std-dev :std-dev-p :var :var-p} op)
-                    (when-not (t/numeric-type? t) (assertion-violation `expression-type "not a numeric type" op t))
-                    (contains? #{:min :max} op)
-                    (when-not (t/ordered-type? t) (assertion-violation `expression-type "not an ordered type" op t)))
-                  t)))
+   (fn [op t]
+     (if (= :count op)
+       t/integer%
+       (do
+         (cond
+           (contains? #{:sum :avg :std-dev :std-dev-p :var :var-p} op)
+           (when-not (t/numeric-type? t)
+             (assertion-violation `expression-type "not a numeric type" op t))
+           (contains? #{:min :max} op)
+           (when-not (t/ordered-type? t)
+             (assertion-violation `expression-type "not an ordered type" op t)))
+         t)))
    ;; aggregation*
    (fn [op] (if (= :count-all op)
               t/integer%
@@ -593,20 +615,26 @@
    ;; case-expr
    (fn [alist t]
      (doseq [[p r] alist]
-       (when-not (t/type=? t/boolean% p) (assertion-violation `expression-type "non-boolean test in case" p r))
-       (when-not (t/type=? t r) (assertion-violation `expression-type "type mismatch in case" p r)))
+       (when-not (t/type=? t/boolean% p)
+         (assertion-violation `expression-type "non-boolean test in case" p r))
+       (when-not (t/type=? t r)
+         (assertion-violation `expression-type "type mismatch in case" p r)))
      t)
-   (fn [subquery] (let [scheme (query-scheme subquery env)
-                        alist (rel-scheme-map scheme)]
-                    (when-not (rel-scheme-unary? scheme)
-                      (assertion-violation `expression-type "must be a unary relation" subquery))
-                    (val (first alist))))
+   (fn [subquery]
+     (let [scheme (query-scheme subquery env)
+           alist (rel-scheme-map scheme)]
+       (when-not (rel-scheme-unary? scheme)
+         (assertion-violation
+          `expression-type "must be a unary relation" subquery))
+       (val (first alist))))
    ;; FIXME what should the result here really be?
-   (fn [subquery] (let [scheme (query-scheme subquery env)
-                        alist (rel-scheme-map scheme)]
-                    (when-not (rel-scheme-unary? scheme)
-                      (assertion-violation `expression-type "must be a unary relation" subquery))
-                    (t/make-set-type (key (first alist)))))
+   (fn [subquery]
+     (let [scheme (query-scheme subquery env)
+           alist (rel-scheme-map scheme)]
+       (when-not (rel-scheme-unary? scheme)
+         (assertion-violation
+          `expression-type "must be a unary relation" subquery))
+       (t/make-set-type (key (first alist)))))
    expr))
 
 (defn aggregate?
@@ -645,8 +673,9 @@
   that are not inside an application of an aggregate occur in `grouped`."
   [grouped expr]
   (cond
-    (attribute-ref? expr) (when-not (contains? grouped (attribute-ref-name expr))
-                            (assertion-violation `check-grouped "non-aggregate expression" expr))
+    (attribute-ref? expr)
+    (when-not (contains? grouped (attribute-ref-name expr))
+      (assertion-violation `check-grouped "non-aggregate expression" expr))
     (const? expr) nil
     (const-null? expr) nil
     (application? expr) (doseq [r (application-rands expr)]
@@ -666,15 +695,16 @@
 (defn query?
   "Returns true if the `obj` is a query."
   [obj]
-  (or (empty-query? obj) (base-relation? obj) (project? obj) (restrict? obj) (restrict-outer? obj)
-      (combine? obj) (order? obj) (group? obj) (top? obj)))
+  (or (empty-query? obj) (base-relation? obj) (project? obj) (restrict? obj)
+      (restrict-outer? obj) (combine? obj) (order? obj) (group? obj)
+      (top? obj)))
 
 (declare query->datum)
 
 (defn expression->datum
   "Takes an expression and returns a data representation of it.
   Example:
-  * `(expression->datum (make-attribute-ref \"foo\")) => (attribute-ref \"foo\")'"
+  * `(expression->datum (make-attribute-ref \"fo\")) => (attribute-ref \"fo\")`"
   [e]
   (fold-expression
    (fn [name] (list 'attribute-ref name))
@@ -700,7 +730,8 @@
                        (query->datum (project-query q)))
     (restrict? q) (list 'restrict (expression->datum (restrict-exp q))
                         (query->datum (restrict-query q)))
-    (restrict-outer? q) (list 'restrict-outer (expression->datum (restrict-outer-exp q))
+    (restrict-outer? q) (list 'restrict-outer (expression->datum
+                                               (restrict-outer-exp q))
                               (query->datum (restrict-outer-query q)))
     (combine? q) (list (combine-rel-op q)
                        (query->datum (combine-query-1 q))
@@ -712,7 +743,8 @@
     (group? q) (list 'group
                      (group-columns q)
                      (query->datum (group-query q)))
-    (top? q) (list 'top (top-offset q) (top-count q) (query->datum (top-query q)))
+    (top? q) (list 'top (top-offset q) (top-count q) (query->datum
+                                                      (top-query q)))
     :else (assertion-violation `query->datum "unknown query" q)))
 
 (declare datum->expression)
@@ -733,15 +765,16 @@
                             (next-step (third d)))
       restrict (make-restrict (datum->expression (second d) universe)
                               (next-step (third d)))
-      restrict-outer (make-restrict-outer (datum->expression (second d) universe)
-                                          (next-step (third d)))
+      restrict-outer
+      (make-restrict-outer (datum->expression (second d) universe)
+                           (next-step (third d)))
       (:product :left-outer-product :union :intersection :quotient :difference)
       (make-combine (first d) (next-step (second d))
                     (next-step (third d)))
-      order (make-order (map (fn [p]
-                               [(datum->expression (first p) universe) (second p)])
-                             (second d))
-                        (next-step (third d)))
+      order (make-order
+             (map (fn [p] [(datum->expression (first p) universe) (second p)])
+                  (second d))
+             (next-step (third d)))
       top (make-top (second d) (third d) (next-step (fourth d)))
       (assertion-violation `datum->query "invalid datum" d))))
 
@@ -891,8 +924,10 @@
    make-aggregation
    make-aggregation
    make-case-expr
-   (fn [subquery] (make-scalar-subquery (query-substitute-attribute-refs alist subquery)))
-   (fn [subquery] (make-set-subquery (query-substitute-attribute-refs alist subquery)))
+   (fn [subquery] (make-scalar-subquery
+                   (query-substitute-attribute-refs alist subquery)))
+   (fn [subquery] (make-set-subquery
+                   (query-substitute-attribute-refs alist subquery)))
    expr))
 
 (defn cull-substitution-alist
@@ -919,12 +954,15 @@
                       (next-step sub)))
       (restrict? q) (let [sub (restrict-query q)
                           culled (cull-substitution-alist alist sub)]
-                      (make-restrict (substitute-attribute-refs culled (restrict-exp q))
+                      (make-restrict (substitute-attribute-refs
+                                      culled (restrict-exp q))
                                      (next-step sub)))
       (restrict-outer? q) (let [sub (restrict-outer-query q)
                                 culled (cull-substitution-alist alist sub)]
-                            (make-restrict-outer (substitute-attribute-refs culled (restrict-outer-exp q))
-                                                 (next-step sub)))
+                            (make-restrict-outer
+                             (substitute-attribute-refs culled
+                                                        (restrict-outer-exp q))
+                             (next-step sub)))
       
       (combine? q) (make-combine (combine-rel-op q)
                                  (next-step (combine-query-1 q))
@@ -940,7 +978,8 @@
                              (next-step (group-query q)))
       
       (top? q) (make-top (top-offset q) (top-count q) (next-step (top-query q)))
-      :else (assertion-violation `query-substitute-attribute-refs "unknown query" q))))
+      :else (assertion-violation
+             `query-substitute-attribute-refs "unknown query" q))))
 
 (defn count-aggregations
   "Count all aggregations in an expression."

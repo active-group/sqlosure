@@ -6,12 +6,12 @@
            [java.time Instant LocalDate LocalDateTime ZoneId]))
 
 (defn make-date
-  "Wrapper around some common 'constructor' calls of LocalDate."
+  "Wrapper around some common 'constructor' calls of `LocalDate`."
   ([] (LocalDate/now))
   ([year month day] (LocalDate/of year month day)))
 
 (defn make-timestamp
-  "Wrapper around some common 'constructor' calls of LocalDateTime."
+  "Wrapper around some common 'constructor' calls of `LocalDateTime`."
   ([] (LocalDateTime/now))
   ([year month day hour minute]
    (LocalDateTime/of year month day hour minute))
@@ -21,35 +21,36 @@
    (LocalDateTime/of year month day hour minute second nano-of-second)))
 
 (defn to-sql-date
-  "Takes a date object produced by java.time.LocalDate and returns a
-  java.sql.Date."
+  "Takes a date object produced by `java.time.LocalDate` and returns a
+  `java.sql.Date`."
   [^java.time.LocalDate date]
   (java.sql.Date/valueOf date))
 
 (defn from-sql-date
-  "Takes a date object of type java.sql.Date and returns a java.time.LocalDate."
+  "Takes a date object of type `java.sql.Date` and returns a
+  `java.time.LocalDate`."
   [^java.sql.Date date]
   (.toLocalDate date))
 
 (defn to-sql-timestamp
-  "Takes a date object produced by java.time.LocalDateTime and returns a
-  java.sql.Timestamp."
+  "Takes a date object produced by `java.time.LocalDateTime` and returns a
+  `java.sql.Timestamp`."
   [t]
   (cond
     (instance? Timestamp t) t
-
     (instance? LocalDateTime t)
     (Timestamp/valueOf t)
-
-    :else
-    (assertion-violation `to-sql-timestamp "value of invalid timestamp type" t)))
+    :else (assertion-violation
+           `to-sql-timestamp "value of invalid timestamp type" t)))
 
 (defn from-sql-timestamp
-  "Takes a date object of type java.sql.Timestamp and returns a java.time.LocalDateTime."
+  "Takes a date object of type `java.sql.Timestamp` and returns a
+  `java.time.LocalDateTime`."
   [sql-timestamp]
   (if (instance? Timestamp sql-timestamp)
     (.toLocalDateTime sql-timestamp)
-    (assertion-violation `from-sql-timestamp "value of invalid timestamp type" sql-timestamp)))
+    (assertion-violation
+     `from-sql-timestamp "value of invalid timestamp type" sql-timestamp)))
 
 (defn coerce-time-values
   "Takes the list of arguments and returns the list with all time values coerced
@@ -66,7 +67,8 @@
 ;; NOTE: since sqlite3 does not support real dates, those must be represented as
 ;; a string. Use these functions for coercion.
 (defn to-sql-time-string
-  "Takes a java.time.LocalDate(Time) and returns it's string representation."
+  "Takes a `java.time.LocalDate` or `java.time.LocalDateTime` and returns it's
+  string representation."
   [d]
   (.toString d))
 

@@ -4,7 +4,8 @@
             [sqlosure
              [core :refer :all]
              [db-connection :as db]
-             [galaxy :as glxy :refer [*db-galaxies* initialize-db-galaxies! make&install-db-galaxy]]
+             [galaxy :as glxy :refer [*db-galaxies* initialize-db-galaxies!
+                                      make&install-db-galaxy]]
              [relational-algebra :as rel]
              [sql :as sql]
              [sugar :refer :all]
@@ -73,16 +74,17 @@
                (sel (glxy/make-tuple
                      [($integer 0) ($integer 1) ($string "foobar")])))]
     (is (function? sel))
-    (let [res-rator (rel/make-rator "kv-k" (fn [fail t]
-                                             (when-not (= t $kv-t)
-                                               fail)
-                                             $integer-t)
-                                    kv-k
-                                    :universe sql/sql-universe
-                                    :data (glxy/make-db-operator-data
-                                           nil
-                                           (fn [kv & _]
-                                             (first (glxy/tuple-expressions kv)))))]
+    (let [res-rator (rel/make-rator
+                     "kv-k" (fn [fail t]
+                              (when-not (= t $kv-t)
+                                fail)
+                              $integer-t)
+                     kv-k
+                     :universe sql/sql-universe
+                     :data (glxy/make-db-operator-data
+                            nil
+                            (fn [kv & _]
+                              (first (glxy/tuple-expressions kv)))))]
       (is (= (rel/rator-name res-rator) (rel/rator-name rator)))
       (is (= (glxy/db-operator-data-base-query (rel/rator-data res-rator))
              (glxy/db-operator-data-base-query (rel/rator-data rator)))))))

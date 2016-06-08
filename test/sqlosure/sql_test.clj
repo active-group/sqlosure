@@ -40,7 +40,8 @@
   (is (thrown? Exception (make-sql-expr-app op-+ 1 2 3))))
 
 (deftest check-numerical-test
-  (let [fail (fn [source t] (throw (Exception. (str source ": not numerical " t))))]
+  (let [fail (fn [source t] (throw (Exception.
+                                    (str source ": not numerical " t))))]
     (is (and (check-numerical integer% fail) (check-numerical double% fail)))
     (is (thrown? Exception (check-numerical string% fail)))))
 

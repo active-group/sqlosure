@@ -26,9 +26,9 @@
 
 (defn table
   "Returns a `sqlosure.relational-algebra/base-relation`.
-  `sql-name` ist the name of the table in the DBMS, `map` is a map of column-name
-  -> sqlosure.type-type. `opts` may contain a :universe key and a universe
-  (defaults to `nil`)."
+  `sql-name` ist the name of the table in the DBMS, `map` is a map of
+  column-name -> sqlosure.type-type. `opts` may contain a :universe key and a
+  universe (defaults to `nil`)."
   [sql-name m & opts]
   (let [opts-m (apply hash-map opts)
         universe? (get opts-m :universe)
@@ -245,7 +245,9 @@
   $min* (aggregate :min))
 (def ^{:doc "Aggregation. Calculate maximum of whole relation (`MAX(*)`)."}
   $max* (aggregate :max))
-(def ^{:doc "Aggregation. Calculate standart deviation of whole relation (`STDEV(*)`)."}
+(def
+  ^{:doc
+    "Aggregation. Calculate standart deviation of whole relation (`STDEV(*)`)."}
   $std-dev (aggregate :std-dev))
 (def $std-dev-p (aggregate :std-dev-p))
 (def ^{:doc "Aggregation. Calculate variance of whole relation (`VAR(*)`)."}

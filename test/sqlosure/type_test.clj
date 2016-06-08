@@ -210,9 +210,10 @@
     (define-type-method-implementation ty method (fn [x] (+ x 1)))
     (is (= 2 (invoke-type-method ty method 1)))
     (is (= 2 (invoke-type-method (make-nullable-type ty) method 1)))
-    (is (= 10 (invoke-type-method (make-base-type 'integer integer? identity identity
-                                                  :numeric? true :ordered? true)
-                                  method
-                                  5)))))
+    (is (= 10 (invoke-type-method
+               (make-base-type 'integer integer? identity identity
+                               :numeric? true :ordered? true)
+               method
+               5)))))
                                    
                                    

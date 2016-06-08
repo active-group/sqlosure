@@ -81,7 +81,8 @@
       (print (sql/sql-select-table-name sel))
       [])
     :else
-    (assertion-violation `put-sql-select (str "unhandled query " (pr-str sel)))))
+    (assertion-violation
+     `put-sql-select (str "unhandled query " (pr-str sel)))))
 
 (defn put-joining-infix
   "Intersperse `between` between `lis`'s elements and print via `proc`."
@@ -253,8 +254,9 @@
 
     (sql/sql-select-table? sel) (print (sql/sql-select-table-name sel))
 
-    (sql/sql-select-empty? sel) (print "")  ;; woot woot
-    :else (assertion-violation `put-sql-select-1 (str "unknown select " (pr-str sel)))))
+    (sql/sql-select-empty? sel) (print "")
+    :else (assertion-violation
+           `put-sql-select-1 (str "unknown select " (pr-str sel)))))
 
 (defn put-sql-expression
   [expr]
@@ -339,7 +341,8 @@
           v (put-sql-select (sql/sql-expr-subquery-query expr))
           _ (print ")")]
       v)
-    :else (assertion-violation `put-sql-expression (str "unhandled expression" (pr-str expr)))))
+    :else (assertion-violation
+           `put-sql-expression (str "unhandled expression" (pr-str expr)))))
 
 (defn sql-expression->string
   [expr]

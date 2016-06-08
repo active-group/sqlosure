@@ -89,9 +89,10 @@
   (fn [^ResultSet rs ix] (.getString rs ix)))
 
 (define-type-method-implementations t/string%-nullable
-  (fn [^PreparedStatement stmt ix val] (if (nil? val)
-                                         (.setNull stmt ix java.sql.Types/VARCHAR)
-                                         (.setString stmt ix val)))
+  (fn [^PreparedStatement stmt ix val]
+    (if (nil? val)
+      (.setNull stmt ix java.sql.Types/VARCHAR)
+      (.setString stmt ix val)))
   (fn [^ResultSet rs ix] (let [v (.getString rs ix)]
                            (when-not (.wasNull rs) v))))
 
@@ -100,9 +101,10 @@
   (fn [^ResultSet rs ix] (.getInt rs ix)))
 
 (define-type-method-implementations t/integer%-nullable
-  (fn [^PreparedStatement stmt ix val] (if (nil? val)
-                                         (.setNull stmt ix java.sql.Types/INTEGER)
-                                         (.setInt stmt ix val)))
+  (fn [^PreparedStatement stmt ix val]
+    (if (nil? val)
+      (.setNull stmt ix java.sql.Types/INTEGER)
+      (.setInt stmt ix val)))
   (fn [^ResultSet rs ix] (let [v (.getInt rs ix)]
                            (when-not (.wasNull rs) v))))
 
@@ -111,9 +113,10 @@
   (fn [^ResultSet rs ix] (.getDouble rs ix)))
 
 (define-type-method-implementations t/double%-nullable
-  (fn [^PreparedStatement stmt ix val] (if (nil? val)
-                                         (.setNull stmt ix java.sql.Types/DOUBLE)
-                                         (.setDouble stmt ix val)))
+  (fn [^PreparedStatement stmt ix val]
+    (if (nil? val)
+      (.setNull stmt ix java.sql.Types/DOUBLE)
+      (.setDouble stmt ix val)))
   (fn [^ResultSet rs ix] (let [v (.getDouble rs ix)]
                            (when-not (.wasNull rs) v))))
 
@@ -191,7 +194,8 @@
         run-query-with-params
         (^{:once true} fn* [con]
          (let [^PreparedStatement stmt
-               (apply jdbc/prepare-statement con sql (dissoc opts-map :optimize?))]
+               (apply jdbc/prepare-statement con sql
+                      (dissoc opts-map :optimize?))]
            (set-parameters stmt param-types+args)
            (.closeOnCompletion stmt)
            (result-set-seq (.executeQuery stmt) col-types)))]

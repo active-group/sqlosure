@@ -24,7 +24,8 @@
 
 (deftest x->sql-select-test
   (is (= (new-sql-select) (x->sql-select the-sql-select-empty)))
-  (let [sel (lens/shove (new-sql-select) sql-select-attributes-lens {"one" (make-sql-expr-column "one")})]
+  (let [sel (lens/shove (new-sql-select) sql-select-attributes-lens
+                        {"one" (make-sql-expr-column "one")})]
     (is (= (lens/shove (new-sql-select) sql-select-tables-lens [[nil sel]])
            (x->sql-select sel))))
   (let [sel (lens/shove (new-sql-select) sql-select-nullary?-lens true)]
@@ -37,9 +38,12 @@
   (is (= "foobar" (aggregation-op->sql :foobar))))
 
 (deftest expression->sql-test
-  (is (= (make-sql-expr-column "two") (expression->sql (make-attribute-ref "two"))))
-  (is (= (make-sql-expr-const string% "foobar") (expression->sql (make-const string% "foobar"))))
-  (is (= (make-sql-expr-app op-= (make-sql-expr-const boolean% true) (make-sql-expr-const string% "bar"))
+  (is (= (make-sql-expr-column "two")
+         (expression->sql (make-attribute-ref "two"))))
+  (is (= (make-sql-expr-const string% "foobar")
+         (expression->sql (make-const string% "foobar"))))
+  (is (= (make-sql-expr-app op-= (make-sql-expr-const boolean% true)
+                            (make-sql-expr-const string% "bar"))
          (expression->sql (=$ (make-const boolean% true)
                               (make-const string% "bar")))))
   (is (= (make-sql-expr-tuple [(make-sql-expr-const double% 42.0)
@@ -50,13 +54,16 @@
                                        (make-attribute-ref "ref")]))))
   (is (= (make-sql-expr-app
           op-count
-          (make-sql-expr-tuple [(make-sql-expr-column "two")
-                                (make-sql-expr-app op-=
-                                                   (make-sql-expr-const integer% 42)
-                                                   (make-sql-expr-const integer% 23))]))
-         (expression->sql (make-aggregation :count (make-tuple [(make-attribute-ref "two")
-                                                                (=$ (make-const integer% 42)
-                                                                    (make-const integer% 23))])))))
+          (make-sql-expr-tuple
+           [(make-sql-expr-column "two")
+            (make-sql-expr-app op-=
+                               (make-sql-expr-const integer% 42)
+                               (make-sql-expr-const integer% 23))]))
+         (expression->sql
+          (make-aggregation :count (make-tuple
+                                    [(make-attribute-ref "two")
+                                     (=$ (make-const integer% 42)
+                                         (make-const integer% 23))])))))
   (is (= (make-sql-expr-case
           {(make-sql-expr-app op-=
                               (make-sql-expr-const integer% 42)
@@ -105,14 +112,17 @@
         (let [grouping-p (query->sql
                           (make-project
                            [["one" (make-attribute-ref "one")]
-                            ["count_twos" (make-aggregation :count (make-attribute-ref "two"))]]
+                            ["count_twos"
+                             (make-aggregation :count
+                                               (make-attribute-ref "two"))]]
                            (make-group #{"one"}
                                        tbl1)))]
           (is (= [["one" (make-sql-expr-column "one")]
-                  ["count_twos" (make-sql-expr-app op-count
-                                                   (make-sql-expr-column "two"))]]
+                  ["count_twos" (make-sql-expr-app
+                                 op-count (make-sql-expr-column "two"))]]
                  (sql-select-attributes grouping-p)))
-          (is (= [[nil (make-sql-select-table "tbl1")]] (sql-select-tables grouping-p)))
+          (is (= [[nil (make-sql-select-table "tbl1")]]
+                 (sql-select-tables grouping-p)))
           
           (is (= #{"one"} (sql-select-group-by grouping-p)))))))
   (testing "restrict"
@@ -160,11 +170,14 @@
 
   (testing "combining grouping with empty projection"
     (let [s (query->sql
-             (make-project [["all" (make-aggregation :count-all)]]
-                           (make-project []
-                                         (make-group #{"one"}
-                                                     (make-sql-table "tbl1"
-                                                                     (alist->rel-scheme [["one" string%]
-                                                                                         ["two" integer%]]))))))]
+             (make-project
+              [["all" (make-aggregation :count-all)]]
+              (make-project
+               []
+               (make-group
+                #{"one"}
+                (make-sql-table "tbl1"
+                                (alist->rel-scheme [["one" string%]
+                                                    ["two" integer%]]))))))]
       ;; we want a subquery
       (is (sql-select? (second (first (sql-select-tables s))))))))

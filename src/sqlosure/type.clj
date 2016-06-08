@@ -19,9 +19,11 @@
   (-ordered? [this] "Is this type ordered?")
   (-const->datum [this val] "Convert value to datum.")
   (-datum->const [this datum] "Convert datum to value.")
-  (-method-map-atom [this] "Get us an an atom pointing to a map of type-specific methods.")
+  (-method-map-atom [this]
+    "Get us an an atom pointing to a map of type-specific methods.")
   (-data [this] "Domain-specific data, for outside use.")
-  (-to-string [this] "(SQL-)String representation for this datatype (e.g. 'TEXT')."))
+  (-to-string [this]
+    "(SQL-)String representation for this datatype (e.g. 'TEXT')."))
 
 (defn nullable-type?
   "Is type nullable?"
@@ -302,7 +304,8 @@
   subtypes. If the `type` is invalid, raises assertion-violation.
   Examples:
   * `(type->datum string%) => (string)`
-  * `(type->datum (make-product-type [string% double%])) => (product (string) (double)`"
+  * `(type->datum (make-product-type [string% double%])) =>
+     (product (string) (double)`"
   [t]
   (cond
     (satisfies? base-type-protocol t)
@@ -324,7 +327,8 @@
   throws an exception.
   Examples:
   * `(datum->type (string) => string`
-  * `(datum->type (product (string) (double))) => (make-product-type [string% double%])`"
+  * `(datum->type (product (string) (double)))
+     => (make-product-type [string% double%])`"
   [d universe]
   ;; TODO: Make this a multimethod to support externally defined types or something?
   (cond
@@ -404,9 +408,10 @@
                         (or (pair? d) (nil? d))
                         ;; Maybe add type check here?
                         (map datum->const (product-type-components t) d)
-                        :else (assertion-violation `datum->const
-                                                   "invalid product type datum for type"
-                                                   t d))
+                        :else
+                        (assertion-violation
+                         `datum->const "invalid product type datum for type"
+                         t d))
     (set-type? t) (cond
                     (or (pair? d) (nil? d))
                     (let [mem (set-type-member-type t)]

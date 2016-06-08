@@ -45,10 +45,12 @@
            (let [new-alist (filter (fn [[k _]] (contains? live k))
                                    (r/project-alist q))]
              (r/make-project new-alist
-                             ;; live variables === values of this project's alist.
-                             (worker (apply set/union (map (fn [[_ v]]
-                                                             (r/expression-attribute-names v))
-                                                           new-alist))
+                             ;; live variables = values of this project's alist.
+                             (worker (apply
+                                      set/union
+                                      (map (fn [[_ v]]
+                                             (r/expression-attribute-names v))
+                                           new-alist))
                                      (r/project-query q))))
            (r/restrict? q)
            (let [e (r/restrict-exp q)]
@@ -139,8 +141,9 @@
         :else (r/make-project pa (merge-project pq))))
     (r/restrict? q) (r/make-restrict (r/restrict-exp q)
                                      (merge-project (r/restrict-query q)))
-    (r/restrict-outer? q) (r/make-restrict-outer (r/restrict-outer-exp q)
-                                                 (merge-project (r/restrict-outer-query q)))
+    (r/restrict-outer? q) (r/make-restrict-outer
+                           (r/restrict-outer-exp q)
+                           (merge-project (r/restrict-outer-query q)))
 
     (r/order? q) (r/make-order (r/order-alist q)
                                (merge-project (r/order-query q)))
@@ -148,7 +151,8 @@
     (r/group? q) (r/make-group (r/group-columns q)
                                (merge-project (r/group-query q)))
 
-    (r/top? q) (r/make-top (r/top-offset q) (r/top-count q) (merge-project (r/top-query q)))
+    (r/top? q) (r/make-top (r/top-offset q) (r/top-count q)
+                           (merge-project (r/top-query q)))
     (r/combine? q) (r/make-combine (r/combine-rel-op q)
                                    (merge-project (r/combine-query-1 q))
                                    (merge-project (r/combine-query-2 q)))
@@ -224,8 +228,9 @@
           (r/make-project
            alist
            (push-restrict
-            (r/make-restrict-outer (r/substitute-attribute-refs (into {} alist) re)
-                                   (r/project-query rq)))))
+            (r/make-restrict-outer
+             (r/substitute-attribute-refs (into {} alist) re)
+             (r/project-query rq)))))
         (r/combine? rq)
         (let [op (r/combine-rel-op rq)
               q1 (r/combine-query-1 rq)
@@ -257,11 +262,13 @@
         (r/restrict-outer? rq) (let [pushed (push-restrict rq)]
                                  (if (r/restrict-outer? pushed)
                                    (r/make-restrict-outer re pushed)
-                                   (push-restrict (r/make-restrict-outer re pushed))))
+                                   (push-restrict
+                                    (r/make-restrict-outer re pushed))))
 
         (r/order? rq) (r/make-order (r/order-alist rq)
                                     (push-restrict
-                                     (r/make-restrict-outer re (r/order-query rq))))
+                                     (r/make-restrict-outer
+                                      re (r/order-query rq))))
 
         :else (r/make-restrict-outer re (push-restrict rq))))
 
@@ -271,15 +278,20 @@
       (cond
         (r/project? oq) (let [palist (r/project-alist oq)
                               palist-map (into {} palist)
-                              new-alist (into {} (map (fn [[k v]]
-                                                        [(r/substitute-attribute-refs palist-map k) v])
-                                                      alist))]
+                              new-alist
+                              (into
+                               {}
+                               (map
+                                (fn [[k v]]
+                                  [(r/substitute-attribute-refs palist-map k)
+                                   v])
+                                alist))]
                           (if (some (fn [[k v]] (r/aggregate? k)) new-alist)
                             (r/make-order alist (push-restrict oq))
-                            (r/make-project palist
-                                            (push-restrict
-                                             (r/make-order new-alist
-                                                           (r/project-query oq))))))
+                            (r/make-project
+                             palist
+                             (push-restrict
+                              (r/make-order new-alist (r/project-query oq))))))
         (r/order? oq) (let [pushed (push-restrict oq)
                             new (r/make-order alist pushed)]
                         (if (r/order? pushed)

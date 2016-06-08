@@ -93,7 +93,8 @@ returns a db-representation of the value (for example, a Clojure record to a
       :or [ordered? false numeric? false]}]
   (t/make-base-type name pred const->datum-fn datum->const-fn
                     :universe sql/sql-universe
-                    :data (make-db-type-data scheme reifier value->db-expression-fn)))
+                    :data
+                    (make-db-type-data scheme reifier value->db-expression-fn)))
 
 (define-record-type db-operator-data
   ^{:doc "Used to define the `sqlosure.relational-algebra/rator-data` component
@@ -187,9 +188,10 @@ operator is intended to work."}
                  ;; What's goining on here?
                  ;; We basically split up the value reference into 'real' cols
                  ;; and assign new names to it.
-                 [(rel/make-project (map (fn [k new-name]
-                                           [new-name (rel/make-attribute-ref k)])
-                                         cols new-names)
+                 [(rel/make-project (map
+                                     (fn [k new-name]
+                                       [new-name (rel/make-attribute-ref k)])
+                                     cols new-names)
                                     db-query)
                   ;; We keep a reference of the name to a tuple containing the
                   ;; 'real' column names to replace them when necessary.

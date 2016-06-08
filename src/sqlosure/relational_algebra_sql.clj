@@ -29,7 +29,8 @@
       (-> (sql/new-sql-select)
           (lens/shove sql/sql-select-tables-lens
                       [[nil (lens/shove sql sql/sql-select-group-by-lens nil)]])
-          (lens/shove sql/sql-select-group-by-lens (sql/sql-select-group-by sql))))))
+          (lens/shove
+           sql/sql-select-group-by-lens (sql/sql-select-group-by sql))))))
 
 (defn aggregation-op->sql
   "Takes an op keyword and returns the corresponding sql-op. If there is no
@@ -57,11 +58,11 @@
   (cond
     (rel/attribute-ref? expr) (sql/make-sql-expr-column
                                (rel/attribute-ref-name expr))
-    (rel/const? expr) (sql/make-sql-expr-const (rel/const-type expr) (rel/const-val expr))
-    (rel/application? expr) (apply sql/make-sql-expr-app
-                                   (rel/rator-data (rel/application-rator expr))
-                                   (map expression->sql
-                                        (rel/application-rands expr)))
+    (rel/const? expr)
+    (sql/make-sql-expr-const (rel/const-type expr) (rel/const-val expr))
+    (rel/application? expr)
+    (apply sql/make-sql-expr-app (rel/rator-data (rel/application-rator expr))
+           (map expression->sql (rel/application-rands expr)))
     (rel/tuple? expr) (sql/make-sql-expr-tuple
                        (map expression->sql (rel/tuple-expressions expr)))
     (rel/aggregation? expr) (sql/make-sql-expr-app
@@ -116,7 +117,8 @@
     (if-not (sql/sql-table? (rel/base-relation-handle q))
       (c/assertion-violation `query->sql "base relation not a SQL table" q)
       ;; FIXME: results in select * from, but should select in the order of column in rel:
-      (sql/make-sql-select-table (sql/sql-table-name (rel/base-relation-handle q))))
+      (sql/make-sql-select-table
+       (sql/sql-table-name (rel/base-relation-handle q))))
     (rel/project? q) (project->sql q)
     (rel/restrict? q) (let [sql (x->sql-select (query->sql
                                                 (rel/restrict-query q)))
@@ -128,11 +130,12 @@
                           (lens/shove sql sql/sql-select-criteria-lens
                                       (cons (expression->sql exp)
                                             (sql/sql-select-criteria sql)))))
-    (rel/restrict-outer? q) (let [sql (x->sql-select (query->sql
-                                                      (rel/restrict-outer-query q)))]
-                              (lens/shove sql sql/sql-select-outer-criteria-lens
-                                          (cons (expression->sql (rel/restrict-outer-exp q))
-                                                (sql/sql-select-outer-criteria sql))))
+    (rel/restrict-outer? q)
+    (let [sql (x->sql-select (query->sql
+                              (rel/restrict-outer-query q)))]
+      (lens/shove sql sql/sql-select-outer-criteria-lens
+                  (cons (expression->sql (rel/restrict-outer-exp q))
+                        (sql/sql-select-outer-criteria sql))))
     (rel/combine? q)
     (let [q1 (rel/combine-query-1 q)
           q2 (rel/combine-query-2 q)
@@ -143,10 +146,12 @@
               sql2 (query->sql q2)]
 
           (cond
-            (and (sql/sql-select? sql1) (empty? (sql/sql-select-attributes sql1)))
+            (and (sql/sql-select? sql1)
+                 (empty? (sql/sql-select-attributes sql1)))
             (add-table sql1 sql2)
 
-            (and (sql/sql-select? sql2) (empty? (sql/sql-select-attributes sql2)))
+            (and (sql/sql-select? sql2)
+                 (empty? (sql/sql-select-attributes sql2)))
             (add-table sql2 sql1)
 
             :else
@@ -179,7 +184,8 @@
                   (add-table sql1)
                   (lens/shove sql/sql-select-attributes-lens
                               (map
-                               (fn [k] [k (sql/make-sql-expr-column k)]) diff-columns))
+                               (fn [k] [k (sql/make-sql-expr-column k)])
+                               diff-columns))
                   (lens/shove sql/sql-select-criteria-lens
                               (list (sql/make-sql-expr-app
                                      sql/op-in
@@ -187,34 +193,40 @@
                                      (sql/make-sql-expr-subquery sql2))))
                   (lens/shove sql/sql-select-group-by-lens
                               (map
-                               (fn [k] (sql/make-sql-expr-column k)) diff-columns))
-                  (lens/shove sql/sql-select-having-lens
-                              [(sql/make-sql-expr-app
-                                sql/op-=
-                                (sql/make-sql-expr-app
-                                 sql/op-count
-                                 (sql/make-sql-expr-column
-                                  (first diff-columns)))
-                                (sql/make-sql-expr-subquery
-                                 (let [sql* (sql/new-sql-select)]
-                                   (-> sql*
-                                       (add-table sql2)
-                                       (lens/shove sql/sql-select-attributes-lens
-                                                   (list [nil (sql/make-sql-expr-app
-                                                               sql/op-count
-                                                               (sql/make-sql-expr-column name-2))]))))))])))
-
-            (let [diff-project-alist (map (fn [k] [k (rel/make-attribute-ref k)])
+                               (fn [k] (sql/make-sql-expr-column k))
+                               diff-columns))
+                  (lens/shove
+                   sql/sql-select-having-lens
+                   [(sql/make-sql-expr-app
+                     sql/op-=
+                     (sql/make-sql-expr-app
+                      sql/op-count
+                      (sql/make-sql-expr-column
+                       (first diff-columns)))
+                     (sql/make-sql-expr-subquery
+                      (let [sql* (sql/new-sql-select)]
+                        (-> sql*
+                            (add-table sql2)
+                            (lens/shove
+                             sql/sql-select-attributes-lens
+                             (list [nil (sql/make-sql-expr-app
+                                         sql/op-count
+                                         (sql/make-sql-expr-column
+                                          name-2))]))))))])))
+            (let [diff-project-alist (map (fn [k]
+                                            [k (rel/make-attribute-ref k)])
                                           (rel/rel-scheme-columns diff-scheme))
                   q1-project-alist (map (fn [k] [k (rel/make-attribute-ref k)])
                                         (rel/rel-scheme-columns scheme-1))
                   pruned (rel/make-project diff-project-alist q1)]
-              (query->sql (rel/make-difference pruned
-                                               (rel/make-project diff-project-alist
-                                                                 (rel/make-difference
-                                                                  (rel/make-project q1-project-alist
-                                                                                    (rel/make-product q2 pruned))
-                                                                  q1)))))))
+              (query->sql (rel/make-difference
+                           pruned
+                           (rel/make-project diff-project-alist
+                                             (rel/make-difference
+                                              (rel/make-project
+                                               q1-project-alist
+                                               (rel/make-product q2 pruned))
+                                              q1)))))))
 
         (sql/make-sql-select-combine op (query->sql q1) (query->sql q2))))
 

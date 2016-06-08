@@ -226,8 +226,8 @@ running the query monad."}
   (run-query-comprehension* prod state))
 
 (defn- build-query+scheme!
-  "Monadic command to create the final query from the given relation and the current monad
-  state, and return it and the scheme. Also resets the state."
+  "Monadic command to create the final query from the given relation and the
+  current monad state, and return it and the scheme. Also resets the state."
   [rel]
   (monadic
    [state (get-state)]
@@ -269,12 +269,14 @@ running the query monad."}
         scheme2 (relation-scheme rel2)
         p1 (rel/make-project (map (fn [k]
                                     [(fresh-name k alias)
-                                     (rel/make-attribute-ref (fresh-name k a1))])
+                                     (rel/make-attribute-ref
+                                      (fresh-name k a1))])
                                   (rel/rel-scheme-columns scheme1))
                              q1)
         p2 (rel/make-project (map (fn [k]
                                     [(fresh-name k alias)
-                                     (rel/make-attribute-ref (fresh-name k a2))])
+                                     (rel/make-attribute-ref
+                                      (fresh-name k a2))])
                                   (rel/rel-scheme-columns scheme2))
                              q2)]
     (monadic
@@ -289,7 +291,8 @@ running the query monad."}
    [query0 current-query
     alias0 current-alias]
     (let [[rel1 state1] (generate-query prod1 (make-state query0 alias0))
-          [rel2 state2] (generate-query prod2 (make-state query0 (::alias state1)))])
+          [rel2 state2] (generate-query prod2 (make-state query0
+                                                          (::alias state1)))])
     (combination* rel-op query0
                   rel1 (::query state1) rel2 (::query state2)
                   compute-scheme
@@ -327,7 +330,8 @@ running the query monad."}
                     (order {(! t \"foo\") :ascending})
                     (project {\"foo\" (! t \"foo\")}))
 
-  The corresponding SQL statemant would be \"SELECT foo FROM t ORDER BY foo ASC\"."
+  The corresponding SQL statemant would be
+  \"SELECT foo FROM t ORDER BY foo ASC\"."
   [alist]
   (monadic
    [old current-query]

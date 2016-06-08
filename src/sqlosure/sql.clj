@@ -288,7 +288,8 @@
                               (do
                                 (check-ordered t1 fail)
                                 (check-ordered t2 fail)
-                                (when-not (t/type=? (t/non-nullable-type t1) (t/non-nullable-type t2))
+                                (when-not (t/type=? (t/non-nullable-type t1)
+                                                    (t/non-nullable-type t2))
                                   (fail t1 t2))))
                             t/boolean%)
                           (null-lift-binary-predicate clj)
@@ -366,7 +367,11 @@
 (def =$
   (let [rator (make-rator '=
                           (fn [fail t1 t2]
-                            (when (and fail (not (t/type=? (t/non-nullable-type t1) (t/non-nullable-type t2))))
+                            (when (and fail
+                                       ;; FIXME Wouldn't "=" be enough here?
+                                       (not (t/type=?
+                                             (t/non-nullable-type t1)
+                                             (t/non-nullable-type t2))))
                               (fail t1 t2))
                             t/boolean%)
                           =
@@ -403,7 +408,10 @@
 (def in$
   (let [rator (make-rator 'in
                           (fn [fail t1 t2]
-                            (when (and fail (not (t/type=? (t/make-set-type t1) t2)))
+                            (when (and fail
+                                       ;; FIXME See above.
+                                       (not (t/type=?
+                                             (t/make-set-type t1) t2)))
                               (fail (t/make-set-type t1) t2))
                             t/boolean%)
                           contains?

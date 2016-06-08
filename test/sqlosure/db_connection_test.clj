@@ -6,7 +6,8 @@
              [core :refer :all]
              [db-connection :as db]
              [relational-algebra :as rel]
-             [test-utils :refer [actor-movie-table db-spec jdbc-out movie-table person-table sqlosure-out with-actor-db]]
+             [test-utils :refer [actor-movie-table db-spec jdbc-out movie-table
+                                 person-table sqlosure-out with-actor-db]]
              [time :as time]]))
 
 (deftest insert!-test
