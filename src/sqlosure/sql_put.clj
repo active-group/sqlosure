@@ -1,13 +1,12 @@
 (ns ^{:doc "Printing SQL"}
-    sqlosure.sql-put
-  (:require [sqlosure.sql :as sql]
-            [sqlosure.relational-algebra :as rel]
-            [sqlosure.relational-algebra-sql :refer [add-table]]
-            [sqlosure.type :as t]
-            [sqlosure.utils :refer [third]]
-            [active.clojure.record :refer [define-record-type]]
-            [active.clojure.condition :refer [assertion-violation]]
-            [clojure.string :as s]))
+ sqlosure.sql-put
+  (:require [active.clojure
+             [condition :refer [assertion-violation]]
+             [record :refer [define-record-type]]]
+            [clojure.string :as s]
+            [sqlosure
+             [sql :as sql]
+             [utils :refer [third]]]))
 
 (defmacro with-out-str-and-value
   "See http://stackoverflow.com/a/7151125.

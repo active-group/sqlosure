@@ -1,4 +1,4 @@
-(ns sqlosure.galaxy.galaxy
+(ns sqlosure.galaxy
   (:require [active.clojure
              [condition :as c]
              [record :refer [define-record-type]]]

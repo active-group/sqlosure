@@ -1,8 +1,7 @@
 (ns sqlosure.optimization
-  (:require [sqlosure.relational-algebra :as r]
-            [sqlosure.relational-algebra-sql :as rs]
-            [active.clojure.condition :as c]
-            [clojure.set :as set]))
+  (:require [active.clojure.condition :as c]
+            [clojure.set :as set]
+            [sqlosure.relational-algebra :as r]))
 
 (defn project-alist-substitute-attribute-refs
   "Takes an alist and a project query's alist and substitutes all of the

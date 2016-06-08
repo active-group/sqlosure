@@ -1,4 +1,4 @@
-(ns sqlosure.galaxy.galaxy-test
+(ns sqlosure.galaxy-test
   (:require [active.clojure.record :refer [define-record-type]]
             [clojure.java.jdbc :as jdbc]
             [clojure.test :refer [deftest is testing]]
