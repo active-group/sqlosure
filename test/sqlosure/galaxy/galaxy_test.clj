@@ -503,242 +503,254 @@ db-type."}
 (comment
   "Next, we are going to define db-types for those record types, which can then
 be used alongside primtive db-types. We'll also define the sql-table and scheme
-values to use in the queries.")
+values to use in the queries."
 
-(define-table+scheme publisher {"name" $string-t
-                                "operates_from" $string-t})
+  (define-table+scheme publisher {"name" $string-t
+                                  "operates_from" $string-t})
 
-(defn db->publisher
-  "Takes the values returned by a query to get a `publisher` from the database
+  (defn db->publisher
+    "Takes the values returned by a query to get a `publisher` from the database
   and returns the corresponding `publisher` record."
-  [publisher]
-  (apply make-publisher publisher))
+    [publisher]
+    (apply make-publisher publisher))
 
-(defn publisher->db
-  "Takes a publisher-record `publisher` and returns a representation which can
+  (defn publisher->db
+    "Takes a publisher-record `publisher` and returns a representation which can
   be inserted into the database."
-  [publisher]
-  (make-tuple [($string (publisher-name publisher))
-               ($string (publisher-operates-from publisher))]))
+    [publisher]
+    (make-tuple [($string (publisher-name publisher))
+                 ($string (publisher-operates-from publisher))]))
 
-(def $publisher-t
-  (make-db-type "publisher"  ;; The name of the db-type
-                publisher?   ;; A predicate to check whether a value is a publisher
-                nil
-                nil
-                publisher-scheme  ;; The scheme of the record type
-                db->publisher  ;; How to "make" a publisher from a query result
-                publisher->db  ;; How to make a db-representation from a record
-                ))
+  (def $publisher-t
+    (make-db-type "publisher"  ;; The name of the db-type
+                  publisher?   ;; A predicate to check whether a value is a publisher
+                  nil
+                  nil
+                  publisher-scheme  ;; The scheme of the record type
+                  db->publisher  ;; How to "make" a publisher from a query result
+                  publisher->db  ;; How to make a db-representation from a record
+                  ))
 
-(defn install-publisher-table!
-  [db]
-  (jdbc/db-do-prepared (db/db-connection-conn db)
-                       (jdbc/create-table-ddl
-                        "publisher"
-                        [["name" "TEXT"] ["operates_from" "TEXT"]])))
+  (defn install-publisher-table!
+    [db]
+    (jdbc/db-do-prepared (db/db-connection-conn db)
+                         (jdbc/create-table-ddl
+                          "publisher"
+                          [["name" "TEXT"] ["operates_from" "TEXT"]])))
 
-(def publisher-galaxy
-  (make&install-db-galaxy "publisher" $publisher-t install-publisher-table!
-                          publisher-table))
+  (def publisher-galaxy
+    (make&install-db-galaxy "publisher" $publisher-t install-publisher-table!
+                            publisher-table))
 
-(def $publisher-name "sql-like operator to get the name of a publisher."
-  (rel/make-monomorphic-combinator "publisher-name" [$publisher-t] $string-t
-                                   publisher-name
-                                   :universe sql/sql-universe
-                                   :data (make-db-operator-data
-                                          nil
-                                          (fn [pub & _]
-                                            (first (tuple-expressions pub))))))
+  (def $publisher-name "sql-like operator to get the name of a publisher."
+    (rel/make-monomorphic-combinator "publisher-name" [$publisher-t] $string-t
+                                     publisher-name
+                                     :universe sql/sql-universe
+                                     :data (make-db-operator-data
+                                            nil
+                                            (fn [pub & _]
+                                              (first (tuple-expressions pub))))))
 
-;; Same thing for person
-(define-table+scheme person {"fname" $string-t
-                             "lname" $string-t
-                             "birthday" $date-t
-                             "gender" $string-t})
+  ;; Same thing for person
+  (define-table+scheme person {"fname" $string-t
+                               "lname" $string-t
+                               "birthday" $date-t
+                               "gender" $string-t})
 
-(defn db->person [person] (apply make-person person))
+  (defn db->person [person] (apply make-person person))
 
-(defn person->db
-  [person]
-  (make-tuple [($string (person-fname person))
-               ($string (person-lname person))
-               ($date (person-birthday person))
-               ($string (person-gender person))]))
+  (defn person->db
+    [person]
+    (make-tuple [($string (person-fname person))
+                 ($string (person-lname person))
+                 ($date (person-birthday person))
+                 ($string (person-gender person))]))
 
-(def $person-t
-  (make-db-type "person" person? nil nil person-scheme
-                db->person person->db))
+  (def $person-t
+    (make-db-type "person" person? nil nil person-scheme
+                  db->person person->db))
 
-(defn install-person-table!
-  [db]
-  (jdbc/db-do-prepared (db/db-connection-conn db)
-                       (jdbc/create-table-ddl
-                        "person"
-                        [["fname" "TEXT"] ["lname" "TEXT"]
-                         ["birthday" "DATE"] ["gender" "TEXT"]])))
+  (defn install-person-table!
+    [db]
+    (jdbc/db-do-prepared (db/db-connection-conn db)
+                         (jdbc/create-table-ddl
+                          "person"
+                          [["fname" "TEXT"] ["lname" "TEXT"]
+                           ["birthday" "DATE"] ["gender" "TEXT"]])))
 
-(def person-galaxy
-  (make&install-db-galaxy "person" $person-t install-person-table!
-                          person-table))
+  (def person-galaxy
+    (make&install-db-galaxy "person" $person-t install-person-table!
+                            person-table))
 
-(defn- person-op
-  [name out-type out-fn data-fn]
-  (rel/make-monomorphic-combinator name [$person-t] out-type out-fn
-                                   :universe sql/sql-universe
-                                   :data data-fn))
+  (defn- person-op
+    [name out-type out-fn data-fn]
+    (rel/make-monomorphic-combinator name [$person-t] out-type out-fn
+                                     :universe sql/sql-universe
+                                     :data data-fn))
 
-(def $person-lname "sql-like operator to get the last-name of a person."
-  (person-op "person-lname" $string-t person-lname
-             (make-db-operator-data
-              nil (fn [p & _] (second (tuple-expressions p))))))
+  (def $person-lname "sql-like operator to get the last-name of a person."
+    (person-op "person-lname" $string-t person-lname
+               (make-db-operator-data
+                nil (fn [p & _] (second (tuple-expressions p))))))
 
-;; And again for book. Note the `$person-t` and `$publisher-t`, which can be
-;; used just like primitive types.
-(define-table+scheme book {"isbn" $string-t
-                           "author" $person-t
-                           "title" $string-t
-                           "release" $date-t
-                           "publisher" $publisher-t})
+  ;; And again for book. Note the `$person-t` and `$publisher-t`, which can be
+  ;; used just like primitive types.
+  (define-table+scheme book {"isbn" $string-t
+                             "author" $person-t
+                             "title" $string-t
+                             "release" $date-t
+                             "publisher" $publisher-t})
 
-(defn db->book
-  "This is a little more interesting but what it actually does is quite easy.
+  (defn db->book
+    "This is a little more interesting but what it actually does is quite easy.
   It is taking the result for one book (as it is stored in the database) and
   reconstructs the record from those values by looking up the missing parts in
   the neighbor galaxies (in this case person and publisher)."
-  [book]
-  (let [[isbn author title release pub] book
-        [pers pub] (first (db/db-query-reified-results
-                           @*conn*
-                           (query [pers (<- person-galaxy)
-                                   pubs (<- publisher-galaxy)]
-                                  (restrict ($= ($person-lname (! pers))
-                                                ($string author)))
-                                  (restrict ($= ($publisher-name (! pubs))
-                                                ($string pub)))
-                                  (project {"author" (! pers)
-                                            "publisher" (! pubs)}))))]
-    (make-book isbn pers title release pub)))
+    [book]
+    (let [[isbn author title release pub] book
+          [pers pub] (first (db/db-query-reified-results
+                             @*conn*
+                             (query [pers (<- person-galaxy)
+                                     pubs (<- publisher-galaxy)]
+                                    (restrict ($= ($person-lname (! pers))
+                                                  ($string author)))
+                                    (restrict ($= ($publisher-name (! pubs))
+                                                  ($string pub)))
+                                    (project {"author" (! pers)
+                                              "publisher" (! pubs)}))))]
+      (make-book isbn pers title release pub)))
 
-(defn book->db
-  [book]
-  (make-tuple [($string (book-isbn book))
-               ($string (-> book book-author person-lname))
-               ($string (book-release book))
-               ($date (book-release book))
-               ($string (-> book book-publisher publisher-name))]))
+  (defn book->db
+    [book]
+    (make-tuple [($string (book-isbn book))
+                 ($string (-> book book-author person-lname))
+                 ($string (book-release book))
+                 ($date (book-release book))
+                 ($string (-> book book-publisher publisher-name))]))
 
-(defn title->book
-  [title]
-  nil)
+  (defn title->book
+    [title]
+    nil)
 
-(def $book-t
-  (make-db-type "book" book? book-title title->book book-scheme
-                db->book book->db))
+  (def $book-t
+    (make-db-type "book" book? book-title title->book book-scheme
+                  db->book book->db))
 
-(defn install-book-table!
-  [db]
-  (jdbc/db-do-prepared (db/db-connection-conn db)
-                       (jdbc/create-table-ddl
-                        "book"
-                        [["isbn" "TEXT"]
-                         ;; It's just an example, so we'll use the last name as
-                         ;; the foreign key.
-                         ["author" "TEXT"] ["title" "TEXT"]
-                         ["release" "DATE"]
-                         ;; Again, we'll just use the publisher's name.
-                         ["publisher" "TEXT"]])))
+  (defn install-book-table!
+    [db]
+    (jdbc/db-do-prepared (db/db-connection-conn db)
+                         (jdbc/create-table-ddl
+                          "book"
+                          [["isbn" "TEXT"]
+                           ;; It's just an example, so we'll use the last name as
+                           ;; the foreign key.
+                           ["author" "TEXT"] ["title" "TEXT"]
+                           ["release" "DATE"]
+                           ;; Again, we'll just use the publisher's name.
+                           ["publisher" "TEXT"]])))
 
-(def book-galaxy
-  (make&install-db-galaxy "book" $book-t install-book-table! book-table))
+  (def book-galaxy
+    (make&install-db-galaxy "book" $book-t install-book-table! book-table))
 
-(defn with-book-db
-  "Takes a db-spec and a function that takes a (db-connect spec) connection.
+  (defn with-book-db
+    "Takes a db-spec and a function that takes a (db-connect spec) connection.
   Sets up a kv-galaxy + tables, etc."
-  [spec func]
-  (jdbc/with-db-connection [db spec]
-    (let [conn (db-connect db)]
-      (reset! *db-galaxies* nil)
-      (reset! *conn* conn)
-      (make&install-db-galaxy "publisher" $publisher-t install-publisher-table!
-                              publisher-table)
-      (make&install-db-galaxy "person" $person-t install-person-table!
-                              person-table)
-      (make&install-db-galaxy "book" $book-t install-book-table! book-table)
-      (initialize-db-galaxies! @*conn*)
-      ;; Insert a few values
-      (db/insert! @*conn* publisher-table "Rowohlt" "Berlin")
-      (db/insert! @*conn* publisher-table "Kipenheuer & Witsch" "Köln")
-      (db/insert! @*conn* person-table
-                  "Wolfgang" "Herrndorf" (time/make-date 1965 6 12) "male")
-      (db/insert! @*conn* book-table
-                  "978-3-87134-781-8" "Herrndorf" "Arbeit und Struktur"
-                  (time/make-date 2013 1 1) "Rowohlt")
+    [spec func]
+    (jdbc/with-db-connection [db spec]
+      (let [conn (db-connect db)]
+        (reset! *db-galaxies* nil)
+        (reset! *conn* conn)
+        (make&install-db-galaxy "publisher" $publisher-t install-publisher-table!
+                                publisher-table)
+        (make&install-db-galaxy "person" $person-t install-person-table!
+                                person-table)
+        (make&install-db-galaxy "book" $book-t install-book-table! book-table)
+        (initialize-db-galaxies! @*conn*)
+        ;; Insert a few values
+        (db/insert! @*conn* publisher-table "Rowohlt" "Berlin")
+        (db/insert! @*conn* publisher-table "Kipenheuer & Witsch" "Köln")
+        (db/insert! @*conn* person-table
+                    "Wolfgang" "Herrndorf" (time/make-date 1965 6 12) "male")
+        (db/insert! @*conn* book-table
+                    "978-3-87134-781-8" "Herrndorf" "Arbeit und Struktur"
+                    (time/make-date 2013 1 1) "Rowohlt")
 
-      (func))))
+        (func))))
 
-(comment
-  "Now, instead of querying the tables, we don't need to care about constructing
+  (comment
+    "Now, instead of querying the tables, we don't need to care about constructing
 and reconstructing records from the result sets.")
 
-(def $publisher-operates-from
-  (rel/make-monomorphic-combinator "publisher-operates-from" [$publisher-t]
-                                   $string-t
-                                   publisher-operates-from
-                                   :universe sql/sql-universe
-                                   :data (make-db-operator-data
-                                          nil
-                                          (fn [pub & _]
-                                            (second (tuple-expressions pub))))))
+  (def $publisher-operates-from
+    (rel/make-monomorphic-combinator "publisher-operates-from" [$publisher-t]
+                                     $string-t
+                                     publisher-operates-from
+                                     :universe sql/sql-universe
+                                     :data (make-db-operator-data
+                                            nil
+                                            (fn [pub & _]
+                                              (second (tuple-expressions pub))))))
 
-;; PERSON ----------------------------------------------------------------------
+  ;; PERSON ----------------------------------------------------------------------
 
-(def $person-fname
-  (person-op "person-name" $string-t person-fname
-             (make-db-operator-data
-              nil (fn [p & _] (first (tuple-expressions p))))))
+  (def $person-fname
+    (person-op "person-name" $string-t person-fname
+               (make-db-operator-data
+                nil (fn [p & _] (first (tuple-expressions p))))))
 
-(def $person-birthday
-  (person-op "person-birthday" $date-t person-birthday
-             (make-db-operator-data
-              nil (fn [p & _] (second (rest (tuple-expressions p)))))))
+  (def $person-birthday
+    (person-op "person-birthday" $date-t person-birthday
+               (make-db-operator-data
+                nil (fn [p & _] (second (rest (tuple-expressions p)))))))
 
-(def $person-gender
-  (person-op "person-gender" $string-t person-gender
-             (make-db-operator-data
-              nil (fn [p & _] (second (rest (rest (tuple-expressions p))))))))
+  (def $person-gender
+    (person-op "person-gender" $string-t person-gender
+               (make-db-operator-data
+                nil (fn [p & _] (second (rest (rest (tuple-expressions p))))))))
 
-;; BOOK ------------------------------------------------------------------------
+  ;; BOOK ------------------------------------------------------------------------
 
-(def $book-title
-  (rel/make-monomorphic-combinator "book-title" [$book-t] $string-t
-                                   book-title
-                                   :universe sql/sql-universe
-                                   :data (make-db-operator-data
-                                          nil
-                                          (fn [book & _]
-                                            (get (tuple-expressions book) 2)))))
+  (def $book-title
+    (rel/make-monomorphic-combinator "book-title" [$book-t] $string-t
+                                     book-title
+                                     :universe sql/sql-universe
+                                     :data (make-db-operator-data
+                                            nil
+                                            (fn [book & _]
+                                              (get (tuple-expressions book) 2)))))
 
 
-(def rowohlt (make-publisher "Rowohlt" "Berlin"))
-(def kiwi (make-publisher "Kipenheuer & Witsch" "Köln"))
-(def herrndorf (make-person "Wolfgang" "Herrndorf" (time/make-date 1965 6 12)
-                            "Köln"))
-(def arbeit-und-struktur (make-book "978-3-87134-781-8"
-                                    herrndorf
-                                    "Arbeit und Struktur"
-                                    (time/make-date 2013 1 1)
-                                    rowohlt))
+  (def rowohlt (make-publisher "Rowohlt" "Berlin"))
+  (def kiwi (make-publisher "Kipenheuer & Witsch" "Köln"))
+  (def herrndorf (make-person "Wolfgang" "Herrndorf" (time/make-date 1965 6 12)
+                              "Köln"))
+  (def arbeit-und-struktur (make-book "978-3-87134-781-8"
+                                      herrndorf
+                                      "Arbeit und Struktur"
+                                      (time/make-date 2013 1 1)
+                                      rowohlt))
 
-(with-book-db db-spec
-  (fn []
-    (db/db-query-reified-results
-     @*conn* (query [books (<- book-galaxy)]
-                    (restrict ($= ($book-title (! books))
-                                  ($string "Arbeit und Struktur")))
-                    (project books)))))
+  #_(with-book-db db-spec
+      (fn []
+        (db/db-query-reified-results
+         @*conn* (query [books (<- book-galaxy)]
+                        (restrict ($= ($book-title (! books))
+                                      ($string "Arbeit und Struktur")))
+                        (project books)))))
 
-;; SET TYPE
+  ;; SET TYPE
+
+  (comment "with a cool name, this could be something like"
+           (define-set-type string-v int-v)
+           "which could then expand to"
+           (define-record-type string-v-int-v
+             (make-string-v-int-v id id_0 id_1) string-v-int-v?
+             [id string-v-int-v-id
+              id_0 string-v-int-v-id_0
+              id_1 string-v-int-v-id_1])
+           )
+
+  )
 
 (define-record-type string-v
   (make-string-v id v) string-v?
@@ -750,128 +762,128 @@ and reconstructing records from the result sets.")
   [id int-v-id
    v int-v-v])
 
-(comment "with a cool name, this could be something like"
-         (define-set-type string-v int-v)
-         "which could then expand to"
-         (define-record-type string-v-int-v
-           (make-string-v-int-v id id_0 id_1) string-v-int-v?
-           [id string-v-int-v-id
-            id_0 string-v-int-v-id_0
-            id_1 string-v-int-v-id_1])
-         )
 
 (define-record-type int-or-string
-  (really-make-int-or-string id i s) int-or-string?
-  [id int-or-string-id
-   i int-or-string-i
-   s int-or-string-s])
+    (really-make-int-or-string id i s) int-or-string?
+    [id int-or-string-id
+     i int-or-string-i
+     s int-or-string-s])
 
-(defn make-int-or-string
-  [id i-or-s]
-  (if (integer? i-or-s)
-    (really-make-int-or-string id i-or-s nil)
-    (really-make-int-or-string id nil i-or-s)))
+  (defn make-int-or-string
+    [id i-or-s]
+    (if (integer? i-or-s)
+      (really-make-int-or-string id i-or-s nil)
+      (really-make-int-or-string id nil i-or-s)))
 
-(defn extract-typed-value
-  [int-or-s]
-  (let [id (int-or-string-id int-or-s)
-        i (int-or-string-i int-or-s)
-        s (int-or-string-s int-or-s)]
-    (if i (make-int-v id i) (make-string-v id s))))
+  (defn extract-typed-value
+    [int-or-s]
+    (let [id (int-or-string-id int-or-s)
+          i (int-or-string-i int-or-s)
+          s (int-or-string-s int-or-s)]
+      (if i (make-int-v id i) (make-string-v id s))))
 
-(define-table+scheme int-or-string {"id" $integer-t
-                                    "i" $integer-null-t
-                                    "s" $integer-null-t})
+  (define-table+scheme int-or-string {"id" $integer-t
+                                      "i" $integer-null-t
+                                      "s" $integer-null-t})
 
-(define-table+scheme integer {"id" $integer-t
-                              "val" $integer-t})
+  (define-table+scheme integer {"id" $integer-t
+                                "val" $integer-t})
 
-(define-table+scheme string {"id" $integer-t
-                             "val" $string-t})
+  (define-table+scheme string {"id" $integer-t
+                               "val" $string-t})
 
-(defn db->i-or-s
-  [i-or-s]
-  (let [[id i s] i-or-s
-        v (first (if i
-                   (db/run-query @*conn* (query [is (<- integer-table)]
-                                                (restrict ($= (! is "id")
-                                                              ($integer id)))
-                                                (project is)))
-                   (db/run-query @*conn* (query [ss (<- string-table)]
-                                                (restrict ($= (! ss "id")
-                                                              ($integer id)))
-                                                (project ss)))))]
-    (extract-typed-value (make-int-or-string id (second v)))))
+  (defn db->i-or-s
+    [i-or-s]
+    (let [[id i s] i-or-s
+          v (first (if i
+                     (db/run-query @*conn* (query [is (<- integer-table)]
+                                                  (restrict ($= (! is "id")
+                                                                ($integer id)))
+                                                  (project is)))
+                     (db/run-query @*conn* (query [ss (<- string-table)]
+                                                  (restrict ($= (! ss "id")
+                                                                ($integer id)))
+                                                  (project ss)))))]
+      (extract-typed-value (make-int-or-string id (second v)))))
 
-(defn i-or-s->db
-  [i-or-s]
-  (make-tuple [($integer (int-or-string-id i-or-s))
-               ($integer-null-t (int-or-string-i i-or-s))
-               ($integer-null-t (int-or-string-s i-or-s))]))
+  (defn i-or-s->db
+    [i-or-s]
+    (make-tuple [($integer (int-or-string-id i-or-s))
+                 ($integer-null-t (int-or-string-i i-or-s))
+                 ($integer-null-t (int-or-string-s i-or-s))]))
 
-(defn key->i-or-s
-  [k]
-  nil)
+  (defn key->i-or-s
+    [k]
+    nil)
 
-(def $int-or-string-t
-  (make-db-type "int-or-string" int-or-string? int-or-string-id
-                key->i-or-s int-or-string-scheme
-                db->i-or-s i-or-s->db))
+  (def $int-or-string-t
+    (make-db-type "int-or-string" int-or-string? int-or-string-id
+                  key->i-or-s int-or-string-scheme
+                  db->i-or-s i-or-s->db))
 
-(defn install-i-or-s-tables!
-  [db]
-  (doall
-   [(jdbc/db-do-prepared (db/db-connection-conn db)
-                          (jdbc/create-table-ddl
-                           "int_or_string"
-                           [["id" "INTEGER"] ["i" "INTEGER"] ["s" "INTEGER"]]))
-    (jdbc/db-do-prepared (db/db-connection-conn db)
-                         (jdbc/create-table-ddl
-                          "integer"
-                          [["id" "INTEGER"] ["val" "INTEGER"]]))
-    (jdbc/db-do-prepared (db/db-connection-conn db)
-                         (jdbc/create-table-ddl
-                          "string"
-                          [["id" "INTEGER"] ["val" "TEXT"]]))]))
+  (defn install-i-or-s-tables!
+    [db]
+    (doall
+     [(jdbc/db-do-prepared (db/db-connection-conn db)
+                           (jdbc/create-table-ddl
+                            "int_or_string"
+                            [["id" "INTEGER"] ["i" "INTEGER"] ["s" "INTEGER"]]))
+      (jdbc/db-do-prepared (db/db-connection-conn db)
+                           (jdbc/create-table-ddl
+                            "integer"
+                            [["id" "INTEGER"] ["val" "INTEGER"]]))
+      (jdbc/db-do-prepared (db/db-connection-conn db)
+                           (jdbc/create-table-ddl
+                            "string"
+                            [["id" "INTEGER"] ["val" "TEXT"]]))]))
 
-(def int-or-string-galaxy
-  (make&install-db-galaxy "int_or_string"
-                          $int-or-string-t
-                          install-i-or-s-tables!
-                          int-or-string-table))
+  (def int-or-string-galaxy
+    (make&install-db-galaxy "int_or_string"
+                            $int-or-string-t
+                            install-i-or-s-tables!
+                            int-or-string-table))
 
-(defn with-i-or-s-db
-  [spec func]
-  (jdbc/with-db-connection [db spec]
-    (let [conn (db-connect db)]
-      (reset! *db-galaxies* nil)
-      (reset! *conn* conn)
-      (make&install-db-galaxy "int_or_string"
-                              $int-or-string-t
-                              install-i-or-s-tables!
-                              int-or-string-table)
-      (initialize-db-galaxies! @*conn*)
+  (defn with-i-or-s-db
+    [spec func]
+    (jdbc/with-db-connection [db spec]
+      (let [conn (db-connect db)]
+        (reset! *db-galaxies* nil)
+        (reset! *conn* conn)
+        (make&install-db-galaxy "int_or_string"
+                                $int-or-string-t
+                                install-i-or-s-tables!
+                                int-or-string-table)
+        (initialize-db-galaxies! @*conn*)
 
-      (db/insert! @*conn* int-or-string-table 0 nil 0)
-      (db/insert! @*conn* int-or-string-table 1 nil 1)
-      (db/insert! @*conn* int-or-string-table 2 2 nil)
-      (db/insert! @*conn* int-or-string-table 3 nil 3)
-      (db/insert! @*conn* int-or-string-table 4 4 nil)
+        (db/insert! @*conn* int-or-string-table 0 nil 0)
+        (db/insert! @*conn* int-or-string-table 1 nil 1)
+        (db/insert! @*conn* int-or-string-table 2 2 nil)
+        (db/insert! @*conn* int-or-string-table 3 nil 3)
+        (db/insert! @*conn* int-or-string-table 4 4 nil)
 
-      (db/insert! @*conn* integer-table 2 42)
-      (db/insert! @*conn* integer-table 4 23)
+        (db/insert! @*conn* integer-table 2 42)
+        (db/insert! @*conn* integer-table 4 23)
 
-      (db/insert! @*conn* string-table 0 "foo")
-      (db/insert! @*conn* string-table 1 "bar")
-      (db/insert! @*conn* string-table 3 "baz")
-      (func))))
-
+        (db/insert! @*conn* string-table 0 "foo")
+        (db/insert! @*conn* string-table 1 "bar")
+        (db/insert! @*conn* string-table 3 "baz")
+        (func))))
+(def $i-or-s-id (rel/make-monomorphic-combinator "ir-or-s-id"
+                                                 [$int-or-string-t]
+                                                 $integer-t
+                                                 int-or-string-id
+                                                 :universe sql/sql-universe
+                                                 :data
+                                                 (make-db-operator-data
+                                                  nil
+                                                  (fn [k & args]
+                                                    (first (tuple-expressions k))))))
 (with-i-or-s-db db-spec
-  (fn []
-    #_(db/run-query @*conn* (query [strings (<- string-table)]
-                                 (restrict ($= (! strings "id")
-                                               ($integer 0)))
-                                 (project strings)))
-    (db/db-query-reified-results @*conn*
-                                 (query [ios (<- int-or-string-galaxy)]
-                                        (project ios)))))
+    (fn []
+      #_(db/run-query @*conn* (query [strings (<- string-table)]
+                                     (restrict ($= (! strings "id")
+                                                   ($integer 0)))
+                                     (project strings)))
+      (db/db-query-reified-results @*conn*
+                                   (query [ios (<- int-or-string-galaxy)]
+                                          (project {"id" ($i-or-s-id (! ios))})))))

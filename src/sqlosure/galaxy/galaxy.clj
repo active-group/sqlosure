@@ -301,7 +301,7 @@ operator is intended to work."}
          res res
          rev '()]
     (if (empty? cols)
-      (reverse rev)
+      (first (reverse rev))
       (let [typ (get (rel/rel-scheme-map scheme) (first cols))]
         (if (and (satisfies? t/base-type-protocol typ)
                  (db-type-data? (t/-data typ)))
