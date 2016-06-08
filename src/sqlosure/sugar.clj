@@ -10,20 +10,27 @@
              [relational-algebra :as rel]
              [sql :as sql]
              [type :as t]
-             [utils :as utils]]))
+             [utils :as u]]))
 
 (defn cons-id-field
+  "Takes a map `m` and prepends a key->value `{\"id\" '$integer-t}` to it. All
+  keys are returned as strings via `name`."
   [m]
-  (into {} (cons {"id" '$integer-t}
-                 (map (fn [[k v]]
-                        [(name k) v]) m))))
+  (into {} (cons {"id" '$integer-t} (map (fn [[k v]] [(name k) v]) m))))
 
 ;; NOTE This seems hella hacky -- there must be another way for this and all
 ;;      it's uses.
 (defn- symbol->value
+  "Takes a symbol `sym` and tries to get it's value from all loaded namespaces.
+  If the symbol is found, return the value, else `nil`."
   [sym]
   (when-let [v (first (remove nil? (map #(ns-resolve % sym) (all-ns))))]
     (var-get v)))
+
+(defn- all-sqlosure-types?
+  "Is every value in the seq `ts` a `sqlosure` type?"
+  [ts]
+  (every? #(satisfies? t/base-type-protocol %) ts))
 
 (defn check-types
   "Check the types of values passed to a function. If the vectors match up,
@@ -33,30 +40,54 @@
   Args:
 
   * `vs`: a vector of values to be type-checked
-  * `ts`: a vector of `sqlosure.type`s the `vs` should satisfy"
+  * `ts`: a vector of `sqlosure.type`s the `vs` should satisfy
+
+  Throws an `active.clojure.condition/assertion-violation` if the input seqs are
+  of unequeal length or the types sequence contains non-`sqlosure` types."
   [vs ts]
   (let [bools (map (fn [ix v t] [ix ((t/atomic-type-predicate t) v)])
                    (range 0 (count vs)) vs ts)]
-    (if (every? #(satisfies? t/base-type-protocol %) ts)
-      (cond
-        (= (count vs) (count ts))
-        (or (every? true? (map second bools))
-            (let [idx (ffirst (filter #(-> % second false?) bools))]
-              [idx (get vs idx) (get ts idx)]))
-        :else (c/assertion-violation `check-types
-                                     "sequences of unequal length" vs ts))
-      (c/assertion-violation `check-types
-                             "types vector contains non-sqlosure type values"
-                             ts))))
+    (cond
+      (not (all-sqlosure-types? ts))
+      (c/assertion-violation
+       `check-types "types vector contains non-sqlosure type values" ts)
+      (u/count= vs ts)
+      (or (u/all? (map second bools))
+          (let [idx (ffirst (filter #(-> % second false?) bools))]
+            [idx (get vs idx) (get ts idx)]))
+      :else
+      (c/assertion-violation
+       `check-types "sequences of unequal length" vs ts))))
 
 (defn make-db->val
-  [constructor]
+  "Takes a constructor function `constr` that takes a set of values and returns
+  a value. Returns a function that takes a seq of values and applies `constr` to
+  them.
+
+  This serves as the transformation from db-records to their respective clojure
+  data representation."
+  [constr]
   (fn [vs]
-    (apply constructor vs)))
+    (apply constr vs)))
 
 (defn make-val->db
+  "Takes a sequence of `sqlosure`-types `ts`. Returns a function that takes a
+  value `v` and returns a `galaxy/tuple` containing the components of `v` as
+  `relational-algebra/const` values depending on the supplied types `ts`.
+
+  Example:
+
+      (def kv->db (make-val->db [$integer-t $string-t]))
+      (kv->db (make-kv 1 \"foobar\"))
+      ;; => (galaxy/make-tuple [($integer 1) ($string \"foobar\")])
+
+  This serves as the transformation from a values clojure data representation to
+  it's corresponding db-record representation.
+
+  If the types seq contains something else than `sqlosure` types, this function
+  throws an assertion-violation."
   [ts]
-  (c/assert (every? #(satisfies? t/base-type-protocol %) ts) "invalid type(s).")
+  (c/assert (all-sqlosure-types? ts) "invalid type(s).")
   (fn [v]
     (glxy/make-tuple (into [] (mapv (fn [v' t]
                                       (rel/make-const t v')) 
@@ -64,6 +95,14 @@
 
 ;; TODO Write tests.
 (defmacro define-db-type
+  "`define-db-type` defines a db-type value based on it's arguments.
+
+  Arg:
+
+  - `nom`: The base-name (symbol) of the the type. For Example, `nom = \"foo\"`
+           will result in a value named `$foo-t`.
+  - `pred`: A predicate function for values of this type (in Clojure-land).
+  - `ts`: A vector of types, used to the define the val->db and db->val fns."
   [nom pred ts]
   (let [db-type-name# (symbol (str "$" nom "-t"))
         constr-name# (symbol (str "$" nom))]
@@ -80,7 +119,10 @@
                             (make-val->db ~ts))))))
 
 (defn make-selector
-  "Args:
+  "This function returns a query-monad operation to query for one field of a
+  galaxy record. Not intended for usage outside of `define-product-type`.
+
+  Args:
 
   * `selector-name`: The name of this selector (SQL-name)
   * `in-type`: Type that goes into the generated function
@@ -112,7 +154,7 @@
 
   Args:
 
-  * function-name `fn-name?`
+  * function-name `fn-name`
   * `fields` vector which will serve as the arguments vector to the
     constructor
   * `types` vector representing the types of the constructor arguments."
@@ -135,20 +177,24 @@
                                        " (" (get res# 1) ")")))))))
 
 (defn db-installer-strings
-  [fields types]
-  (c/assert (and (seq fields) (seq types)) "fields and types must not be empty")
-  (into [] (for [[f t] (utils/zip fields types)]
+  "Takes a vec of fields `fs` and a vec of types `ts` and returns a vector of
+  vectors for creating a table via jdbc."
+  [fs ts]
+  (c/assert (and (seq fs) (seq ts)) "fields and types must not be empty")
+  (into [] (for [[f t] (u/zip fs ts)]
              [(name f) (t/-to-string
                         (if (symbol? t) (symbol->value t) t))])))
 
 ;; TODO Write tests.
 (defn make-db-installer!
-  [nom fields types]
+  "Takes the name `nom` of a sql-table, it's fields (record columns) `fs` and
+  their types `ts` and runs jdbc's table installer for those values."
+  [nom fs ts]
   (fn [db]
     (jdbc/db-do-prepared (db/db-connection-conn db)
                          (jdbc/create-table-ddl
                           nom
-                          (db-installer-strings fields types)))))
+                          (db-installer-strings fs ts)))))
 
 (defn- table*
   [sql-name the-map & opts]
