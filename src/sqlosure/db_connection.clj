@@ -261,7 +261,8 @@
          (apply str (interpose ", " (rel/rel-scheme-columns scheme))) ") "
          "VALUES (" values ")")))
 
-(defn rel-is-galaxy?
+(defn- rel-is-galaxy?
+  "Returns true if the argument represents a galaxy rather than a sql-table."
   [rel]
   (glxy/db-galaxy? (rel/base-relation-handle rel)))
 
@@ -310,7 +311,10 @@
         sql-table* (extract-table sql-table)
         [scheme vals] (if (and (seq args) (rel/rel-scheme? (first args)))
                         [(first args) (rest args)]
-                        [(rel/query-scheme sql-table*) args])
+                        [(rel/query-scheme sql-table*)
+                         (if (rel-is-galaxy? sql-table)
+                           (vals (first args))
+                           args)])
         db (db-connection-conn conn)
         run-query-with-params
         (^{:once true} fn* [con]

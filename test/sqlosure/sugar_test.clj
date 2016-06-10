@@ -115,7 +115,9 @@
 (defn with-person-db
   [spec func]
   (jdbc/with-db-connection [db spec]
-    (let [conn (db-connect db)]
+    (let [conn (db-connect db)
+          ins-person (fn [p]
+                       (db/insert! @*conn* person-galaxy p))]
       (reset! *db-galaxies* nil)
       (reset! *conn* conn)
       (make&install-db-galaxy "person" $person-t install-person-table!
@@ -123,15 +125,11 @@
       (initialize-db-galaxies! @*conn*)
 
       ;; Insert a few values
-      (db/insert! @*conn* person-table 0 "Marco" "Schneider"
-                  false (time/make-date 1989 10 31))
-      (db/insert! @*conn* person-table 1 "Helen" "Ahner"
-                  true (time/make-date 1990 10 15))
-      (db/insert! @*conn* person-table 2 "Frederike" "Guggemos"
-                  true (time/make-date 1989 12 4))
-      (db/insert! @*conn* person-table 3 "Tim" "Rach"
-                  false (time/make-date 1991 6 2))
-
+      (ins-person ($person 0 "Marco" "Schneider" false (time/make-date 1989 10 31)))
+      (ins-person ($person 1 "Helen" "Ahner" true (time/make-date 1990 10 15)))
+      (ins-person ($person 2 "Frederike" "Guggemos" true (time/make-date 1989 12 4)))
+      (ins-person ($person 3 "Tim" "Rach" false (time/make-date 1991 6 2)))
+      (ins-person ($person 4 "John" "Doe" false (time/make-date 2016 6 9)))
       (func))))
 
 (def $sex=female

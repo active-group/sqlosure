@@ -164,6 +164,8 @@
         field-names# (mapv #(-> % name symbol) fields)
         args# (into [] field-names#)]
     `(defn ~fn-name#
+       ~(str "Takes " (count field-names#)
+             " args " args# " and returns a new " fn-name#)
        ~args#
        (let [res# (~check-types ~args# ~types)]
          (if-not (vector? res#)

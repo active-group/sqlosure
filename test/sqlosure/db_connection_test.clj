@@ -34,17 +34,7 @@
             (apply db/insert! conn person-table
                    (rel/base-relation-scheme person-table)
                    axel)
-            (is (= #{axel} (set (db/run-query conn get-1)))))
-          #_(testing "should fail with underspecified rel-scheme"
-            ;; Clean the last insert
-            (delete-1)
-            (is (thrown?
-                 Exception
-                 (db/insert! conn person-table
-                             ;; Note missing keys which should cause this query to fail.
-                             (rel/alist->rel-scheme {"id" $integer-t
-                                                     "first" $string-t})
-                             -1 "Cormac")))))))))
+            (is (= #{axel} (set (db/run-query conn get-1))))))))))
 
 (deftest delete!-test
   (with-actor-db db-spec
