@@ -98,7 +98,11 @@
           ["k" "INTEGER"]
           ["v" "TEXT"]]
          (db-installer-strings ["id" "k" "v"]
-                               [$integer-t $integer-t $string-t]))))
+                               [$integer-t $integer-t $string-t])))
+  (is (= [["id" "INTEGER"]
+          ["kv" "INTEGER"]]
+         (db-installer-strings ["id" "kv"]
+                               [$integer-t $kv-t]))))
 
 ;; -- stuff and stuff
 

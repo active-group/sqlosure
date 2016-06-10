@@ -180,12 +180,15 @@
 
 (defn db-installer-strings
   "Takes a vec of fields `fs` and a vec of types `ts` and returns a vector of
-  vectors for creating a table via jdbc."
+  vectors for creating a table via jdbc.
+  For every user-defined type, the db-type will be replaced by an integer to
+  signal a foreign key to another table."
   [fs ts]
   (c/assert (and (seq fs) (seq ts)) "fields and types must not be empty")
   (into [] (for [[f t] (u/zip fs ts)]
              [(name f) (t/-to-string
-                        (if (symbol? t) (symbol->value t) t))])))
+                        (let [tt (if (symbol? t) (symbol->value t) t)]
+                          (if (t/-galaxy-type? tt) $integer-t tt)))])))
 
 ;; TODO Write tests.
 (defn make-db-installer!
