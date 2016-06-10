@@ -5,7 +5,8 @@
             [sqlosure
              [relational-algebra :as rel]
              [sql :as sql]
-             [type :as t]]))
+             [type :as t]
+             [utils :as u]]))
 
 (define-record-type tuple
   ^{:doc "A tuple holds a (sorted) vector of values."}
@@ -299,26 +300,29 @@ operator is intended to work."}
   "`reify-query-result` takes one result-record of a query and the (non-dbized)
   scheme of the query ran and applies the necessary reification to the resulting
   values."
-  [res scheme]
-  (loop [cols (rel/rel-scheme-columns scheme)
-         res res
-         rev '()]
-    (if (empty? cols)
-      (into [] (reverse rev))
-      (let [typ (get (rel/rel-scheme-map scheme) (first cols))]
-        (if (and (satisfies? t/base-type-protocol typ)
-                 (db-type-data? (t/-data typ)))
-          (let [data (t/-data typ)
-                scheme (db-type-data-scheme data)
-                reifier (db-type-data-reifier data)
-                [prefix suffix] (take+drop
-                                 (count (rel/rel-scheme-columns scheme)) res)]
+  [res scheme & [opts]]
+  (let [cs (rel/rel-scheme-columns scheme)]
+    (loop [cols (rel/rel-scheme-columns scheme)
+           res res
+           rev '()]
+      (if (empty? cols)
+        (if (:as-maps opts)
+          (into {} (u/zip cs (reverse rev)))
+          (into [] (reverse rev)))
+        (let [typ (get (rel/rel-scheme-map scheme) (first cols))]
+          (if (and (satisfies? t/base-type-protocol typ)
+                   (db-type-data? (t/-data typ)))
+            (let [data (t/-data typ)
+                  scheme (db-type-data-scheme data)
+                  reifier (db-type-data-reifier data)
+                  [prefix suffix] (take+drop
+                                   (count (rel/rel-scheme-columns scheme)) res)]
+              (recur (rest cols)
+                     suffix
+                     (cons (reifier prefix) rev)))
             (recur (rest cols)
-                   suffix
-                   (cons (reifier prefix) rev)))
-          (recur (rest cols)
-                 (rest res)
-                 (cons (first res) rev)))))))
+                   (rest res)
+                   (cons (first res) rev))))))))
 
 (defn rename-query
   "Takes a query `q` and a name-generator function `generate-name` and returns

@@ -462,11 +462,11 @@
   "Takes a db-connetion `conn` and a query `q` and runs the query against the
   connected database. The result is returnd reified, which means all data is
   transformed in the shape specified by it's corresponding data type."
-  [db q]
+  [db q & [opts]]
   (let [[db-q _] (glxy/dbize-query q)
         db-res (run-query db db-q)
         scheme (rel/query-scheme q)]
-    (mapv #(glxy/reify-query-result % scheme) db-res)))
+    (mapv #(glxy/reify-query-result % scheme opts) db-res)))
 
 (defn db-query-reified-result
   [db q]
