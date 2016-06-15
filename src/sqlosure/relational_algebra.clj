@@ -8,7 +8,8 @@
             [sqlosure
              [type :as t]
              [universe :as u]
-             [utils :refer [fourth third]]]))
+             [utils :refer [fourth third]]])
+  (:import java.io.Writer))
 
 (define-record-type rel-scheme
   (^:private really-make-rel-scheme columns map grouped) rel-scheme?
@@ -998,3 +999,135 @@ to 0."}
    (fn [_] 0)
    (fn [_] 0)
    e))
+
+;; -----------------------------------------------------------------------------
+;; -- Printer methods for println, etc.
+;; -----------------------------------------------------------------------------
+
+(defmethod print-method rel-scheme [v ^Writer w]
+  (.write w (str "(#rel-scheme " (rel-scheme-map v) ")")))
+
+(defmethod print-method base-relation [v ^Writer w]
+  (.write w (str "(#base-relation " (base-relation-name v) " "))
+  (print-method (base-relation-scheme v) w)
+  (when-let [h (base-relation-handle v)]
+    (.write w " ")
+    (print-method h w))
+  (.write w ")"))
+
+(defmethod print-method attribute-ref [v ^Writer w]
+  (.write w (str "(#attr-ref " (attribute-ref-name v) ")")))
+
+(defmethod print-method const [v ^Writer w]
+  (.write w (str "(#const "))
+  (.write w (str (const-val v) " "))
+  (print-method (const-type v) w)
+  (.write w (str ")")))
+
+(defmethod print-method null [v ^Writer w]
+  (.write w (str "(#null "))
+  (print-method (null-type v) w)
+  (.write w ")"))
+
+(defmethod print-method rator [v ^Writer w]
+  (.write w (str "#" (rator-name v))))
+
+(defmethod print-method application [v ^Writer w]
+  (.write w "(#app (")
+  (print-method (application-rator v) w)
+  (.write w " ")
+  (loop [r (application-rands v)]
+    (when rand
+      (print-method r w)))
+  (.write w "))"))
+
+(defmethod print-method empty-query [_ ^Writer w]
+  (.write w "#empty-query"))
+
+(defmethod print-method project [v ^Writer w]
+  (.write w "(\u03C0 ")
+  (print-method (project-alist v) w)
+  (.write w " ")
+  (print-method (project-query v) w)
+  (.write w ")"))
+
+(defmethod print-method restrict [v ^Writer w]
+  (.write w "(\u03C3 ")
+  (print-method (restrict-exp v) w)
+  (.write w " ")
+  (print-method (restrict-query v) w)
+  (.write w ")"))
+
+(defmethod print-method restrict-outer [v ^Writer w]
+  (.write w "(\u03C3 ")
+  (print-method (restrict-outer-exp v) w)
+  (.write w " ")
+  (print-method (restrict-outer-query v) w)
+  (.write w ")"))
+
+(defn- rel-op->str
+  [rel-op]
+  (case rel-op
+    :product "\u2A2F"
+    :left-outer-product "\u222A"
+    :union "\u222A"
+    :intersection "\u2229"
+    :quotient "\u00F7"
+    :difference "\u2216"
+    :else rel-op))
+
+(defmethod print-method combine [v ^Writer w]
+  (.write w (str "(#" (rel-op->str (combine-rel-op v)) " "))
+  (print-method (combine-query-1 v) w)
+  (.write w " ")
+  (print-method (combine-query-2 v) w)
+  (.write w ")"))
+
+(defmethod print-method order [v ^Writer w]
+  (.write w "(#order ")
+  (print-method (order-alist v) w)
+  (.write w " ")
+  (print-method (order-query v) w)
+  (.write w ")"))
+
+(defmethod print-method top [v ^Writer w]
+  (.write w (str "(#top " (top-count v)
+                 (if (< 0 (top-offset v))
+                   (str " (offset " (top-offset v) ") ")
+                   " ")))
+  (print-method (top-query v) w)
+  (.write w ")"))
+
+(defmethod print-method group [v ^Writer w]
+  (.write w "(#group ")
+  (print-method (group-columns v) w)
+  (.write w " ")
+  (print-method (group-query v) w)
+  (.write w ")"))
+
+(defmethod print-method aggregation [v ^Writer w]
+  (.write w (str "(#aggregation " (aggregation-operator v) " "))
+  (print-method (aggregation-expr v) w)
+  (.write w ")"))
+
+(defmethod print-method aggregation* [v ^Writer w]
+  (.write w (str "(#aggregation* " (aggregation-operator v) " "))
+  (print-method (aggregation-expr v) w)
+  (.write w ")"))
+
+(defmethod print-method case-expr [v ^Writer w]
+  (.write w (str "(#case "))
+  (print-method (case-expr-alist v) w)
+  (.write w " ")
+  (print-method (case-expr-default v) w)
+  (.write w ")"))
+
+(defmethod print-method scalar-subquery [v ^Writer w]
+  (.write w (str "(#scalar-subquery "))
+  (print-method (scalar-subquery-query v) w)
+  (.write w ")"))
+
+(defmethod print-method set-subquery [v ^Writer w]
+  (.write w (str "(#set-subquery "))
+  (print-method (set-subquery-query v) w)
+  (.write w ")"))
