@@ -103,6 +103,7 @@ Replaced alist with hash-map."
   (make-rel-scheme (rel-scheme-columns scheme)
                    (into {}
                          (map (fn [[name type]]
+                                ;; FIXME: does not work for product types
                                 [name (t/make-nullable-type type)])
                               (rel-scheme-map scheme)))
                    (rel-scheme-grouped scheme)))
@@ -246,7 +247,7 @@ Replaced alist with hash-map."
   ^{:doc "List of pairs."}
   (really-really-make-project alist query)
   project?
-  [^{:doc "Maps newly bound attribute names to expressions.alist project-alist"}
+  [^{:doc "Maps newly bound attribute names to expressions."}
    alist project-alist
    query project-query])
 
@@ -439,7 +440,7 @@ Replaced alist with hash-map."
 
 (define-record-type order
   (really-make-order alist query) order?
-  [alist order-alist  ;; (order -> hash-map)
+  [alist order-alist  ;; list of pairs (expr direction), where direction = :ascending | :descending
    query order-query])
 
 (defn make-order
@@ -452,6 +453,7 @@ Replaced alist with hash-map."
        (doseq [p alist]
          (let [exp (first p)
                t (expression-type env exp)]
+           ;; FIXME: works only for base types
            (when-not (t/ordered-type? t)
              (assertion-violation `make-order "not an ordered type " t exp))))
        scheme))))
