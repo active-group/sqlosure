@@ -405,7 +405,7 @@ Replaced alist with hash-map."
                        a2 (rel-scheme-map s2)]
 
                    (doseq [[k v] a2]
-                     (when-let [p2 (get a1 v)]
+                     (when-let [p2 (get a1 k)]
                        (when-not (t/type=? v p2)
                          (assertion-violation `make-combine "types don't match" rel-op k v p2 query-1 query-2))))
                    (rel-scheme-difference s1 s2))
