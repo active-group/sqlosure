@@ -287,6 +287,7 @@
 (def $< sql/<$)
 (def $plus sql/plus$)
 (def $minus sql/minus$)
+(def $times sql/times$)
 (def $concat sql/concat$)
 (def $lower sql/lower$)
 (def $upper sql/upper$)
@@ -337,7 +338,6 @@
   "`put-query` takes a (relational algebra) query and returns it's (SQL-) string
   representation. Uses the default printer from `sqlosure.sql-put`."
   [q & [opts]]
-  (println opts)
   (let [s (->> q opt/optimize-query
                glxy/dbize-query
                first

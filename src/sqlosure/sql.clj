@@ -7,7 +7,8 @@
             [sqlosure
              [relational-algebra :refer :all]
              [type :as t]
-             [universe :refer [make-derived-universe make-universe]]]))
+             [universe :refer [make-derived-universe make-universe]]])
+  (:import java.io.Writer))
 
 (define-record-type sql-table
   ^{:doc "Represents a sql-table."}
@@ -15,6 +16,11 @@
   [^{:doc "The name of the table (`string`)."} name sql-table-name
    ^{:doc "The scheme of the table (`sqlosure.relational-algebra/rel-scheme`)."}
    scheme sql-table-scheme])
+
+(defmethod print-method sql-table [v ^Writer w]
+  (.write w (str "(#sql-table " (sql-table-name v) " "))
+  (print-method (sql-table-scheme v) w)
+  (.write w ")"))
 
 ;; FIXME: clean up public api: (sql-table-name (make-sql-table "abc" ...)) would break, e.g. 
 (defn make-sql-table
@@ -328,6 +334,19 @@
                           -
                           :universe sql-universe
                           :data op--)]
+    (fn [expr1 expr2]
+      (make-application rator expr1 expr2))))
+
+(def times$
+  (let [rator (make-rator '*
+                          (fn [fail t1 t2]
+                            (when fail
+                              (check-numerical t1 fail)
+                              (check-numerical t2 fail))
+                            t1)
+                          *
+                          :universe sql-universe
+                          :data op-*)]
     (fn [expr1 expr2]
       (make-application rator expr1 expr2))))
 
