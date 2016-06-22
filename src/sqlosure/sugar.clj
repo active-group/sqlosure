@@ -59,6 +59,13 @@
       (c/assertion-violation
        `check-types "sequences of unequal length" vs ts))))
 
+(defn arg-count
+  "Returns the numer of args a function returns. Works on (anonymus) functions
+  but not macros.http://stackoverflow.com/a/1813967"
+  [f]
+  {:pre [(instance? clojure.lang.AFunction f)]}
+  (-> f class .getDeclaredMethods first .getParameterTypes alength))
+
 (defn make-db->val
   "Takes a constructor function `constr` that takes a set of values and returns
   a value. Returns a function that takes a seq of values and applies `constr` to
@@ -66,9 +73,51 @@
 
   This serves as the transformation from db-records to their respective clojure
   data representation."
-  [constr]
-  (fn [vs]
-    (apply constr vs)))
+  [constr types id->val]
+  (if-not (reduce (fn [acc v] (or acc (t/-galaxy-type? v))) false types)
+    ;; If this is the case, we need not worry. Just apply the constructor to the
+    ;; result and return it.
+    (fn [vs]
+      (if (not= (arg-count constr) (count vs))
+        ;; This is the case when not called directly (only returns the id?).
+        (try (first (id->val (first vs)))
+             (catch Exception e
+               (c/assertion-violation `make-db->val
+                                      "arguments do not match up" vs)))
+        (apply constr vs)))
+    ;; Otherwise, things get a little more complicated and we have to assume
+    ;; that every non-default-type already is defined with it's own type/galaxy/
+    ;; etc.
+    (fn [vs]
+      (loop [i 0
+             ts (mapv #(t/-galaxy-type? %) types)
+             vs vs
+             res []]
+        (if (empty? ts)
+          (apply constr res)
+          (if-not (first ts)
+            ;; Base case, just keep the value.
+            (recur (inc i)
+                   (vec (rest ts))
+                   (vec (rest vs))
+                   (conj res (first vs)))
+            ;; 'Complex' type. This means what we have here is an id for some
+            ;; record stored in anther table / galaxy.
+            (let [glxy (symbol->value
+                        (-> (get types i) t/-name (str "-galaxy") symbol))
+                  by-id (symbol->value
+                         (symbol (str "$" (t/-name (get types i)) "-id")))
+                  v (ffirst (db/run-query
+                             @*current-db-connection*
+                             (query [g (<- glxy)]
+                                    (restrict ($= ($integer (first vs))
+                                                  (by-id (! g))))
+                                    (project g))
+                             {:galaxy-query? true}))]
+              (recur (inc i)
+                     (vec (rest ts))
+                     (vec (rest vs))
+                     (conj res v)))))))))
 
 (defn make-val->db
   "Takes a sequence of `sqlosure`-types `ts`. Returns a function that takes a
@@ -93,6 +142,19 @@
                                       (rel/make-const t v')) 
                                     (vals v) ts)))))
 
+(defn make-id->val
+  "Takes the name of a galaxy `glxy-name` and a selector that selects the id of
+  an entry `$id` and returns a function that takes an id and returns the
+  associated record or an empty seq."
+  [glxy-name $id]
+  (fn [id]
+    (first (db/run-query @*current-db-connection*
+                         (query [vs (<- glxy-name)]
+                                (restrict ($= ($id (! vs))
+                                              ($integer id)))
+                                (project vs))
+                         {:galaxy-query? true}))))
+
 ;; TODO Write tests.
 (defmacro define-db-type
   "`define-db-type` defines a db-type value based on it's arguments.
@@ -101,22 +163,33 @@
 
   - `nom`: The base-name (symbol) of the the type. For Example, `nom = \"foo\"`
            will result in a value named `$foo-t`.
-  - `pred`: A predicate function for values of this type (in Clojure-land).
   - `ts`: A vector of types, used to the define the val->db and db->val fns."
-  [nom pred ts]
+  [nom ts]
   (let [db-type-name# (symbol (str "$" nom "-t"))
-        constr-name# (symbol (str "$" nom))]
-    `(def ~db-type-name#
-       (glxy/make-db-type ~(str nom)
-                          ~pred
-                          nil nil
-                          ~(symbol (str nom "-scheme"))
-                          (def ~(symbol (str "db->" nom))
-                            ~(str "Takes a db-record and returns a " nom ".")
-                            (make-db->val ~constr-name#))
-                          (def ~(symbol (str nom "->db"))
-                            ~(str "Takes a " nom " and returns it's db-representation.")
-                            (make-val->db ~ts))))))
+        constr-name# (symbol (str "$" nom))
+        galaxy-name# (symbol->value (symbol (str nom "-galaxy")))
+        sel-name# (symbol->value (symbol (str "$" nom "-id")))]
+    `(do
+       (declare ~(symbol (str "id->" nom))
+                ~(symbol (str "db->" nom))
+                ~(symbol (str nom "->db")))
+       (def ~(symbol (str "id->" nom))
+         (make-id->val ~galaxy-name# ~sel-name#))
+       (def ~(symbol (str "db->" nom))
+         ~(str "Takes a db-record and returns a " nom ".")
+         (make-db->val ~constr-name# ~ts
+                       ~(symbol->value (symbol (str "id->" nom)))))
+       (def ~(symbol (str nom "->db"))
+         ~(str "Takes a " nom " and returns it's db-representation.")
+         (make-val->db ~ts))
+       (def ~db-type-name#
+         (glxy/make-db-type ~(str nom)
+                            ~(symbol (str nom "?"))
+                            ~(symbol (str nom "-id"))
+                            ~(symbol->value (symbol (str "id->" nom)))
+                            ~(symbol (str nom "-scheme"))
+                            ~(symbol->value (symbol (str "db->" nom)))
+                            ~(symbol->value (symbol (str nom "->db))"))))))))
 
 (defn make-selector
   "This function returns a query-monad operation to query for one field of a
@@ -138,7 +211,8 @@
                                                in-type))
                                   fail)
                                 (if (symbol? out-type)
-                                  (symbol->value out-type)))
+                                  (symbol->value out-type)
+                                  out-type))
                               selector
                               :universe sql/sql-universe
                               :data (glxy/make-db-operator-data
@@ -193,7 +267,9 @@
 ;; TODO Write tests.
 (defn make-db-installer!
   "Takes the name `nom` of a sql-table, it's fields (record columns) `fs` and
-  their types `ts` and runs jdbc's table installer for those values."
+  their types `ts` and runs jdbc's table installer for those values.
+  For each user-defined type, `make-db-installer!` uses 'INTEGER' as it's column
+  type."
   [nom fs ts]
   (fn [db]
     (jdbc/db-do-prepared (db/db-connection-conn db)
@@ -236,7 +312,7 @@
   * `?map`: A map of field-names to `sqlosure.type` types. Those can either be
             atomic-types predefined in `sqlosure.type` or user-defined types.
   * `?opts`: Optional arguments to customize the defined type."
-  [?name ?map & ?opts]
+  [?name ?map & [?opts]]
   (let [?map-with-id# (cons-id-field ?map)
         ?fields# (into [] (keys ?map-with-id#))
         ?types# (into [] (vals ?map-with-id#))
@@ -254,7 +330,7 @@
        (def ~(symbol (str ?name "-table")) ~(table* ?name ?map-with-id#))
        (def ~(symbol (str ?name "-scheme")) ~(scheme* ?name ?map-with-id#))
        (define-constructor ~?name ~?fields# ~?types#)
-       (define-db-type ~?name (symbol (str ~?name "?")) ~?types#)
+       (define-db-type ~?name ~?types#)
        (def ~(symbol (str "install-" ?name "-table!"))
          ~(make-db-installer! ?name ?fields# ?types#))
        (def ~(symbol (str ?name "-galaxy")) ~(galaxy* ?name ?fields# ?types#))
