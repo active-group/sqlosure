@@ -102,13 +102,19 @@ returns a db-representation of the value (for example, a Clojure record to a
   ^{:doc "Used to define the `sqlosure.relational-algebra/rator-data` component
 of an operator. This enables you to define your own functions for arbitrary
 (db-)types."}
-  (make-db-operator-data base-query transformer-fn) db-operator-data?
+  (really-make-db-operator-data base-query transformer-fn) db-operator-data?
   [^{:doc "A query to lift another value to this context (for underlying values,
 especially components of a more complex product-type."}
    base-query db-operator-data-base-query
    ^{:doc "A fuction that takes a result and extracs/transforms it the way this
 operator is intended to work."}
    transformer-fn db-operator-data-transformer-fn])
+
+(defn make-db-operator-data
+  ([transformer]
+   (make-db-operator-data nil transformer))
+  ([base-query transformer]
+   (really-make-db-operator-data base-query transformer)))
 
 (defn- make-name-generator
   "Takes a `prefix` (String) and returns a function that returns the prefix with
@@ -235,7 +241,7 @@ operator is intended to work."}
                           (c/assertion-violation
                            `dbize-query "object values used in order query")
                           ;; NOTE This implicitly turns a map into an alist.
-                          ;;      This is not the only playe, but Is this okay
+                          ;;      This is not the only place, but is this okay
                           ;;      here?
                           [exp v])))
                     (rel/order-alist q))
@@ -371,11 +377,11 @@ operator is intended to work."}
                   (rel/const-val e))
                  e))
              (rel/application? e)
-             (let [rator (rel/application-rator e)
-                   data (rel/rator-data rator)
+             (let [rator      (rel/application-rator e)
+                   data       (rel/rator-data rator)
                    base-query (when (db-operator-data? data)
                                 (db-operator-data-base-query data))
-                   rands (rel/application-rands e)
+                   rands      (rel/application-rands e)
                    initiate
                    (fn []
                      (apply (db-operator-data-transformer-fn data)
@@ -408,7 +414,7 @@ operator is intended to work."}
                  ;; Base case, nothing special here.
                  (apply rel/make-application
                         rator
-                        (map worker rands))))
+                        (mapv worker rands))))
              (tuple? e)
              (make-tuple (mapv worker (tuple-expressions e)))
              (rel/aggregation? e)
