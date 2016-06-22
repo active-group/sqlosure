@@ -4,8 +4,7 @@
             [sqlosure
              [core :refer :all]
              [db-connection :as db]
-             [galaxy :as glxy :refer [*db-galaxies* initialize-db-galaxies!
-                                      make&install-db-galaxy]]
+             [galaxy :as glxy :refer [*db-galaxies* initialize-db-galaxies! make&install-db-galaxy]]
              [relational-algebra :as rel]
              [sql :as sql]
              [sugar :refer :all]
@@ -50,7 +49,7 @@
                          :v $string-t})
 
 (deftest make-db->val-test
-  (let [db->kv (make-db->val $kv)]
+  (let [db->kv (make-db->val $kv [$integer-t $integer-t $string-t])]
     (is (function? db->kv))
     (is (= ($kv 0 1 "foo")
            (db->kv [0 1 "foo"])))
@@ -160,16 +159,102 @@
 
 #_(with-person-db db-spec
   (fn []
-    (db/db-query-reified-results
+    (db/run-query
      @*conn*
      (query [ps (<- person-galaxy)]
             (restrict ($women-older-than 25 ps))
-            (order {($person-fname (! ps)) :descending})
-            (top 1)
-            (project {"name" ($person-fname (! ps))})))
-    (put-query
-     (query [ps (<- person-galaxy)]
-            (restrict ($women-older-than 25 ps))
-            (order {($person-fname (! ps)) :descending})
-            (top 1)
-            (project {"name" ($person-fname (! ps))})))))
+            (project ps)
+           #_ (project {"name" ($person-fname (! ps))
+                      "sex" ($person-sex (! ps))}))
+     {:galaxy-query? true})))
+
+(define-product-type point {:x $integer-t
+                            :y $integer-t})
+
+(define-product-type circle {:center $point-t
+                             :radius $double-t})
+
+(define-product-type rect {:bot_left $point-t
+                           :top_right $point-t})
+
+(defn with-shapes-db
+  [spec func]
+  (jdbc/with-db-connection [db spec]
+    (let [conn (db-connect db)
+          ins-point (fn [p]
+                      (db/insert! @*current-db-connection* point-galaxy p))
+          ins-circle (fn [c]
+                       (db/insert! @*current-db-connection* circle-galaxy c))
+          ins-rect (fn [r]
+                     (db/insert! @*current-db-connection* rect-galaxy r))]
+      (reset! *db-galaxies* nil)
+
+      (set-db-connection! conn)
+
+      (make&install-db-galaxy "point" $point-t install-point-table!
+                              point-table)
+      (make&install-db-galaxy "circle" $circle-t install-circle-table!
+                              circle-table)
+      (make&install-db-galaxy "rect" $rect-t install-rect-table!
+                              rect-table)
+
+      (initialize-db-galaxies! @*current-db-connection*)
+
+      ;; Insert a few values
+      (let [p0 ($point 0 0 0)
+            p1 ($point 1 0 1)
+            p2 ($point 2 1 0)
+            p3 ($point 3 1 1)
+            p4 ($point 4 2 2)
+            p5 ($point 5 3 3)
+            c1 ($circle 0 p0 1.0)
+            c2 ($circle 1 p1 2.8)
+            c3 ($circle 2 p3 0.5)
+            r1 ($rect 0 p0 p3)
+            r2 ($rect 1 p0 p4)
+            r3 ($rect 2 p1 p5)
+            ]
+        (doall (map ins-point [p0 p1 p2 p3]))
+        (doall (map ins-circle [c1 c2 c3]))
+        (doall (map ins-rect [r1 r2 r3])))
+      (func))))
+
+(defn make-db-operator
+  [name in-range out data]
+  (rel/make-monomorphic-combinator name in-range out nil
+                                   :universe sql/sql-universe
+                                   :data data))
+
+(def $point=
+  (make-db-operator "point=" [$point-t $point-t] $boolean-t
+                    (glxy/make-db-operator-data
+                     (fn [p1 p2 & args]
+                       (println "$point=2" p1 p2)
+                       ($= p1 p2)))))
+
+(defn $share-point?
+  [circle rect]
+  ($or ($point= ($circle-center (! circle))
+                ($rect-bot_left (! rect)))
+       ($point= ($circle-center (! circle))
+                ($rect-top_right (! rect)))))
+
+(def $square (fn [x] ($times x x)))
+(def $area (fn [r] ($times ($double Math/PI) ($square r))))
+
+(def $circle-area
+  (make-db-operator "circle-area" [$circle-t] $double-t
+                    (glxy/make-db-operator-data
+                     (fn [c & _]
+                       ($area (get (glxy/tuple-expressions c) 2))))))
+
+(with-shapes-db db-spec
+  (fn []
+    (let [$areas (query [cs (<- circle-galaxy)]
+                        (project {"area" ($circle-area (! cs))}))]
+      (run (query [areas (<- $areas)]
+                  (order {(! areas "area") :descending})
+                  (top 1)
+                  (project areas))
+        {:galaxy-query? true}))))
+
