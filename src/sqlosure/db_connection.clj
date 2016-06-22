@@ -170,7 +170,7 @@
   (fn [^ResultSet rs ix]
     (time/from-sql-timestamp (.getTimestamp rs ix))))
 
-(defn run-query
+(defn- run-query*
   "Takes a database connection and a query and runs it against the database.
 
   Example:
@@ -184,8 +184,8 @@
                         (restrict ($> (! k \"key\")
                                     ($integer 10)))
                         (project {\"value\" (! kv \"value\")})))"
-  [conn q & {:keys [optimize?] :or {optimize? true} :as opts-map}]
-  (let [qq (if optimize? (o/optimize-query q) q)
+  [conn q & [opts]]
+  (let [qq (if (:optimize? opts) (o/optimize-query q) q)
         scheme (rel/query-scheme qq)
         col-types (rel/rel-scheme-types scheme)
         asql (rsql/query->sql qq)
@@ -195,7 +195,7 @@
         (^{:once true} fn* [con]
          (let [^PreparedStatement stmt
                (apply jdbc/prepare-statement con sql
-                      (dissoc opts-map :optimize?))]
+                      (dissoc opts :optimize?))]
            (set-parameters stmt param-types+args)
            (.closeOnCompletion stmt)
            (result-set-seq (.executeQuery stmt) col-types)))]
@@ -205,6 +205,29 @@
       (with-open [con (jdbc/get-connection db)]
         (doall ; sorry
          (run-query-with-params con))))))
+
+(defn db-query-reified-results
+  "Takes a db-connetion `conn` and a query `q` and runs the query against the
+  connected database. The result is returnd reified, which means all data is
+  transformed in the shape specified by it's corresponding data type."
+  [db q & [opts]]
+  (let [[db-q _] (glxy/dbize-query q)
+        db-res (run-query* db db-q opts)
+        scheme (rel/query-scheme q)]
+    (mapv #(glxy/reify-query-result % scheme opts) db-res)))
+
+;; TODO Add '?' to :as-maps
+(defn run-query
+  "Opts:
+
+  - `:galaxy-query?` (boolean): should the results be refied? (default = false)
+  - `:opimitze?` (boolean): should the query be optimized? (default = true)
+  - `:as-maps` (boolean): should the result set be a vector of maps containing
+                          the record-column'name name? (default = false)"
+  [db q & [opts]]
+  (if (get opts :galaxy-query?)
+    (db-query-reified-results db q (dissoc opts :galaxy-query?))
+    (run-query* db q (dissoc opts :galaxy-query?))))
 
 (defn- validate-scheme
   "`validate-scheme` takes two rel-schemes and checks if they obey the following
@@ -325,7 +348,9 @@
                  (rel/base-relation-name sql-table)
                  scheme))
                types+vals (map (fn [ty val]
-                                 [ty val])
+                                 (if (t/-galaxy-type? ty)
+                                   [t/integer% (:id val)]
+                                   [ty val]))
                                (rel/rel-scheme-types scheme) vals)]
            (set-parameters stmt types+vals)
            (.closeOnCompletion stmt)
@@ -457,19 +482,3 @@
   to jdbc's execute function)."
   [conn sql]
   (jdbc/execute! (db-connection-conn conn) sql))
-
-(defn db-query-reified-results
-  "Takes a db-connetion `conn` and a query `q` and runs the query against the
-  connected database. The result is returnd reified, which means all data is
-  transformed in the shape specified by it's corresponding data type."
-  [db q & [opts]]
-  (let [[db-q _] (glxy/dbize-query q)
-        db-res (run-query db db-q)
-        scheme (rel/query-scheme q)]
-    (mapv #(glxy/reify-query-result % scheme opts) db-res)))
-
-(defn db-query-reified-result
-  [db q]
-  (let [results (db-query-reified-results db q)]
-    (and (seq? results)
-         (ffirst results))))
