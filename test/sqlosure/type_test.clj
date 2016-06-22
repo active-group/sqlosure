@@ -77,9 +77,9 @@
     (is (not (type-member? "false" integer%)))
     (is (not (type-member? 42.0 integer%))))
   (testing "nullable types"
-    (is (type-member? nil nullable-integer%))
-    (is (type-member? 1 nullable-integer%))
-    (is (not (type-member? "string" nullable-integer%))))
+    (is (type-member? nil integer%-nullable))
+    (is (type-member? 1 integer%-nullable))
+    (is (not (type-member? "string" integer%-nullable))))
   (testing "bounded string type"
     (let [string-5% (make-bounded-string-type 6)]
       (is (type-member? "foobar" string-5%))

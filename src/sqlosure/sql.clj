@@ -46,6 +46,7 @@
   sql-select?
   [;; [ string ]
    ;; DISTINCT, ALL, etc.
+   ;; FIXME: right now, this is never actually used.
    options sql-select-options
    ;; list [sql-column sql-expr]
    ;; [] is for '*'
@@ -66,6 +67,7 @@
    (outer-tables sql-select-outer-tables sql-select-outer-tables-lens)
    (criteria sql-select-criteria sql-select-criteria-lens)
    (outer-criteria sql-select-outer-criteria sql-select-outer-criteria-lens)
+
    ^{:doc "set of SQL column names or `nil`."}
    (group-by sql-select-group-by sql-select-group-by-lens)
 
@@ -78,18 +80,17 @@
    ;; TOP n, etc.
    (extra sql-select-extra sql-select-extra-lens)])
 
-;; FIXME: Use proper representation of empty values instead of nil.
-(defn ^{:test false} new-sql-select
+(defn new-sql-select
   "Create a new, empty sql-select."
   []
-  (make-sql-select nil    ;; options
-                   nil    ;; attributes
-                   false  ;; nullary?
+  (make-sql-select '()   ;; options
+                   nil   ;; attributes
+                   false ;; nullary?
                    nil    ;; tables
                    nil    ;; outer-tables
                    nil    ;; criteria
                    nil    ;; outer-criteria
-                   nil    ;; group-by
+                   #{}   ;; group-by
                    nil    ;; having
                    nil    ;; order-by
                    nil    ;; extra

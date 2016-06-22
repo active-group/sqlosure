@@ -4,13 +4,15 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.7.0"]
-                 [org.clojure/java.jdbc "0.5.7"]
+                 [org.clojure/java.jdbc "0.6.0"]
                  ;; Refer to your required driver here.
                  [org.postgresql/postgresql "9.4.1208"]
                  [active-clojure "0.12.0"]]
   :plugins [[lein-cloverage "1.0.6"]
             [lein-kibit "0.1.2"]
             [lein-codox "0.9.4"]]
+
+  :codox {:metadata {:doc/format :markdown}}
 
   :profiles {:test {:dependencies [[pjstadig/humane-test-output "0.8.0"]]
                     :injections [(require 'pjstadig.humane-test-output)

@@ -7,7 +7,9 @@
              [db-connection :as db]
              [relational-algebra :as rel]
              [test-utils :refer [actor-movie-table db-spec jdbc-out movie-table person-table sqlosure-out with-actor-db]]
-             [time :as time]]))
+             [time :as time]]
+            [sqlosure.sql-put :as put]
+            [sqlosure.relational-algebra-sql :as rsql]))
 
 (deftest insert!-test
   (with-actor-db db-spec
@@ -34,15 +36,15 @@
                    (rel/base-relation-scheme person-table)
                    axel)
             (is (= #{axel} (set (db/run-query conn get-1)))))
-          (testing "should fail with underspecified rel-scheme"
+          #_(testing "should fail with underspecified rel-scheme"
             ;; Clean the last insert
             (delete-1)
             (is (thrown?
                  Exception
                  (db/insert! conn person-table
                              ;; Note missing keys which should cause this query to fail.
-                             (rel/alist->rel-scheme {"id" $integer
-                                                     "first" $string})
+                             (rel/alist->rel-scheme {"id" $integer-t
+                                                     "first" $string-t})
                              -1 "Cormac")))))))))
 
 (deftest delete!-test
@@ -53,7 +55,7 @@
           (let [r (first (db/run-query conn (query [p (<- person-table)]
                                                    (return p))))]
             (do
-              (is r)  ;; We have on record now.
+              (is r)  ;; We have one record now.
               (is (= r (first (db/run-query conn (query [p (<- person-table)]
                                                         (return p))))))
               (db/delete! conn person-table
@@ -78,6 +80,34 @@
                                 ($<= id ($integer 0)))))
             (is (empty? (db/run-query conn q)))))))))
 
+(deftest update!-test
+  (with-actor-db db-spec
+    (fn [db]
+      (let [conn (db-connect db)
+            vian [-1 "Boris" "Vian" (time/make-date 1920 3 10) false]
+            foucault [-1 "Michel" "Foucault" (time/make-date 1926 10 15) false]
+            person=-1 (query [p (<- person-table)]
+                            (restrict ($= (! p "id") ($integer -1)))
+                            (return p))]
+        (do
+          ;; Insert a new person with id -1.
+          (apply db/insert! conn person-table vian)
+          ;; Make sure he's there.
+          (is (= vian (first (db/run-query conn person=-1))))
+          (db/update! conn person-table
+                      (fn [id _ _ _ _]
+                        ($= id ($integer -1)))
+                      (fn [_ _ _ _ _]
+                        {"first" ($string "Michel")
+                         "last" ($string "Foucault")
+                         "birthday" ($date (time/make-date 1926 10 15))}))
+          (is (= foucault (first (db/run-query conn person=-1)))))))))
+
+(defn- time-string->local-date
+  [r ix]
+  (update-in r [ix]
+             #(-> % long java.sql.Date. time/from-sql-date)))
+
 ;; A set of example tests to illustrate one possible way to test with an
 ;; in-memory instance of sqlite3.
 (deftest simple-test
@@ -85,32 +115,43 @@
     (fn [db]
       (let [conn (db-connect db)]
         (testing "order"
-          (let [row-fn (fn [row] (assoc row 1 (time/from-sql-time-string (get row 1))))]
+          (let [row-fn (fn [row]
+                         (time-string->local-date row 1))]
             (is (= (jdbc-out db [(str "SELECT title, release "
                                       "FROM movie "
                                       "ORDER BY release DESC")]
                              row-fn)
-                   (sqlosure-out conn (query [movie (<- movie-table)]
-                                             (order {(! movie "release") :descending})
-                                             (project {"title" (! movie "title")
-                                                       "release" (! movie "release")}))))))
-          (let [row-fn (fn [[release]]
-                         [(time/from-sql-time-string release)])]
-            (is (= (jdbc-out db ["SELECT release FROM movie ORDER BY release ASC"] row-fn)
-                   (sqlosure-out conn (query [movie (<- movie-table)]
-                                             (order {(! movie "release") :ascending})
-                                             (project {"release" (! movie "release")})))))))
+                   (sqlosure-out
+                    conn
+                    (query [movie (<- movie-table)]
+                           (order {(! movie "release") :descending})
+                           (project {"title" (! movie "title")
+                                     "release" (! movie "release")}))))))
+          (let [row-fn (fn [row] (time-string->local-date row 0))]
+            (is (= (jdbc-out
+                    db
+                    ["SELECT release FROM movie ORDER BY release ASC"] row-fn)
+                   (sqlosure-out
+                    conn (query [movie (<- movie-table)]
+                                (order {(! movie "release") :ascending})
+                                (project {"release" (! movie "release")})))))))
         (testing "top"
-          (let [row-fn (fn [[id title release good]]
-                         [id title (time/from-sql-time-string release) (= 1 good)])]
-            ;; NOTE: sqlite3 represents booleans a 0 and 1 -> need to convert to boolean manually.
+          (let [row-fn
+                (fn [row]
+                  (-> row
+                      (time-string->local-date 2)
+                      (update-in [3] #(= 1 %))))]
+            ;; NOTE: sqlite3 represents booleans a 0 and 1 -> need to convert to
+            ;;       boolean manually.
             (is (= (jdbc-out db [(str "SELECT * FROM movie LIMIT 5")] row-fn)
                    (sqlosure-out conn (query [movie (<- movie-table)]
                                              (top 5)
                                              (return movie)))))
-            ;; TODO: This seems to work for now but we need to investigate wheter the same query against
-            ;; the same database state will always return the same order of elements.
-            (is (= (jdbc-out db [(str "SELECT * FROM movie LIMIT 5 OFFSET 2")] row-fn)
+            ;; TODO: This seems to work for now but we need to investigate
+            ;;       wheter the same query against the same database state will
+            ;;       always return the same order of elements.
+            (is (= (jdbc-out
+                    db [(str "SELECT * FROM movie LIMIT 5 OFFSET 2")] row-fn)
                    (sqlosure-out conn (query [movie (<- movie-table)]
                                              (top 2 5)
                                              (return movie)))))))
@@ -123,58 +164,75 @@
                                             person (<- person-table)]
                                            (project {"count" $count*})))))
           (testing "with nested SELECTs"
-            (is (= (jdbc-out db "SELECT count(*) AS count FROM movie, (SELECT * FROM person WHERE id < 10)")
-                   (sqlosure-out conn (query [movie (<- movie-table)]
-                                             [person (<- (query [people (<- person-table)]
-                                                                (restrict ($< (! people "id") ($integer 10)))
-                                                                (return people)))]
-                                             (project {"count" $count*})))))))
+            (is (= (jdbc-out db (str "SELECT count(*) AS count "
+                                     "FROM movie, (SELECT * "
+                                                  "FROM person WHERE id < 10)"))
+                   (sqlosure-out
+                    conn
+                    (query [movie (<- movie-table)]
+                           [person (<- (query [people (<- person-table)]
+                                              (restrict ($< (! people "id")
+                                                            ($integer 10)))
+                                              (return people)))]
+                           (project {"count" $count*})))))))
         (testing "group"
           (testing "statement can be moved"
-            (let [qstring (str "SELECT p.id, count(m.id) AS movies "
-                               "FROM person AS p, movie AS m, actor_movie AS am "
-                               "WHERE am.movie_id = m.id AND p.id = am.actor_id "
-                               "GROUP BY p.id")]
-              (is (jdbc-out db qstring)
-                  (sqlosure-out conn (query [p  (<- person-table)
-                                             m  (<- movie-table)
-                                             am (<- actor-movie-table)]
-                                            (restrict ($and ($= (! am "movie_id")
-                                                                (! m "id"))
-                                                            ($= (! p "id")
-                                                                (! am "actor_id"))))
-                                            (group [p "id"])  ;; Note the order of the statements.
-                                            (project {"id" (! p "id")
-                                                      "movies" ($count (! m "id"))}))))
-              (is (jdbc-out db qstring)
-                  (sqlosure-out conn (query [p  (<- person-table)
-                                             m  (<- movie-table)
-                                             am (<- actor-movie-table)]
-                                            (group [p "id"])  ;; Note the order of the statements.
-                                            (restrict ($and ($= (! am "movie_id")
-                                                                (! m "id"))
-                                                            ($= (! p "id")
-                                                                (! am "actor_id"))))
-                                            (project {"id" (! p "id")
-                                                      "movies" ($count (! m "id"))})))))
+            (let [qs (str "SELECT p.id, count(m.id) AS movies "
+                          "FROM person AS p, movie AS m, actor_movie AS am "
+                          "WHERE am.movie_id = m.id AND p.id = am.actor_id "
+                          "GROUP BY p.id")]
+              (is (jdbc-out db qs)
+                  (sqlosure-out
+                   conn (query [p  (<- person-table)
+                                m  (<- movie-table)
+                                am (<- actor-movie-table)]
+                               (restrict ($and ($= (! am "movie_id")
+                                                   (! m "id"))
+                                               ($= (! p "id")
+                                                   (! am "actor_id"))))
+                               ;; Note the order of the statements.
+                               (group [p "id"])
+                               (project {"id" (! p "id")
+                                         "movies" ($count (! m "id"))}))))
+              (is (jdbc-out db qs)
+                  (sqlosure-out
+                   conn
+                   (query [p  (<- person-table)
+                           m  (<- movie-table)
+                           am (<- actor-movie-table)]
+                          (group [p "id"])  ;; Note the order of the statements.
+                          (restrict ($and ($= (! am "movie_id")
+                                              (! m "id"))
+                                          ($= (! p "id")
+                                              (! am "actor_id"))))
+                          (project {"id" (! p "id")
+                                    "movies" ($count (! m "id"))})))))
             (testing "with grouping in nested table"
-              (is (= (jdbc-out db (str "SELECT p.first, p.last, m.count "
-                                       "FROM person AS p, (SELECT a.id, count(m.id) AS count "
-                                       "                   FROM person AS a, movie AS m, actor_movie AS am "
-                                       "                   WHERE a.id = am.actor_id AND m.id = am.movie_id "
-                                       "                   GROUP BY a.id) AS m "
-                                       "WHERE m.count >= 2 AND p.id = m.id"))
-                     (sqlosure-out conn (query [p (<- person-table)
-                                                m (<- (query [a  (<- person-table)
-                                                              m  (<- movie-table)
-                                                              am (<- actor-movie-table)]
-                                                             (restrict ($and ($= (! a "id") (! am "actor_id"))
-                                                                             ($= (! m "id") (! am "movie_id"))))
-                                                             (group [a "id"])
-                                                             (project {"id"    (! a "id")
-                                                                       "count" ($count (! m "id"))})))]
-                                               (restrict ($and ($>= (! m "count") ($integer 2))
-                                                               ($=  (! m "id") (! p "id"))))
-                                               (project {"first" (! p "first")
-                                                         "last"  (! p "last")
-                                                         "count" (! m "count")}))))))))))))
+              (is (= (jdbc-out
+                      db
+                      (str "SELECT p.first, p.last, m.count "
+                           "FROM person AS p, (SELECT a.id, count(m.id) AS count "
+                           "                   FROM person AS a, movie AS m, actor_movie AS am "
+                           "                   WHERE a.id = am.actor_id AND m.id = am.movie_id "
+                           "                   GROUP BY a.id) AS m "
+                           "WHERE m.count >= 2 AND p.id = m.id"))
+                     (sqlosure-out
+                      conn
+                      (query [p (<- person-table)
+                              m (<-
+                                 (query [a  (<- person-table)
+                                         m  (<- movie-table)
+                                         am (<- actor-movie-table)]
+                                        (restrict ($and ($= (! a "id")
+                                                            (! am "actor_id"))
+                                                        ($= (! m "id")
+                                                            (! am "movie_id"))))
+                                        (group [a "id"])
+                                        (project {"id"    (! a "id")
+                                                  "count" ($count (! m "id"))}))
+                                 )]
+                             (restrict ($and ($>= (! m "count") ($integer 2))
+                                             ($=  (! m "id") (! p "id"))))
+                             (project {"first" (! p "first")
+                                       "last"  (! p "last")
+                                       "count" (! m "count")}))))))))))))

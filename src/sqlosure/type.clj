@@ -1,12 +1,12 @@
-(ns ^{:doc "Types."
-      :author "Marco Schneider, based on Mike Sperbers schemeql2"}
-    sqlosure.type
-  (:require [sqlosure.universe :refer [register-type! universe-lookup-type]]
-            [sqlosure.utils :refer [zip]]
-            [active.clojure.record :refer [define-record-type]]
-            [active.clojure.condition :refer [assertion-violation]])
-  (:import [java.time LocalDate LocalDateTime]
-           [java.io Writer]))
+(ns sqlosure.type
+  (:require [active.clojure
+             [condition :refer [assertion-violation]]
+             [record :refer [define-record-type]]]
+            [sqlosure
+             [universe :refer [register-type! universe-lookup-type]]
+             [utils :refer [zip]]])
+  (:import java.io.Writer
+           [java.time LocalDate LocalDateTime]))
 
 (defprotocol base-type-protocol
   "Protocol for base types."
@@ -19,7 +19,8 @@
   (-ordered? [this] "Is this type ordered?")
   (-const->datum [this val] "Convert value to datum.")
   (-datum->const [this datum] "Convert datum to value.")
-  (-method-map-atom [this] "Get us an an atom pointing to a map of type-specific methods."))
+  (-method-map-atom [this] "Get us an an atom pointing to a map of type-specific methods.")
+  (-data [this] "Domain-specific data, for outside use."))
 
 (defn nullable-type?
   "Is type nullable?"
@@ -53,6 +54,8 @@
       (type-method-default-implementation method)))
 
 (defn invoke-type-method
+  "Looks up the type-method-implementation for ty and method and applies it's
+  result (fn) to the rest-args."
   [ty method & args]
   (apply (type-method-implementation ty method) args))
 
@@ -61,7 +64,7 @@
 (define-record-type atomic-type
   (make-atomic-type name nullable? numeric? ordered? predicate
                     const->datum-fn datum->const-fn
-                    method-map-atom)
+                    method-map-atom data)
   atomic-type?
   [name atomic-type-name
    nullable? atomic-type-nullable?
@@ -70,22 +73,24 @@
    predicate atomic-type-predicate
    const->datum-fn atomic-type-const->datum-fn
    datum->const-fn atomic-type-datum->const-fn
-   method-map-atom atomic-type-method-map-atom]
+   method-map-atom atomic-type-method-map-atom
+   data atomic-type-data]
   base-type-protocol
   (-name [_] name)
   (-contains? [_ val] (predicate val))
   (-nullable? [_] nullable?)
   (-nullable [_] (make-atomic-type name true numeric? ordered? predicate
                                    const->datum-fn datum->const-fn
-                                   method-map-atom))
+                                   method-map-atom data))
   (-non-nullable [_] (make-atomic-type name false numeric? ordered? predicate
                                        const->datum-fn datum->const-fn
-                                       method-map-atom))
+                                       method-map-atom data))
   (-numeric? [_] numeric?)
   (-ordered? [_] ordered?)
   (-const->datum [_ val] (const->datum-fn val))
   (-datum->const [_ datum] (datum->const-fn datum))
-  (-method-map-atom [_] method-map-atom))
+  (-method-map-atom [_] method-map-atom)
+  (-data [_] data))
 
 (defmethod print-method atomic-type [r, ^Writer w]
   (.write w "#")
@@ -107,12 +112,15 @@
   "Returns a new base type as specified.
   If :universe is supplied, the new type will be registered in the universe and
   this function returns a vector containing `[type universe]`."
-  [name predicate const->datum-proc datum->const-proc & {:keys [universe numeric? ordered?]}]
+  [name predicate const->datum-proc datum->const-proc
+   & {:keys [universe numeric? ordered? data]
+      :or [universe nil numeric? false ordered? false data nil]}]
   (let [t (make-atomic-type name false
                             (boolean numeric?) (boolean ordered?)
                             predicate
                             const->datum-proc datum->const-proc
-                            (atom {}))]
+                            (atom {})
+                            data)]
     (when universe
       (register-type! universe name t))
     t))
@@ -198,13 +206,15 @@
       :else (assertion-violation `type-member? "unhandled type" thing))))
 
 (defn numeric-type?
-  "Is type numeric, in the sense of the server's capability to call standard operations like MAX and AVG on them."
+  "Is type numeric, in the sense of the server's capability to call standard
+  operations like MAX and AVG on them."
   [ty]
   (and (satisfies? base-type-protocol ty)
        (-numeric? ty)))
 
 (defn ordered-type?
-  "Is type ordered, in the sense of the servers' capability to make an 'order by' on them."
+  "Is type ordered, in the sense of the servers' capability to make an
+  'order by' on them."
   [ty]
   (and (satisfies? base-type-protocol ty)
        (-ordered? ty)))
@@ -234,6 +244,9 @@
 (def byte-array?
   (test-array byte-array))
 
+(def char-array?
+  (test-array char-array))
+
 (defn date?
   "checks whether a value is of type java.util.Date."
   [x]
@@ -254,7 +267,7 @@
 (def boolean% (make-base-type 'boolean boolean? identity identity))
 
 ;; Used to represent the type of sql NULL. Corresponds to nil in Clojure.
-(def null% (make-base-type 'unknown nil? identity identity))
+(def null% (make-base-type 'unknown nil? identity identity))  ;; FIXME Does this have any real purpose?
 (def any% (make-base-type 'any (constantly true) identity identity))
 
 (def date% (make-base-type 'date date? identity identity
@@ -263,8 +276,7 @@
                                 :ordered? true))
 
 (def blob% (make-base-type 'blob byte-array? 'lose 'lose))
-
-(def nullable-integer% (make-nullable-type integer%))
+(def clob% (make-base-type 'clob char-array? 'lose 'lose))
 
 (def string%-nullable (make-nullable-type string%))
 (def integer%-nullable (make-nullable-type integer%))

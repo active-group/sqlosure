@@ -12,3 +12,5 @@ pom.xml.asc
 /doc
 /dev-resources
 *.sql
+/css
+*.org

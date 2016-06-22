@@ -16,16 +16,7 @@
   "`db-connect` takes a connection map and returns a `db-connection`-record for
   that backend. Dispatches on the `:classname` key in `db-spec`."
   [db-spec]
-  (case (:classname db-spec)
-    "org.postgresql.Driver"
-    (db/make-db-connection db-spec
-                           db/postgresql-sql-put-parameterization
-                           db/postgresql-type-converter)
-    "org.sqlite.JDBC"
-    (db/make-db-connection db-spec
-                           db/sqlite3-sql-put-parameterization
-                           db/sqlite3-type-converter)
-    (assertion-violation `db-connect "unsupported db-spec" db-spec)))
+  (db/make-db-connection db-spec))
 
 (defn table
   "Returns a `sqlosure.relational-algebra/base-relation`.
@@ -113,8 +104,10 @@
                           \"bar\" (! t \"bar\"))
 
   The corresponding SQL statemant would be \"SELECT foo, bar FROM t\"."
-  [alist]
-  (qc/project alist))
+  ([alist-or-relation]
+   (if (qc/relation? alist-or-relation)
+     (return alist-or-relation)
+     (qc/project alist-or-relation))))
 
 (defn order
   "Takes an alist of [[attribute-ref] :descending/:ascending] to order

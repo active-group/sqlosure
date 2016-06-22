@@ -8,7 +8,7 @@
 
 (defn jdbc-out
   [db q & row-fns]
-  (let [res-seq (jdbc/query db q :as-arrays? :cols-as-is)]
+  (let [res-seq (jdbc/query db q {:as-arrays? :cols-as-is})]
     (set (map (apply comp row-fns) (rest res-seq)))))
 
 (defn sqlosure-out
@@ -51,11 +51,11 @@
   (jdbc/db-do-prepared db
    (jdbc/create-table-ddl
     "person"
-    [:id :int]
-    [:first "VARCHAR(32)"]
-    [:last "VARCHAR(32)"]
-    [:birthday "DATETIME"]
-    [:sex :boolean])))
+    [[:id :int]
+     [:first "VARCHAR(32)"]
+     [:last "VARCHAR(32)"]
+     [:birthday "DATE"]
+     [:sex :boolean]])))
 
 (def person-table
   (table "person"
@@ -67,23 +67,23 @@
 
 (defn create-people
   [db]
-  (dotimes [_ 100]
-    (jdbc/insert! db "person"
-                  {:id (next-person-id)
-                   :first (random-string)
-                   :last (random-string)
-                   :birthday (random-date)
-                   :sex (random-boolean)})))
+  (let [conn (db-connect db)]
+    (dotimes [_ 100]
+      (dbs/insert! conn
+                   person-table
+                   (next-person-id) (random-string) (random-string)
+                   (random-date) (random-boolean)))))
 
 (defn make-movie-table
   [db]
-  (jdbc/db-do-prepared db
-                       (jdbc/create-table-ddl
-                        "movie"
-                        [:id :int]
-                        [:title "TEXT"]
-                        [:release "DATE"]
-                        [:good :boolean])))
+  (jdbc/db-do-prepared
+   db
+   (jdbc/create-table-ddl
+    "movie"
+    [[:id :int]
+     [:title "TEXT"]
+     [:release "DATE"]
+     [:good :boolean]])))
 
 (def movie-table
   (table "movie"
@@ -94,20 +94,20 @@
 
 (defn create-movies
   [db]
-  (dotimes [_ 20]
-    (jdbc/insert! db "movie"
-                  {:id (next-movie-id)
-                   :title (random-string)
-                   :release (random-date)
-                   :good (random-boolean)})))
+  (let [conn (db-connect db)]
+    (dotimes [_ 20]
+      (dbs/insert!
+       conn movie-table
+       (next-movie-id) (random-string) (random-date) (random-boolean)))))
 
 (defn make-actor-movie-table
   [db]
-  (jdbc/db-do-prepared db
-                       (jdbc/create-table-ddl
-                        "actor_movie"
-                        [:actor_id :int]
-                        [:movie_id :int])))
+  (jdbc/db-do-prepared
+   db
+   (jdbc/create-table-ddl
+    "actor_movie"
+    [[:actor_id :int]
+     [:movie_id :int]])))
 
 (def actor-movie-table
   (table "actor_movie"
@@ -116,10 +116,11 @@
 
 (defn create-actors
   [db]
-  (dotimes [_ 30]
-    (jdbc/insert! db "actor_movie"
-                  {:actor_id (rand-int @current-person-id)
-                   :movie_id (rand-int @current-movie-id)})))
+  (let [conn (db-connect db)]
+    (dotimes [_ 30]
+      (dbs/insert! conn actor-movie-table
+                   (rand-int @current-person-id)
+                   (rand-int @current-movie-id)))))
 
 (defn with-actor-db
   "`with-actor-db` takes a db-spec and a function which takes the 'conneted' db
