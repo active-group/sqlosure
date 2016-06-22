@@ -13,6 +13,23 @@
              [sql-put :as put]
              [type :as t]]))
 
+(def ^:dynamic *current-db-connection*
+  "This atom stores the current db-connection. Queries will run against that
+  connection. Connect your db via `set-db-connection!`."
+  (atom nil))
+
+(defn set-db-connection!
+  [conn]
+  (when (not= conn @*current-db-connection*)
+    (reset! *current-db-connection* conn)))
+
+(defn run
+  "Takes a query `q` and an optional map of opts `opts` and runs the query
+  against the currently connected database, using `*current-db-connection`.
+  NOTE: Connect via `set-db-connection!`."
+  [q & [opts]]
+  (db/run-query @*current-db-connection* q opts))
+
 (defn db-connect
   "`db-connect` takes a connection map and returns a `db-connection`-record for
   that backend. Dispatches on the `:classname` key in `db-spec`."
