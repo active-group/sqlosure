@@ -3,7 +3,7 @@
   :url "https://github.com/active-group/sqlosure"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.7.0"]
+  :dependencies [[org.clojure/clojure "1.9.0-alpha5"]
                  [org.clojure/java.jdbc "0.6.0"]
                  ;; Refer to your required driver here.
                  [org.postgresql/postgresql "9.4.1208"]
