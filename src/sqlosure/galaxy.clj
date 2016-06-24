@@ -202,7 +202,7 @@ operator is intended to work."}
   (letfn
       [(worker [q generate-name]
          (cond
-           (rel/empty-query? q) [rel/the-empty-rel-scheme {}]
+           (rel/empty-query? q) [rel/the-empty {}]
            (rel/base-relation? q)
            (let [handle (rel/base-relation-handle q)]
              ;; If the query is a galaxy, we need to extract the underlying
@@ -212,7 +212,7 @@ operator is intended to work."}
                      name (db-galaxy-name handle)
                      cols (rel/rel-scheme-columns (rel/query-scheme db-query))
                      new-names (make-new-names name cols)]
-                 ;; What's goining on here?
+                 ;; What's going on here?
                  ;; We basically split up the value reference into 'real' cols
                  ;; and assign new names to it.
                  [(rel/make-project (map
@@ -291,8 +291,7 @@ operator is intended to work."}
                              ::query
                              ::environment) %)]}
   (let [[underlying env] (dbize-query* q-underlying generate-name)]
-    ;; NOTE is it wise to loop through a map (may be unsorted)?
-    (loop [alist alist
+    (loop [alist (into [] alist)
            names []
            bindings env
            queries '()
