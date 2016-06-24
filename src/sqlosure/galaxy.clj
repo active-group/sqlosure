@@ -2,12 +2,16 @@
   (:require [active.clojure
              [condition :as c]
              [record :refer [define-record-type]]]
+            [clojure.spec :as s]
             [sqlosure
              [relational-algebra :as rel]
              [sql :as sql]
              [type :as t]
              [utils :as u]]))
 
+;; ---------------------------------------------------------
+;; -- Records
+;; ---------------------------------------------------------
 (define-record-type tuple
   ^{:doc "A tuple holds a (sorted) vector of values."}
   (make-tuple expressions) tuple?
@@ -29,6 +33,50 @@ by `initialize-db-galaxies!`."}
 be a `sqlosure.relatinal-algebra/base-relation`."}
    query db-galaxy-query])
 
+(define-record-type db-type-data
+  ^{:doc "`db-type-data` is a container for the necessary functions to work with
+arbitrary data-types as db-types."}
+  (make-db-type-data scheme reifier value->db-expression-fn)
+  db-type-data?
+  [^{:doc "A `sqlosure.relational-algebra/rel-scheme`."}
+   scheme db-type-data-scheme
+   ^{:doc "A function that takes the result of a query to the underlying table
+and transforms it into it's data-representation (for example, a db-record to a
+Clojure record, etc.)."}
+   reifier db-type-data-reifier
+   ^{:doc "A function that takes the data-representation of the value and
+returns a db-representation of the value (for example, a Clojure record to a
+`sqlosure.galaxy/tuple`)."}
+   value->db-expression-fn db-type-data-value->db-expression-fn])
+
+(define-record-type db-operator-data
+  ^{:doc "Used to define the `sqlosure.relational-algebra/rator-data` component
+of an operator. This enables you to define your own functions for arbitrary
+(db-)types."}
+  (really-make-db-operator-data base-query transformer-fn) db-operator-data?
+  [^{:doc "A query to lift another value to this context (for underlying values,
+especially components of a more complex product-type."}
+   base-query db-operator-data-base-query
+   ^{:doc "A fuction that takes a result and extracs/transforms it the way this
+operator is intended to work."}
+   transformer-fn db-operator-data-transformer-fn])
+
+;; ---------------------------------------------------------
+;; -- Specs
+;; ---------------------------------------------------------
+(s/def ::query rel/query?)
+(s/def ::query-or-nil (s/or :nil nil? :quer ::query))
+(s/def ::queries (s/* ::query))
+(s/def ::expression rel/expression?)
+(s/def ::expressions (s/* ::expression))
+(s/def ::scheme (s/or :empty  empty?
+                      :scheme rel/rel-scheme?))
+(s/def ::environment (s/or :empty empty?
+                           :env   (s/map-of string? tuple?)))
+
+;; ---------------------------------------------------------
+;; -- Fns and vals
+;; ---------------------------------------------------------
 (def ^:dynamic *db-galaxies*
   "`*db-galaxies*` is a map wrapped in an atom that contains all known
   galaxies as a mapping of galaxy-name ->
@@ -58,22 +106,6 @@ be a `sqlosure.relatinal-algebra/base-relation`."}
                 ((db-galaxy-setup-fn (rel/base-relation-handle glxy)) conn))
               @*db-galaxies*)))
 
-(define-record-type db-type-data
-  ^{:doc "`db-type-data` is a container for the necessary functions to work with
-arbitrary data-types as db-types."}
-  (make-db-type-data scheme reifier value->db-expression-fn)
-  db-type-data?
-  [^{:doc "A `sqlosure.relational-algebra/rel-scheme`."}
-   scheme db-type-data-scheme
-   ^{:doc "A function that takes the result of a query to the underlying table
-and transforms it into it's data-representation (for example, a db-record to a
-Clojure record, etc.)."}
-   reifier db-type-data-reifier
-   ^{:doc "A function that takes the data-representation of the value and
-returns a db-representation of the value (for example, a Clojure record to a
-`sqlosure.galaxy/tuple`)."}
-   value->db-expression-fn db-type-data-value->db-expression-fn])
-
 (defn make-db-type
   "`make-db-type` creates a new `sqlosure.type/base-type` for a db-type in a to
   be used in a galaxy. The newly created data type will be registered to the
@@ -98,18 +130,6 @@ returns a db-representation of the value (for example, a Clojure record to a
                     :data
                     (make-db-type-data scheme reifier value->db-expression-fn)))
 
-(define-record-type db-operator-data
-  ^{:doc "Used to define the `sqlosure.relational-algebra/rator-data` component
-of an operator. This enables you to define your own functions for arbitrary
-(db-)types."}
-  (really-make-db-operator-data base-query transformer-fn) db-operator-data?
-  [^{:doc "A query to lift another value to this context (for underlying values,
-especially components of a more complex product-type."}
-   base-query db-operator-data-base-query
-   ^{:doc "A fuction that takes a result and extracs/transforms it the way this
-operator is intended to work."}
-   transformer-fn db-operator-data-transformer-fn])
-
 (defn make-db-operator-data
   ([transformer]
    (make-db-operator-data nil transformer))
@@ -131,6 +151,8 @@ operator is intended to work."}
   "Takes a list and returns a `sqlosure.relational-algebra/product` for this
   list."
   [ql]
+  {:pre [(s/valid? ::queries ql)]
+   :post [(s/valid? ::query %)]}
   (if (empty? ql)
     rel/the-empty
     (rel/make-product (first ql)
@@ -140,30 +162,25 @@ operator is intended to work."}
   "Takes a list of restrictions `rl` and a query and applies the restrictions to
   the query."
   [rl q]
+  {:pre [(s/valid? ::query-or-nil q)
+         (s/valid? ::expressions rl)]
+   :post [(s/valid? ::query %)]}
   (cond
     (nil? q) rel/the-empty
-    (not (rel/query? q)) (c/assertion-violation `apply-restrictions
-                                                "not a query" q)
-    :else
-    (if (empty? rl)
-      q
-      (apply-restrictions (rest rl)
-                          (rel/make-restrict (first rl) q)))))
+    (empty? rl) q
+    :else (apply-restrictions (rest rl) (rel/make-restrict (first rl) q))))
 
 (defn restrict-to-scheme
   "Takes a rel-scheme `scheme` and a query `q` and returns a new
   `sqlosure.relational-algebra/project` which wraps the old query in a
   projection with the mappings of `scheme`."
   [scheme q]
-  (when (empty? scheme)
-    (c/assertion-violation `restrict-to-scheme "empty scheme"))
-  (when-not (rel/query? q)
-    (c/assertion-violation `restrict-to-scheme "unknown query" q))
-  (rel/make-project
-   (map (fn [k]
-          [k (rel/make-attribute-ref k)])
-        (rel/rel-scheme-columns scheme))
-   q))
+  {:pre  [(s/valid? ::query-or-nil q)
+          (s/valid? ::scheme scheme)]
+   :post [(s/valid? ::query %)]}
+  (rel/make-project (map (fn [k] [k (rel/make-attribute-ref k)])
+                         (rel/rel-scheme-columns scheme))
+                    q))
 
 (defn make-new-names
   "Takes a string `base` and a list `lis` and returns a list of
@@ -180,6 +197,8 @@ operator is intended to work."}
 (defn- dbize-query*
   "Returns new query, environment mapping names to tuples."
   [q generate-name]
+  {:pre  [(s/valid? ::query q)]
+   :post [(s/valid? (s/tuple ::query ::environment) %)]}
   (letfn
       [(worker [q generate-name]
          (cond
@@ -258,10 +277,19 @@ operator is intended to work."}
   "Takes a sqlosure query and returns a 'flattened' representation of the same
   query."
   [q]
+  {:pre [(s/valid? ::query q)]
+   :post [(s/valid? (s/tuple ::query ::environment) %)]}
   (dbize-query* q (make-name-generator "dbize")))
 
 (defn dbize-project
   [alist q-underlying generate-name]
+  {:pre [(s/valid? (s/or :map (s/map-of string? rel/attribute-ref?)
+                         :vec (s/coll-of
+                               (s/tuple string? rel/attribute-ref?) [])) alist)
+         (s/valid? ::query q-underlying)]
+   :post [(s/valid? (s/tuple (s/coll-of (s/tuple string? rel/attribute-ref?) [])
+                             ::query
+                             ::environment) %)]}
   (let [[underlying env] (dbize-query* q-underlying generate-name)]
     ;; NOTE is it wise to loop through a map (may be unsorted)?
     (loop [alist alist

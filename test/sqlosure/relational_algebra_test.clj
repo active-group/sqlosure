@@ -9,38 +9,39 @@
              [type :refer :all]
              [universe :refer :all]]))
 
-(def test-scheme1 (alist->rel-scheme [[:foo :bar]
-                                      [:fizz :buzz]]))
-(def test-scheme2 (alist->rel-scheme [[:foo :bar]
-                                      [:some :thing]]))
-(def test-scheme3 (alist->rel-scheme [[:foo :bar]]))
-(def test-scheme4 (alist->rel-scheme [[:fizz :buzz]]))
+(def test-scheme1 (alist->rel-scheme {"foo" integer%
+                                      "fizz" double%}))
+(def test-scheme2 (alist->rel-scheme {"foo" integer%
+                                      "some" string%}))
+(def test-scheme3 (alist->rel-scheme {"foo" integer%}))
+(def test-scheme4 (alist->rel-scheme {"fizz" double%}))
 
 (deftest rel-scheme-types-test
-  (is (= [:bar :buzz]
+  (is (= [integer% double%]
          (rel-scheme-types test-scheme1))))
 
 (deftest rel-scheme-columns-test
-  (is (= [:foo :fizz]
+  (is (= ["foo" "fizz"]
          (rel-scheme-columns test-scheme1))))
 
 (deftest rel-scheme=?-test
   (is (rel-scheme=? (alist->rel-scheme []) the-empty-rel-scheme))
-  (is (rel-scheme=? (alist->rel-scheme [[:foo "bar"]
-                                        [:fizz "buzz"]])
-                    (alist->rel-scheme [[:foo "bar"]
-                                        [:fizz "buzz"]]))))
+  (is (rel-scheme=? (alist->rel-scheme {"foo" integer%
+                                        "fizz" double%})
+                    (alist->rel-scheme {"foo" integer%
+                                        "fizz" double%}))))
 
 (deftest rel-scheme-concat-test
-  (let [a [["one" "one"] ["two" "two"]]
-        b [["three" "three"] ["four" "four"]]
+  (let [a {"one" integer% "two" string%}
+        b {"three" double% "four" blob%} 
         a-scheme (alist->rel-scheme a)
         b-scheme (alist->rel-scheme b)
-        ab-scheme (alist->rel-scheme (concat a b))]
+        ab-scheme (alist->rel-scheme
+                   (into {} (concat a b)))]
     (testing "with either one of the inputs nil"
       ;; FIXME I guess this should rather be an assertion violation?
-      (is (= a-scheme (rel-scheme-concat a-scheme nil)))
-      (is (= a-scheme (rel-scheme-concat nil a-scheme))))
+      (is (= test-scheme1 (rel-scheme-concat test-scheme1 nil)))
+      (is (= test-scheme1 (rel-scheme-concat nil test-scheme1))))
     (testing "with either one of the input alists empty"
       (is (= a-scheme (rel-scheme-concat (alist->rel-scheme []) a-scheme)))
       (is (= a-scheme (rel-scheme-concat a-scheme (alist->rel-scheme [])))))
@@ -53,7 +54,8 @@
             b-scheme-grouped (assoc b-scheme :grouped #{"three"})
             ab-scheme-grouped (assoc ab-scheme :grouped #{"one"})
             ba-scheme-grouped (rel-scheme-concat b-scheme a-scheme-grouped)
-            ab-scheme-grouped-both (assoc (alist->rel-scheme (concat a b))
+            ab-scheme-grouped-both (assoc (alist->rel-scheme
+                                           (into {} (concat a b)))
                                           :grouped #{"one" "three"})]
         (is (= ab-scheme-grouped (rel-scheme-concat a-scheme-grouped b-scheme)))
         (is (= ba-scheme-grouped (rel-scheme-concat b-scheme a-scheme-grouped)))
@@ -62,33 +64,30 @@
 
 (deftest rel-scheme-difference-test
   (is (= (rel-scheme-difference test-scheme1 test-scheme3)
-         (alist->rel-scheme [[:fizz :buzz]])))
+         (alist->rel-scheme {"fizz" double%})))
   (is (= (rel-scheme-difference test-scheme2 test-scheme3)
-         (alist->rel-scheme [[:some :thing]])))
+         (alist->rel-scheme {"some" string%})))
   (is (= (rel-scheme-difference test-scheme1 the-empty-rel-scheme)
          test-scheme1))
   (is (= (rel-scheme-difference
-          (alist->rel-scheme [[:k1 "k1"] [:k2 "k2"] [:k3 "k3"]])
-          (alist->rel-scheme [[:k2 "just"] [:k3 "the"] [:k4 "keys"]]))
-         (alist->rel-scheme [[:k1 "k1"]])))
+          (alist->rel-scheme {"k1" integer% "k2" string% "k3" double%})
+          (alist->rel-scheme {"k2" string% "k3" double% "k4" blob%}))
+         (alist->rel-scheme {"k1" integer%})))
   (is (= (rel-scheme-difference
-          (alist->rel-scheme [[:k2 "just"] [:k3 "the"] [:k4 "keys"]])
-          (alist->rel-scheme [[:k1 "k1"] [:k2 "k2"] [:k3 "k3"]]))
-         (alist->rel-scheme [[:k4 "keys"]])))
-  (is (thrown? Exception (rel-scheme-difference
-                          (alist->rel-scheme [[:foo "some foo"]])
-                          (alist->rel-scheme [[:foo :bar]])))))
+          (alist->rel-scheme {"k2" string% "k3" double% "k4" blob%})
+          (alist->rel-scheme {"k1" integer% "k2" string% "k3" double%}))
+         (alist->rel-scheme {"k4" blob%}))))
 
 (deftest rel-scheme-unary?-test
   (is (rel-scheme-unary? test-scheme4))
   (is (not (rel-scheme-unary? test-scheme1))))
 
 (deftest rel-scheme-nullable-test
-  (let [scheme (alist->rel-scheme [["one" string%]
-                                   ["two" integer%]])
+  (let [scheme (alist->rel-scheme {"one" string%
+                                   "two" integer%})
         scheme-nullable
-        (alist->rel-scheme [["one" (make-nullable-type string%)]
-                            ["two" (make-nullable-type integer%)]])]
+        (alist->rel-scheme {"one" (make-nullable-type string%)
+                            "two" (make-nullable-type integer%)})]
     (is (= scheme-nullable (rel-scheme-nullable scheme)))
     (testing "nil should throw an assertion"
       (is (thrown? Exception (rel-scheme-nullable nil))))
@@ -96,8 +95,8 @@
       (is (= scheme-nullable (rel-scheme-nullable scheme-nullable))))))
 
 (deftest rel-scheme->environment-test
-  (is (= {:fizz :buzz} (rel-scheme->environment test-scheme4)))
-  (is (= {:foo :bar :some :thing} (rel-scheme->environment test-scheme2))))
+  (is (= {"fizz" double%} (rel-scheme->environment test-scheme4)))
+  (is (= {"foo" integer% "some" string%} (rel-scheme->environment test-scheme2))))
 
 (deftest compose-environments-test
   (is (= the-empty-environment
@@ -113,26 +112,36 @@
 
 (deftest make-base-relation-test
   (let [test-universe (make-universe)]
-    (is (= (really-make-base-relation :name :scheme nil)
-           (make-base-relation :name :scheme)))
-    (is (= (really-make-base-relation :name :scheme :some-handle)
-           (make-base-relation :name :scheme :handle :some-handle)))
+    (is (= (really-make-base-relation :name test-scheme1 nil)
+           (make-base-relation :name test-scheme1)))
+    (is (= (really-make-base-relation :name test-scheme2 :some-handle)
+           (make-base-relation :name test-scheme2 :handle :some-handle)))
     (let [rel (make-base-relation "name"
-                                  "scheme"
+                                  test-scheme1
                                   :universe test-universe)]
       (is (= {"name" rel} (universe-get-base-relation-table test-universe)))
-      (is (= (really-make-base-relation "name" "scheme" nil) rel)))
+      (is (= (really-make-base-relation "name" test-scheme1 nil) rel)))
     (let [rel (make-base-relation "name"
-                                  "scheme"
+                                  test-scheme2
                                   :universe test-universe
                                   :handle "some handle")]
       (is (= {"name" rel} (universe-get-base-relation-table test-universe)))
-      (is (= (really-make-base-relation "name" "scheme" "some handle") rel)))))
+      (is (= (really-make-base-relation "name" test-scheme2 "some handle") rel)))))
 
 (deftest make-application-test
-  (let [app (make-application + 1 2 3)]
-    (is (= (application-rator app) +)
-        (= (application-rands app) [1 2 3]))))
+  (let [rator (make-rator '+ (fn [fail t1 t2]
+                               (when fail
+                                 (do (sql/check-numerical t1 fail)
+                                     (sql/check-numerical t2 fail)))
+                               t1)
+                          +
+                          :universe (make-universe))
+        app (make-application rator
+                              (make-const integer% 1)
+                              (make-const integer% 2))]
+    (is (= (application-rator app) rator)
+        (= (application-rands app) [(make-const integer% 1)
+                                    (make-const integer% 2)]))))
 
 (deftest make-rator-test
   (let [test-universe (make-universe)]
@@ -150,19 +159,18 @@
 
 (let [test-universe (make-universe)]
   (def tbl1 (make-base-relation 'tbl1
-                                (alist->rel-scheme [["one" string%]
-                                                    ["two" integer%]])
+                                (alist->rel-scheme {"one" string%
+                                                    "two" integer%})
                                 :universe test-universe
                                 :handle "tbl1"))
-
   (def tbl2 (make-base-relation 'tbl2
-                                (alist->rel-scheme [["one" integer%]
-                                                    ["two" string%]])
+                                (alist->rel-scheme {"one" integer%
+                                                    "two" string%})
                                 :universe test-universe
                                 :handle "tbl2"))
   (def tbl3 (make-base-relation 'tbl3
-                                (alist->rel-scheme [["three" integer%]
-                                                    ["four" string%]])
+                                (alist->rel-scheme {"three" integer%
+                                                    "four" string%})
                                 :universe test-universe
                                 :handle "tbl3")))
 
@@ -216,7 +224,7 @@
       (is (= p1 c2))
       (is (= p2 c3)))
     (testing "with invalid relational operator it should throw an assertion"
-      (is (thrown? Exception (make-combine :non-existent-operator p1 p2))))))
+      (is (thrown? Error (make-combine :non-existent-operator p1 p2))))))
 
 (deftest combinations-test
   (let [p1 (make-project {"two" (make-attribute-ref "two")} tbl1)
@@ -228,17 +236,6 @@
     (is (= (make-combine :quotient p1 p2) (make-quotient p1 p2)))
     (is (= (make-combine :quotient p1 the-empty)
            (make-quotient p1 the-empty)))))
-
-(deftest order-op?-test
-  (is (order-op? :ascending))
-  (is (order-op? :descending))
-  (is (not (order-op? :anything-else))))
-
-(deftest aggregations-op?-test
-  (is (reduce #(and %1 (aggregations-op? %2)) true
-              [:count :count-all :sum :avg :min
-               :max :std-dev :std-dev-p :var :var-p]))
-  (is (not (aggregations-op? :anything-else))))
 
 (deftest make-aggregation-test
   (testing "for regular aggregations"
@@ -312,9 +309,9 @@
                                 (make-aggregation
                                  :sum (make-attribute-ref "one"))))))
       (testing "should fail with anything but :count-all"
-        (is (thrown? Exception (expression-type
-                                the-empty-environment
-                                (make-aggregation :count-something))))))
+        (is (thrown? Error (expression-type
+                            the-empty-environment
+                            (make-aggregation :count-something))))))
     (testing "case expression"
       (let [my-case (make-case-expr {(sql/=$ (make-const integer% 42)
                                              (make-const integer% 42))
@@ -387,27 +384,27 @@
 (deftest query-scheme-test
   (let [test-universe (make-universe)
         SUBB (make-base-relation 'SUBB
-                                 (alist->rel-scheme [["C" string%]])
+                                 (alist->rel-scheme {"C" string%})
                                  :universe test-universe
                                  :handle "SUBB")
         SUBA (make-base-relation 'SUBA
-                                 (alist->rel-scheme [["C" string%]])
+                                 (alist->rel-scheme {"C" string%})
                                  :universe test-universe
                                  :handle "SUBA")]
     (testing "empty val"
       (is (= the-empty-rel-scheme (query-scheme the-empty))))
 
     (testing "base relation"
-      (is (= (alist->rel-scheme [["one" string%]
-                                 ["two" integer%]])
+      (is (= (alist->rel-scheme {"one" string%
+                                 "two" integer%})
              (query-scheme tbl1))))
 
     (testing "projection"
-      (let [p (make-project [["two" (make-attribute-ref "two")]
-                             ["one" (make-attribute-ref "one")]]
+      (let [p (make-project {"two" (make-attribute-ref "two")
+                             "one" (make-attribute-ref "one")}
                             tbl1)
             res (query-scheme p)]
-        (is (= (rel-scheme-map res) {"two" integer% "one" string%})))
+        (is (= {"two" integer% "one" string%} (rel-scheme-map res))))
       (let [p2 (make-project [["count_twos"
                                (make-aggregation
                                 :count (make-attribute-ref "two"))]]
@@ -551,7 +548,7 @@
         (is (thrown? Exception (query-scheme clop)))
         (is (thrown? Exception (query-scheme cu))))))
   (testing "anything else should fail"
-    (is (thrown? Exception (query-scheme nil)))))
+    (is (thrown? Error (query-scheme nil)))))
 
 (deftest query?-test
   ;; everything else is basically the same...
@@ -599,11 +596,11 @@
   (testing "restrict"
     (let [test-universe (make-universe)
           SUBB (make-base-relation 'SUBB
-                                   (alist->rel-scheme [["C" string%]])
+                                   (alist->rel-scheme {"C" string%})
                                    test-universe
                                    "SUBB")
           SUBA (make-base-relation 'SUBA
-                                   (alist->rel-scheme [["C" string%]])
+                                   (alist->rel-scheme {"C" string%})
                                    test-universe
                                    "SUBA")
           r (make-restrict (sql/>=$ (make-scalar-subquery
@@ -626,11 +623,11 @@
   (testing "restrict outer"
     (let [test-universe (make-universe)
           SUBB (make-base-relation 'SUBB
-                                   (alist->rel-scheme [["B" string%]])
+                                   (alist->rel-scheme {"B" string%})
                                    test-universe
                                    "SUBB")
           SUBA (make-base-relation 'SUBA
-                                   (alist->rel-scheme [["A" string%]])
+                                   (alist->rel-scheme {"A" string%})
                                    test-universe
                                    "SUBA")
           r (make-restrict-outer (sql/=$ (make-attribute-ref "A")
@@ -669,11 +666,11 @@
                    (datum->query (query->datum p) (make-universe)))))
     (let [sql-universe* (make-derived-universe sql-universe)
           SUBB (make-base-relation 'SUBB
-                                   (alist->rel-scheme [["C" string%]])
+                                   (alist->rel-scheme {"C" string%})
                                    :universe sql-universe*
                                    :handle "SUBB")
           SUBA (make-base-relation 'SUBA
-                                   (alist->rel-scheme [["C" string%]])
+                                   (alist->rel-scheme {"C" string%})
                                    :universe sql-universe*
                                    :handle "SUBA")
           r (make-restrict (sql/=$ (make-scalar-subquery
@@ -697,11 +694,11 @@
 
     (let [sql-universe* (make-derived-universe sql-universe)
           SUBB (make-base-relation 'SUBB
-                                   (alist->rel-scheme [["B" string%]])
+                                   (alist->rel-scheme {"B" string%})
                                    :universe sql-universe*
                                    :handle "SUBB")
           SUBA (make-base-relation 'SUBA
-                                   (alist->rel-scheme [["A" string%]])
+                                   (alist->rel-scheme {"A" string%})
                                    :universe sql-universe*
                                    :handle "SUBA")
           r (make-restrict-outer (sql/=$ (make-attribute-ref "A")
@@ -716,13 +713,13 @@
              (datum->query (query->datum r) sql-universe*))))
       
     (let [rel1 (make-base-relation 'tbl1
-                                   (alist->rel-scheme [["one" string%]
-                                                       ["two" integer%]])
+                                   (alist->rel-scheme {"one" string%
+                                                       "two" integer%})
                                    :universe test-universe
                                    :handle "tbl1")
           rel2 (make-base-relation 'tbl2
-                                   (alist->rel-scheme [["three" boolean%]
-                                                       ["four" double%]])
+                                   (alist->rel-scheme {"three" boolean%
+                                                       "four" double%})
                                    :universe test-universe
                                    :handle "tbl2")
           p (make-product rel1 rel2)
@@ -735,7 +732,7 @@
       (is (= l (query->datum->query l))))
     (let [o (make-order [[(make-attribute-ref "one") :ascending]] tbl1)]
       (is (= o (query->datum->query o))))
-    (let [t (make-top nil 10 tbl1)]
+    (let [t (make-top 0 10 tbl1)]
       (is (= t (query->datum->query t))))
     (let [t (make-top 5 10 tbl1)]
       (is (= t (query->datum->query t)))))
@@ -794,19 +791,19 @@
              (datum->expression (list 'aggregation* :count-all)
                                 sql-universe))))
     (testing "case expression"
-      (is (= (datum->expression
-              (expression->datum
-               (make-case-expr {(sql/=$ (make-const integer% 42)
-                                        (make-const integer% 42))
-                                (make-const boolean% true)}
-                               (make-const boolean% false)))
-              sql-universe)
-             (make-case-expr {(make-application
+      (is (= (make-case-expr {(make-application
                                (universe-lookup-rator sql-universe '=)
                                (make-const integer% 42)
                                (make-const integer% 42))
                               (make-const boolean% true)}
-                             (make-const boolean% false))))))
+                             (make-const boolean% false))
+             (datum->expression
+               (expression->datum
+                (make-case-expr {(sql/=$ (make-const integer% 42)
+                                         (make-const integer% 42))
+                                 (make-const boolean% true)}
+                                (make-const boolean% false)))
+               sql-universe)))))
   (testing "everything else should fail"
     (is (thrown? Exception (datum->expression
                             (list 'doesnotexists) sql-universe)))))
@@ -861,16 +858,16 @@
   (testing "restrict"
     (let [test-universe (make-universe)
           SUBB (make-base-relation 'SUBB
-                                   (alist->rel-scheme [["B" string%]])
+                                   (alist->rel-scheme {"B" string%})
                                    :universe test-universe
                                    :handle "SUBB")
           SUBA (make-base-relation 'SUBA
-                                   (alist->rel-scheme [["A" string%]])
+                                   (alist->rel-scheme {"A" string%})
                                    :universe test-universe
                                    :handle "SUBA")
           SUBC (make-base-relation 'SUBC
-                                   (alist->rel-scheme [["C" string%]
-                                                       ["D" string%]])
+                                   (alist->rel-scheme {"C" string%
+                                                       "D" string%})
                                    :universe test-universe
                                    :handle "SUBC")
           r1 (make-restrict (sql/=$
@@ -891,13 +888,13 @@
       (is (= #{"A" "B"} (query-attribute-names r3)))))
   (let [test-universe (make-universe)
         rel1 (make-base-relation 'tbl1
-                                 (alist->rel-scheme [["one" string%]
-                                                     ["two" integer%]])
+                                 (alist->rel-scheme {"one" string%
+                                                     "two" integer%})
                                  test-universe
                                  "tbl1")
         rel2 (make-base-relation 'tbl2
-                                 (alist->rel-scheme [["three" boolean%]
-                                                     ["four" double%]])
+                                 (alist->rel-scheme {"three" boolean%
+                                                     "four" double%})
                                  test-universe
                                  "tbl2")
         p1 (make-project [["two" (make-attribute-ref "two")]

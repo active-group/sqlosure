@@ -4,13 +4,18 @@
              [condition :as c :refer [assertion-violation]]
              [lens :as lens]
              [record :refer [define-record-type]]]
-            [clojure.set :refer [difference union]]
+            [clojure
+             [set :refer [difference union]]
+             [spec :as s]]
             [sqlosure
              [type :as t]
              [universe :as u]
              [utils :refer [fourth third]]])
   (:import java.io.Writer))
 
+;; ---------------------------------------------------------
+;; -- Records
+;; ---------------------------------------------------------
 (define-record-type rel-scheme
   (^:private really-make-rel-scheme columns map grouped) rel-scheme?
   [^{:doc "Ordered sequence of the columns."}
@@ -20,15 +25,182 @@
    ^{:doc "`nil` or set of grouped column labels"}
    (grouped rel-scheme-grouped rel-scheme-grouped-lens)])
 
-(defn make-rel-scheme [columns map grouped]
-  (c/assert (not (set? columns)))
-  (c/assert (map? map) map)
-  (c/assert (or (nil? grouped) (set? grouped)) grouped)
+(define-record-type ^{:doc "Cache for the relational scheme of a query."}
+  RelSchemeCache
+  (really-make-rel-scheme-cache fun map-atom)
+  rel-scheme-cache?
+  [^{:doc "Function accepting an environment, producing a rel scheme."}
+   fun rel-scheme-cache-fun
+
+   ^{:doc "Atom containing map `environment |-> scheme`"}
+   map-atom rel-scheme-cache-map-atom])
+
+(define-record-type base-relation
+  ^{:doc "Primitive relations, dpeending on the domain universe."}
+  (really-make-base-relation name scheme handle) base-relation?
+  [^{:doc "The name of this relation (string)."}
+   name base-relation-name
+   ^{:doc "The schema (mapping column-names->types) of this relation."}
+   scheme base-relation-scheme
+   ^{:doc "Domain specific handle. Can either be a SQL-table or a galaxy."}
+   handle base-relation-handle])
+
+(define-record-type attribute-ref
+  (make-attribute-ref name) attribute-ref?
+  [name attribute-ref-name])
+
+(define-record-type const
+  (make-const type val) const?
+  [type const-type
+   val const-val])
+
+(define-record-type null
+  (make-null type) const-null?
+  [type null-type])
+
+(define-record-type application
+  (really-make-application rator rands) application?
+  [rator application-rator
+   rands application-rands])
+
+(define-record-type rator
+  (really-make-rator name range-type-proc proc data) rator?
+  [name rator-name
+   ^{:doc "Gets applied to fail, arg types, yields range type."}
+   range-type-proc rator-range-type-proc
+   ^{:doc "Procedure with a Clojure implementation of the operator."}
+   proc rator-proc
+   ^{:doc "Domain-specific data, for outside use."}
+   data rator-data])
+
+(define-record-type empty-query
+  ^{:doc "Represents an empty relational algebra value."}
+  (make-empty-query) empty-query? [])
+
+(define-record-type project
+  ^{:doc "List of pairs."}
+  (really-really-make-project alist query)
+  project?
+  [^{:doc "Maps newly bound attribute names to expressions.alist project-alist"}
+   alist project-alist
+   query project-query])
+
+(define-record-type restrict
+  (really-make-restrict exp query) restrict?
+  [exp restrict-exp  ;; :expression[boolean%]
+   query restrict-query])
+
+(define-record-type ^{:doc "Restrict a left outer product.
+  This will restrict all the right-hand sides of left outer products.
+  If it doesn't hold, these right-hand sides will have all-null
+  columns."}
+  restrict-outer
+  (really-make-restrict-outer exp query) restrict-outer?
+  [exp restrict-outer-exp
+   query restrict-outer-query])
+
+(define-record-type combine
+  (really-make-combine rel-op query-1 query-2) combine?
+  [rel-op combine-rel-op  ;; Relational algebra. See below.
+   query-1 combine-query-1
+   query-2 combine-query-2])
+
+(define-record-type order
+  (really-make-order alist query) order?
+  [alist order-alist  ;; (order -> hash-map)
+   query order-query])
+
+;; Top n entries.
+(define-record-type top
+  ^{:doc "The top `count` entries, optionally starting at `offset`, defaulting
+to 0."}
+  (really-make-top offset count query) top?
+  [offset top-offset
+   count top-count
+   query top-query])
+
+(define-record-type group
+  (really-make-group columns query)
+  group?
+  [^{:doc "set of columns to group by"}
+   columns group-columns
+   ^{:doc "underlying query"}
+   query group-query])
+
+(define-record-type tuple
+  (make-tuple expressions) tuple?
+  [expressions tuple-expressions])
+
+(define-record-type aggregation
+  (really-make-aggregation op expr) aggregation?
+  [op aggregation-operator  ;; Aggregation-op or string.
+   expr aggregation-expr])
+
+(define-record-type aggregation*
+  (really-make-aggregation* op) aggregation*?
+  [op aggregation*-operator])
+
+(define-record-type case-expr
+  (make-case-expr alist default) case-expr?
+  [alist case-expr-alist  ;; (list (pair expression[boolean] expression)).
+   default case-expr-default])
+
+(define-record-type scalar-subquery
+  (make-scalar-subquery query) scalar-subquery?
+  [query scalar-subquery-query])
+
+(define-record-type set-subquery
+  (make-set-subquery query) set-subquery?
+  [query set-subquery-query])
+
+;; ---------------------------------------------------------
+;; -- Specs
+;; ---------------------------------------------------------
+(s/def ::type (s/or :base-type #(satisfies? t/base-type-protocol %)
+                    :product t/product-type?
+                    :sum t/set-type?))
+(s/def ::scheme-alist
+  (s/or :map   (s/map-of string? ::type)
+        :alist (s/+ (s/tuple string? ::type))
+        :empty empty?))
+(s/def ::rel-scheme rel-scheme?)
+
+(defn query?
+  "Returns true if the `obj` is a query."
+  [obj]
+  (or (empty-query? obj) (base-relation? obj) (project? obj) (restrict? obj)
+      (restrict-outer? obj) (combine? obj) (order? obj) (group? obj)
+      (top? obj)))
+
+(defn expression?
+  [obj]
+  (or (attribute-ref? obj) (const? obj) (const-null? obj) (application? obj)
+      (tuple? obj) (aggregation? obj) (aggregation*? obj) (case-expr? obj)
+      (scalar-subquery? obj) (set-subquery? obj)))
+
+(s/def ::query query?)
+(s/def ::expression expression?)
+(s/def ::relational-op #{:product :left-outer-product :union :intersection
+                         :quotient :difference})
+(s/def ::order-op #{:ascending :descending})
+(s/def ::aggregations-op #{:count :count-all :sum :avg :min :max :std-dev
+                           :std-dev-p :var :var-p})
+;; ---------------------------------------------------------
+;; -- Fns
+;; ---------------------------------------------------------
+(defn make-rel-scheme
+  [columns map grouped]
+  {:pre [(s/valid? (comp not set?) columns)
+         (s/valid? map? map)
+         (s/valid? (s/or :set set? :nil nil?) grouped)]
+   :post [(s/valid? ::rel-scheme %)]}
   (really-make-rel-scheme columns map grouped))
 
 (defn rel-scheme-types
   "Returns the types of a rel-scheme, in the order they were created."
   [rs]
+  {:pre  [(s/valid? ::rel-scheme rs)]
+   :post [(s/valid? (s/coll-of ::type ()) %)] }
   (let [mp (rel-scheme-map rs)]
     (map #(get mp %)
          (rel-scheme-columns rs))))
@@ -36,6 +208,8 @@
 (defn alist->rel-scheme
   "Construct a relational scheme from an alist of `[column-name type]`."
   [alist]
+  {:pre  [(s/valid? ::scheme-alist alist)]
+   :post [(s/valid? rel-scheme? %)]}
   (let [cols (map first alist)]
     (c/assert (count (set cols)) (count cols))
     (make-rel-scheme cols (into {} alist) nil)))
@@ -46,11 +220,13 @@
 (defn rel-scheme=?
   "Returns true if t1 and t2 are the same."
   [t1 t2]
+  {:pre [(s/valid? ::rel-scheme t1) (s/valid? ::rel-scheme t2)]}
   (= t1 t2))
 
 (defn rel-scheme-unary=?
   "Does rel scheme have only 1 column?"
   [rs]
+  {:pre [(s/valid? ::rel-scheme rs)]}
   (= 1 (count (rel-scheme-columns rs))))
 
 (defn rel-scheme-concat
@@ -59,6 +235,9 @@
   - merge alists
   - union grouped-sets"
   [s1 s2]
+  {:pre [(s/valid? (s/or :scheme ::rel-scheme :nil nil?) s1)
+         (s/valid? (s/or :scheme ::rel-scheme :nil nil?) s2)]
+   :post [(s/valid? (s/or :scheme ::rel-scheme :nil nil?) %)]}
   (cond
     ;; FIXME I guess this should rather be an assertion violation?
     ;; (or (nil? s1) (nil? s2)) (assertion-violation `rel-scheme-concat "arguments must not be nil")
@@ -83,6 +262,9 @@
   "Return a new rel-scheme resulting of the (set-)difference of s1's and s2's
   alist."
   [s1 s2]
+  {:pre  [(s/valid? ::rel-scheme s1)
+          (s/valid? ::rel-scheme s2)]
+   :post [(s/valid? ::rel-scheme %)]}
   (let [cols2 (set (rel-scheme-columns s2))
         cols (remove cols2 (rel-scheme-columns s1))]
     (c/assert (not-empty cols))
@@ -111,16 +293,6 @@
   [s]
   (rel-scheme-map s))
 
-(define-record-type ^{:doc "Cache for the relational scheme of a query."}
-  RelSchemeCache
-  (really-make-rel-scheme-cache fun map-atom)
-  rel-scheme-cache?
-  [^{:doc "Function accepting an environment, producing a rel scheme."}
-   fun rel-scheme-cache-fun
-
-   ^{:doc "Atom containing map `environment |-> scheme`"}
-   map-atom rel-scheme-cache-map-atom])
-
 (defn make-rel-scheme-cache
   "Make a rel-scheme cache.
 
@@ -145,6 +317,8 @@
   - `fun` is a function accepting an environment, yielding the scheme of the
   query"
   [query fun]
+  {:pre  [(s/valid? ::query query)]
+   :post [(s/valid? ::query %)]}
   (with-meta query {::rel-scheme-cache (make-rel-scheme-cache fun)}))
 
 (defn query-scheme
@@ -152,6 +326,8 @@
   ([q]
    (query-scheme q the-empty-environment))
   ([q env]
+   {:pre  [(s/valid? ::query q)]
+    :post [(s/valid? ::rel-scheme %)]}
    (rel-scheme-cache-scheme (get (meta q) ::rel-scheme-cache) env)))
 
 (defn compose-environments
@@ -162,21 +338,8 @@
 (defn lookup-env
   "Lookup a name in an environment."
   [name env]
+  {:pre [(s/valid? (s/or :s string? :kw keyword?) name)]}
   (get env name))
-
-;;; ----------------------------------------------------------------------------
-;;; --- Primitive relations, depending on the domain universe
-;;; ----------------------------------------------------------------------------
-
-(define-record-type base-relation
-  ^{:doc "Primitive relations, dpeending on the domain universe."}
-  (really-make-base-relation name scheme handle) base-relation?
-  [^{:doc "The name of this relation (string)."}
-   name base-relation-name
-   ^{:doc "The schema (mapping column-names->types) of this relation."}
-   scheme base-relation-scheme
-   ^{:doc "Domain specific handle. Can either be a SQL-table or a galaxy."}
-   handle base-relation-handle])
 
 (defn make-base-relation
   "Returns a new base relation.
@@ -185,6 +348,8 @@
   [name scheme & {:keys [universe handle]
                   :or {universe nil
                        handle nil}}]
+  {:pre  [(s/valid? ::rel-scheme scheme)]
+   :post [(s/valid? base-relation? %)]}
   (let [rel (attach-rel-scheme-cache
              (really-make-base-relation name scheme handle)
              (fn [_] scheme))]
@@ -192,40 +357,9 @@
       (u/register-base-relation! universe name rel))
     rel))
 
-;;; ----------------------------------------------------------------------------
-;;; --- EXPRESSIONS
-;;; ----------------------------------------------------------------------------
-(define-record-type attribute-ref
-  (make-attribute-ref name) attribute-ref?
-  [name attribute-ref-name])
-
-(define-record-type const
-  (make-const type val) const?
-  [type const-type
-   val const-val])
-
-(define-record-type null
-  (make-null type) const-null?
-  [type null-type])
-
-(define-record-type application
-  (really-make-application rator rands) application?
-  [rator application-rator
-   rands application-rands])
-
 (defn make-application
-  [rator & rands]
+  [rator & rands] 
   (really-make-application rator rands))
-
-(define-record-type rator
-  (really-make-rator name range-type-proc proc data) rator?
-  [name rator-name
-   ^{:doc "Gets applied to fail, arg types, yields range type."}
-   range-type-proc rator-range-type-proc
-   ^{:doc "Procedure with a Clojure implementation of the operator."}
-   proc rator-proc
-   ^{:doc "Domain-specific data, for outside use."}
-   data rator-data])
 
 (defn make-rator
   [name range-type-proc proc & {:keys [universe data]}]
@@ -234,26 +368,10 @@
       (u/register-rator! universe name r))
     r))
 
-;;; ----------------------------------------------------------------------------
-;;; --- QUERIES
-;;; ----------------------------------------------------------------------------
-
-(define-record-type empty-query
-  ^{:doc "Represents an empty relational algebra value."}
-  (make-empty-query) empty-query? [])
-
 (def the-empty
   (attach-rel-scheme-cache
    (make-empty-query)
    (fn [_] the-empty-rel-scheme)))
-
-(define-record-type project
-  ^{:doc "List of pairs."}
-  (really-really-make-project alist query)
-  project?
-  [^{:doc "Maps newly bound attribute names to expressions.alist project-alist"}
-   alist project-alist
-   query project-query])
 
 ;; FIXME: temporary default for the query-scheme fail function
 (defn query-scheme-fail
@@ -291,6 +409,8 @@
 
 (defn make-project
   [alist query]
+  {:pre  [(s/valid? ::query query)]
+   :post [(s/valid? ::query %)]}
   (let [alist (if (map? alist)
                 (vec alist)
                 alist)]
@@ -309,6 +429,8 @@
   "Creates a projection of some attributes while keeping all other attributes in
   the relation visible too."
   [alist query]
+  {:pre  [(s/valid? ::query query)]
+   :post [(s/valid? ::query %)]}
   (let [scheme (query-scheme query)]
     (make-project
      (concat alist
@@ -323,17 +445,15 @@
                       (rel-scheme-columns scheme)))))
      query)))
 
-(define-record-type restrict
-  (really-make-restrict exp query) restrict?
-  [exp restrict-exp  ;; :expression[boolean%]
-   query restrict-query])
-
 (defn make-restrict
   "Create a restriction:
 
   - `exp` is a boolean expression, acting as a filter
   - `query` is the underlying query"
   [exp query]
+  {:pre  [(s/valid? ::expression exp)
+          (s/valid? ::query query)]
+   :post [(s/valid? ::query %)]}
   (attach-rel-scheme-cache
     (really-make-restrict exp query)
     (fn [env]
@@ -346,18 +466,12 @@
                                "not a boolean condition" exp query env))
         scheme))))
 
-(define-record-type ^{:doc "Restrict a left outer product.
-  This will restrict all the right-hand sides of left outer products.
-  If it doesn't hold, these right-hand sides will have all-null
-  columns."}
-  restrict-outer
-  (really-make-restrict-outer exp query) restrict-outer?
-  [exp restrict-outer-exp
-   query restrict-outer-query])
-
 (defn make-restrict-outer
   "Restrict a right-hand side of a left-outer product."
   [exp query]
+  {:pre  [(s/valid? ::expression exp)
+          (s/valid? ::query query)]
+   :post [(s/valid? ::query %)]}
   (attach-rel-scheme-cache
    (really-make-restrict-outer exp query)
    (fn [env]
@@ -370,21 +484,12 @@
           `make-restrict-outer "not a boolean condition" exp query env))
        scheme))))
 
-(define-record-type combine
-  (really-make-combine rel-op query-1 query-2) combine?
-  [rel-op combine-rel-op  ;; Relational algebra. See below.
-   query-1 combine-query-1
-   query-2 combine-query-2])
-
-(def ^{:private true} relational-ops
-  #{:product :left-outer-product :union :intersection :quotient :difference})
-
-(defn relational-op? [k] (contains? relational-ops k))
-
-(defn make-combine [rel-op query-1 query-2]
-  (when-not (relational-op? rel-op)
-    (assertion-violation `make-combine "not a relational operator" rel-op))
-
+(defn make-combine
+  [rel-op query-1 query-2]
+  {:pre  [(s/valid? ::rel-op rel-op)
+          (s/valid? ::query query-1)
+          (s/valid? ::query query-2)]
+   :post [(s/valid? ::query %)]}
   (attach-rel-scheme-cache
    (case rel-op
      :product (cond
@@ -452,18 +557,10 @@
 (defn make-difference [query-1 query-2] (make-combine :difference query-1
   query-2))
 
-(def ^{:private true} order-op #{:ascending :descending})
-
-(defn order-op? [k]
-  (contains? order-op k))
-
-(define-record-type order
-  (really-make-order alist query) order?
-  [alist order-alist  ;; (order -> hash-map)
-   query order-query])
-
 (defn make-order
   [alist query]
+  {:pre  [(s/valid? ::query query)]
+   :post [(s/valid? ::query %)]}
   (attach-rel-scheme-cache
    (really-make-order alist query)
    (fn [env]
@@ -476,30 +573,17 @@
              (assertion-violation `make-order "not an ordered type " t exp))))
        scheme))))
 
-;; Top n entries.
-(define-record-type top
-  ^{:doc "The top `count` entries, optionally starting at `offset`, defaulting
-to 0."}
-  (really-make-top offset count query) top?
-  [offset top-offset
-   count top-count
-   query top-query])
-
 (defn make-top
   "The top `count` entries, optionally starting at `offset`, defaulting to 0."
   [offset count query]
+  {:pre  [(s/valid? (s/or :nil nil? :some (s/and integer? #(>= % 0))) offset)
+          (s/valid? (s/and integer? #(>= % 0)) count)
+          (s/valid? ::query query)]
+   :post [(s/valid? ::query %)]}
   (attach-rel-scheme-cache
    (really-make-top offset count query)
    (fn [env]
      (query-scheme query env))))
-
-(define-record-type group
-  (really-make-group columns query)
-  group?
-  [^{:doc "set of columns to group by"}
-   columns group-columns
-   ^{:doc "underlying query"}
-   query group-query])
 
 (defn make-group
   "Make a grouped query from a basic query.
@@ -507,6 +591,9 @@ to 0."}
   - `columns` is a seq of columns to be grouped by
   - `query` is the underlying query"
   [columns query]
+  {:pre [(s/valid? (s/coll-of string? #{}) columns)
+         (s/valid? ::query query)]
+   :post [(s/valid? ::query %)]}
   (let [columns (set columns)]
     (attach-rel-scheme-cache
      (really-make-group columns query)
@@ -515,46 +602,17 @@ to 0."}
                       rel-scheme-grouped-lens
                       union columns)))))
 
-(define-record-type tuple
-  (make-tuple expressions) tuple?
-  [expressions tuple-expressions])
-
-(def ^{:private true} aggregations-op
-  #{:count :count-all :sum :avg :min :max :std-dev :std-dev-p :var :var-p})
-
-(defn aggregations-op? [k]
-  (contains? aggregations-op k))
-
-(define-record-type aggregation
-  (really-make-aggregation op expr) aggregation?
-  [op aggregation-operator  ;; Aggregation-op or string.
-   expr aggregation-expr])
-
-(define-record-type aggregation*
-  (really-make-aggregation* op) aggregation*?
-  [op aggregation*-operator])
-
 (defn make-aggregation
   [op & expr]
+  {:pre  [(s/valid? ::aggregations-op op)
+          (s/valid? (s/* ::expression) expr)]
+   :post [(s/valid? ::expression %)]}
   (cond
     (empty? expr) (really-make-aggregation* op)
     (= 1 (count expr)) (apply really-make-aggregation op expr)
     :else
     (assertion-violation
      `make-aggregation "invalid number of expressions (must be 0 or 1)" expr)))
-
-(define-record-type case-expr
-  (make-case-expr alist default) case-expr?
-  [alist case-expr-alist  ;; (list (pair expression[boolean] expression)).
-   default case-expr-default])
-
-(define-record-type scalar-subquery
-  (make-scalar-subquery query) scalar-subquery?
-  [query scalar-subquery-query])
-
-(define-record-type set-subquery
-  (make-set-subquery query) set-subquery?
-  [query set-subquery-query])
 
 (defn fold-expression
   [on-attribute-ref on-const on-null on-application on-tuple on-aggregation
@@ -587,6 +645,8 @@ to 0."}
   find the expressions type (either based on expr itself or on the
   mappings of the env)."
   [env expr]
+  {:pre  [(s/valid? ::expression expr)]
+   :post [(s/valid? ::type %)]}
   (fold-expression
    (fn [name]
      (or (lookup-env name env)
@@ -641,6 +701,7 @@ to 0."}
 (defn aggregate?
   "Returns true if `expr` is or contains an aggregation."
   [expr]
+  {:pre  [(s/valid? ::expression expr)]}
   (cond
     (attribute-ref? expr) false
     (const? expr) false
@@ -692,13 +753,6 @@ to 0."}
     (scalar-subquery? expr) nil
     (set-subquery? expr) nil
     :else (assertion-violation `check-grouped "invalid expression" expr)))
-
-(defn query?
-  "Returns true if the `obj` is a query."
-  [obj]
-  (or (empty-query? obj) (base-relation? obj) (project? obj) (restrict? obj)
-      (restrict-outer? obj) (combine? obj) (order? obj) (group? obj)
-      (top? obj)))
 
 (declare query->datum)
 
