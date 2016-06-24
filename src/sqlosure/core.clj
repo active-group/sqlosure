@@ -13,6 +13,22 @@
              [sql-put :as put]
              [type :as t]]))
 
+;; -----------------------------------------------------------------------------
+;; -- Helper
+;; -----------------------------------------------------------------------------
+(defn put-query
+  "`put-query` takes a (relational algebra) query and returns it's (SQL-) string
+  representation. Uses the default printer from `sqlosure.sql-put`."
+  [q & [opts]]
+  (let [s (->> q opt/optimize-query
+               glxy/dbize-query
+               first
+               rsql/query->sql
+               put/sql-select->string)]
+    (when (get opts :println)
+      (println (first s)))
+    s))
+
 (def ^:dynamic *current-db-connection*
   "This atom stores the current db-connection. Queries will run against that
   connection. Connect your db via `set-db-connection!`."
@@ -28,7 +44,10 @@
   against the currently connected database, using `*current-db-connection`.
   NOTE: Connect via `set-db-connection!`."
   [q & [opts]]
-  (db/run-query @*current-db-connection* q opts))
+  (when (:show-sql? opts)
+    (println (first (put-query q))))
+  (let [res (db/run-query @*current-db-connection* q (dissoc opts :show-sql?))]
+    (if (:print-result? opts) (println res) res)))
 
 (defn db-connect
   "`db-connect` takes a connection map and returns a `db-connection`-record for
@@ -180,8 +199,10 @@
              (project {\"foo\" (! t \"foo\")}))
 
   The corresponding SQL statemant would be \"SELECT foo FROM t ORDER BY foo ASC\"."
-  [alist]
-  (qc/order alist))
+  ([ref ordering]
+   (qc/order {ref ordering}))
+  ([alist]
+   (qc/order alist)))
 
 (defn top
   "`top` is used to define queries that return a cerain number of entries.
@@ -330,19 +351,3 @@
 (def $double-null-t t/double%-nullable)
 (def $date-null-t (t/-nullable t/date%))
 (def $timestamp-null-t (t/-nullable t/timestamp%))
-
-;; -----------------------------------------------------------------------------
-;; -- Helper
-;; -----------------------------------------------------------------------------
-(defn put-query
-  "`put-query` takes a (relational algebra) query and returns it's (SQL-) string
-  representation. Uses the default printer from `sqlosure.sql-put`."
-  [q & [opts]]
-  (let [s (->> q opt/optimize-query
-               glxy/dbize-query
-               first
-               rsql/query->sql
-               put/sql-select->string)]
-    (when (get opts :println)
-      (println (first s)))
-    s))
