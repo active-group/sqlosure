@@ -61,9 +61,8 @@
 
 (defn arg-count
   "Returns the numer of args a function returns. Works on (anonymus) functions
-  but not macros.http://stackoverflow.com/a/1813967"
+  but not macros. http://stackoverflow.com/a/1813967"
   [f]
-  {:pre [(instance? clojure.lang.AFunction f)]}
   (-> f class .getDeclaredMethods first .getParameterTypes alength))
 
 (defn make-db->val
@@ -80,10 +79,7 @@
     (fn [vs]
       (if (not= (arg-count constr) (count vs))
         ;; This is the case when not called directly (only returns the id?).
-        (try (first (id->val (first vs)))
-             (catch Exception e
-               (c/assertion-violation `make-db->val
-                                      "arguments do not match up" vs)))
+        (first (id->val (first vs)))
         (apply constr vs)))
     ;; Otherwise, things get a little more complicated and we have to assume
     ;; that every non-default-type already is defined with it's own type/galaxy/
@@ -172,7 +168,8 @@
     `(do
        (declare ~(symbol (str "id->" nom))
                 ~(symbol (str "db->" nom))
-                ~(symbol (str nom "->db")))
+                ~(symbol (str nom "->db"))
+                ~db-type-name#)
        (def ~(symbol (str "id->" nom))
          (make-id->val ~galaxy-name# ~sel-name#))
        (def ~(symbol (str "db->" nom))
@@ -318,8 +315,15 @@
         ?types# (into [] (vals ?map-with-id#))
         ?args-vec# (mapv #(-> % name symbol) ?fields#)
         ?sel-names# (mapv #(symbol (str ?name "-" (name %))) ?fields#)
-        ?sql-sel-names# (mapv #(symbol (str "$" ?name "-" (name %))) ?fields#)]
+        ?sql-sel-names# (mapv #(symbol (str "$" ?name "-" (name %))) ?fields#)
+        ?table-name# (symbol (str ?name "-table"))
+        ?scheme-name# (symbol (str ?name "-scheme"))
+        ?type-name# (symbol (str "$" ?name "-t"))
+        ?installer-name# (symbol (str "install-" ?name "-table!"))
+        ?galaxy-name# (symbol (str ?name "-galaxy"))]
     `(do
+       ~(declare ?table-name# ?scheme-name# ?constructor-name# ?type-name#
+                 ?installer-name# ?galaxy-name#)
        (define-record-type ~?name
          ~(apply list (symbol (str "really-make-" ?name))
                  (map (fn [[k _]] (symbol (name k))) ?map-with-id#))
@@ -327,13 +331,12 @@
          ~(into [] (apply concat (for [[k _] ?map-with-id#]
                                    [(symbol (name k))
                                     (symbol (str ?name "-" (name k)))]))))
-       (def ~(symbol (str ?name "-table")) ~(table* ?name ?map-with-id#))
-       (def ~(symbol (str ?name "-scheme")) ~(scheme* ?name ?map-with-id#))
+       (def ~?table-name# ~(table* ?name ?map-with-id#))
+       (def ~?scheme-name# ~(scheme* ?name ?map-with-id#))
        (define-constructor ~?name ~?fields# ~?types#)
        (define-db-type ~?name ~?types#)
-       (def ~(symbol (str "install-" ?name "-table!"))
-         ~(make-db-installer! ?name ?fields# ?types#))
-       (def ~(symbol (str ?name "-galaxy")) ~(galaxy* ?name ?fields# ?types#))
+       (def ~?installer-name# ~(make-db-installer! ?name ?fields# ?types#))
+       (def ~?galaxy-name# ~(galaxy* ?name ?fields# ?types#))
        ;; Create a set of query-monad accessor functions.
        ~@(for [i (range 0 (count ?sel-names#))]
            `(def ~(get ?sql-sel-names# i)
@@ -341,3 +344,30 @@
                               (symbol (str "$" ?name "-t"))
                               (get ?types# i)
                               (get ?sel-names# i) i))))))
+
+(defmacro define-set-type
+  [?type-elems & [?opts]]
+  nil)
+
+(comment
+  "Syntax we're striving for:"
+  (define-set-type shape
+    $circle-t $rect-t $overlay-t)
+  "Where"
+  (define-product-type circle {:center $point-t
+                               :radius $double-t})
+  (define-product-type rect {:lower-left $point-t
+                             :upper-right $point-t})
+  (define-product-type overlay {:lower $shape-t
+                                :upper $shape-t})
+
+  "Or, maybe even better"
+  (define-set-type shape
+    (define-product-type circle {:center $point-t
+                                 :radius $double-t})
+    (define-product-type rect {:lower-left $point-t
+                               :upper-right $point-t})
+    (define-product-type overlay {:lower $shape-t
+                                  :upper $shape-t}))
+
+  )

@@ -49,7 +49,7 @@
                          :v $string-t})
 
 (deftest make-db->val-test
-  (let [db->kv (make-db->val $kv [$integer-t $integer-t $string-t])]
+  (let [db->kv (make-db->val $kv [$integer-t $integer-t $string-t] id->kv)]
     (is (function? db->kv))
     (is (= ($kv 0 1 "foo")
            (db->kv [0 1 "foo"])))
@@ -214,7 +214,7 @@
             r2 ($rect 1 p0 p4)
             r3 ($rect 2 p1 p5)
             ]
-        (doall (map ins-point [p0 p1 p2 p3]))
+        (doall (map ins-point [p0 p1 p2 p3 p4 p5]))
         (doall (map ins-circle [c1 c2 c3]))
         (doall (map ins-rect [r1 r2 r3])))
       (func))))
@@ -229,7 +229,6 @@
   (make-db-operator "point=" [$point-t $point-t] $boolean-t
                     (glxy/make-db-operator-data
                      (fn [p1 p2 & args]
-                       (println "$point=2" p1 p2)
                        ($= p1 p2)))))
 
 (defn $share-point?
@@ -248,13 +247,30 @@
                      (fn [c & _]
                        ($area (get (glxy/tuple-expressions c) 2))))))
 
-(with-shapes-db db-spec
+#_(with-shapes-db db-spec
   (fn []
-    (let [$areas (query [cs (<- circle-galaxy)]
-                        (project {"area" ($circle-area (! cs))}))]
-      (run (query [areas (<- $areas)]
-                  (order {(! areas "area") :descending})
-                  (top 1)
-                  (project areas))
-        {:galaxy-query? true}))))
-
+    (run (query [cs (<- circle-galaxy)]
+                (project {"center" ($circle-center (! cs))})) {:galaxy-query? true})
+    #_(let [opts {:galaxy-query? true}]
+      (let [$areas (query [cs (<- circle-galaxy)]
+                            (project {"area" ($circle-area (! cs))}))]
+          (run (query [areas (<- $areas)]
+                      (order {(! areas "area") :descending})
+                      (top 1)
+                      (project areas))
+            {:galaxy-query? true}))
+      #_(run (query [ps (<- (query
+                            [rs (<- rect-galaxy)
+                             cs (<- circle-galaxy)]
+                            (restrict ($= ($circle-center (! cs))
+                                          ($rect-bot_left (! rs))))
+                            (project {"id" ($rect-bot_left (! rs))})))]
+                  (let [_ (println (! ps "id"))])
+                  (project ps))
+          opts)
+      #_(run (query [cs (<- circle-galaxy)
+                   ps (<- point-galaxy)]
+                  (restrict ($= ($circle-center (! cs))
+                                (! ps)))
+                  (project {"center" ($circle-center (! cs))}))
+        opts))))
