@@ -219,6 +219,23 @@
     (fn [rand]
       (rel/make-application rator rand))))
 
+(defn constructor*
+  "Args:
+
+  * `field-names`: vector of names of each field, given as a string or keyword."
+  [data-constructor-fn field-names field-types]
+  (let [field-names* (map #(-> % name symbol) field-names)]
+    (fn [& args]
+      (let [checked-args (check-types args field-types)]
+        (if-not (vector? checked-args)
+          (apply data-constructor-fn args)
+          (c/assertion-violation `constructor*
+                                 (str "mismatch, expected val of type "
+                                      (t/-name (get checked-args 2))
+                                      ", got "
+                                      (type (get checked-args 1))
+                                      " (" (get checked-args 1) ")")))))))
+
 ;; TODO Write tests.
 (defmacro define-constructor
   "Define a type-checking constructor function.
@@ -318,14 +335,17 @@
         ?sql-sel-names# (mapv #(symbol (str "$" ?name "-" (name %))) ?fields#)
         ?table-name# (symbol (str ?name "-table"))
         ?scheme-name# (symbol (str ?name "-scheme"))
+        ?data-constructor-name# (symbol (str "really-make-" ?name))
+        ?constructor-name# (symbol (str "$" ?name))
         ?type-name# (symbol (str "$" ?name "-t"))
         ?installer-name# (symbol (str "install-" ?name "-table!"))
         ?galaxy-name# (symbol (str ?name "-galaxy"))]
     `(do
        ~(declare ?table-name# ?scheme-name# ?constructor-name# ?type-name#
-                 ?installer-name# ?galaxy-name#)
+                 ?installer-name# ?galaxy-name#
+                 )
        (define-record-type ~?name
-         ~(apply list (symbol (str "really-make-" ?name))
+         ~(apply list ?data-constructor-name# 
                  (map (fn [[k _]] (symbol (name k))) ?map-with-id#))
          ~(symbol (str ?name "?"))
          ~(into [] (apply concat (for [[k _] ?map-with-id#]
@@ -333,7 +353,8 @@
                                     (symbol (str ?name "-" (name k)))]))))
        (def ~?table-name# ~(table* ?name ?map-with-id#))
        (def ~?scheme-name# ~(scheme* ?name ?map-with-id#))
-       (define-constructor ~?name ~?fields# ~?types#)
+       (def ~?constructor-name#
+         ~(constructor* ?data-constructor-name# ?fields# ?types#))
        (define-db-type ~?name ~?types#)
        (def ~?installer-name# ~(make-db-installer! ?name ?fields# ?types#))
        (def ~?galaxy-name# ~(galaxy* ?name ?fields# ?types#))
