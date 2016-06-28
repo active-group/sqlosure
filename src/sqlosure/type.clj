@@ -236,14 +236,7 @@
 
 ;; Checks if two types are the same.
 ;; Verbose definition unnecessary because of Clojures sensible equality (?).
-(defn type=?
-  [t1 t2]
-  (and (= (atomic-type-name t1) (atomic-type-name t2))
-       (= (atomic-type-nullable? t1) (atomic-type-nullable? t2))
-       (= (atomic-type-ordered? t1) (atomic-type-ordered? t2))
-       (= (atomic-type-string-representation t1)
-          (atomic-type-string-representation t2))
-       (= (atomic-type-galaxy-type? t1) (atomic-type-galaxy-type? t2))))
+(def type=? =)  ;; FIXME What must this actually look like?
 
 ;; Standard types
 

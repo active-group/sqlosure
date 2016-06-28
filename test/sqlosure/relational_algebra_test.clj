@@ -224,7 +224,7 @@
       (is (= p1 c2))
       (is (= p2 c3)))
     (testing "with invalid relational operator it should throw an assertion"
-      (is (thrown? Error (make-combine :non-existent-operator p1 p2))))))
+      (is (thrown? Exception (make-combine :non-existent-operator p1 p2))))))
 
 (deftest combinations-test
   (let [p1 (make-project {"two" (make-attribute-ref "two")} tbl1)
@@ -309,9 +309,9 @@
                                 (make-aggregation
                                  :sum (make-attribute-ref "one"))))))
       (testing "should fail with anything but :count-all"
-        (is (thrown? Error (expression-type
-                            the-empty-environment
-                            (make-aggregation :count-something))))))
+        (is (thrown? Exception (expression-type
+                                        ;TODO: he-empty-environment
+                                (make-aggregation :count-something))))))
     (testing "case expression"
       (let [my-case (make-case-expr {(sql/=$ (make-const integer% 42)
                                              (make-const integer% 42))
@@ -548,7 +548,7 @@
         (is (thrown? Exception (query-scheme clop)))
         (is (thrown? Exception (query-scheme cu))))))
   (testing "anything else should fail"
-    (is (thrown? Error (query-scheme nil)))))
+    (is (thrown? Exception (query-scheme nil)))))
 
 (deftest query?-test
   ;; everything else is basically the same...

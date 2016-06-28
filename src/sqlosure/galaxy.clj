@@ -2,7 +2,6 @@
   (:require [active.clojure
              [condition :as c]
              [record :refer [define-record-type]]]
-            [clojure.spec :as s]
             [sqlosure
              [relational-algebra :as rel]
              [sql :as sql]
@@ -60,19 +59,6 @@ especially components of a more complex product-type."}
    ^{:doc "A fuction that takes a result and extracs/transforms it the way this
 operator is intended to work."}
    transformer-fn db-operator-data-transformer-fn])
-
-;; ---------------------------------------------------------
-;; -- Specs
-;; ---------------------------------------------------------
-(s/def ::query rel/query?)
-(s/def ::query-or-nil (s/or :nil nil? :quer ::query))
-(s/def ::queries (s/* ::query))
-(s/def ::expression rel/expression?)
-(s/def ::expressions (s/* ::expression))
-(s/def ::scheme (s/or :empty  empty?
-                      :scheme rel/rel-scheme?))
-(s/def ::environment (s/or :empty empty?
-                           :env   (s/map-of string? tuple?)))
 
 ;; ---------------------------------------------------------
 ;; -- Fns and vals
@@ -151,8 +137,6 @@ operator is intended to work."}
   "Takes a list and returns a `sqlosure.relational-algebra/product` for this
   list."
   [ql]
-  {:pre [(s/valid? ::queries ql)]
-   :post [(s/valid? ::query %)]}
   (if (empty? ql)
     rel/the-empty
     (rel/make-product (first ql)
@@ -162,10 +146,9 @@ operator is intended to work."}
   "Takes a list of restrictions `rl` and a query and applies the restrictions to
   the query."
   [rl q]
-  {:pre [(s/valid? ::query-or-nil q)
-         (s/valid? ::expressions rl)]
-   :post [(s/valid? ::query %)]}
   (cond
+    (not (or (nil? q) (rel/query? q)))
+    (c/assertion-violation `apply-restrictions "query must be a query or nil" q)
     (nil? q) rel/the-empty
     (empty? rl) q
     :else (apply-restrictions (rest rl) (rel/make-restrict (first rl) q))))
@@ -175,9 +158,6 @@ operator is intended to work."}
   `sqlosure.relational-algebra/project` which wraps the old query in a
   projection with the mappings of `scheme`."
   [scheme q]
-  {:pre  [(s/valid? ::query-or-nil q)
-          (s/valid? ::scheme scheme)]
-   :post [(s/valid? ::query %)]}
   (rel/make-project (map (fn [k] [k (rel/make-attribute-ref k)])
                          (rel/rel-scheme-columns scheme))
                     q))
@@ -197,8 +177,6 @@ operator is intended to work."}
 (defn- dbize-query*
   "Returns new query, environment mapping names to tuples."
   [q generate-name]
-  {:pre  [(s/valid? ::query q)]
-   :post [(s/valid? (s/tuple ::query ::environment) %)]}
   (letfn
       [(worker [q generate-name]
          (cond
@@ -277,19 +255,10 @@ operator is intended to work."}
   "Takes a sqlosure query and returns a 'flattened' representation of the same
   query."
   [q]
-  {:pre [(s/valid? ::query q)]
-   :post [(s/valid? (s/tuple ::query ::environment) %)]}
   (dbize-query* q (make-name-generator "dbize")))
 
 (defn dbize-project
   [alist q-underlying generate-name]
-  {:pre [(s/valid? (s/or :map (s/map-of string? rel/attribute-ref?)
-                         :vec (s/coll-of
-                               (s/tuple string? rel/attribute-ref?) [])) alist)
-         (s/valid? ::query q-underlying)]
-   :post [(s/valid? (s/tuple (s/coll-of (s/tuple string? rel/attribute-ref?) [])
-                             ::query
-                             ::environment) %)]}
   (let [[underlying env] (dbize-query* q-underlying generate-name)]
     (loop [alist (into [] alist)
            names []

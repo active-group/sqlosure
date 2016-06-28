@@ -202,7 +202,7 @@
             {"kv" (make-tuple (mapv rel/make-attribute-ref ["kv_0" "kv_1"]))}]
            (dbize-query (rel/make-top 0 10 kv-galaxy)))))
   (testing "anything else should fail"
-    (is (thrown? Error (dbize-query nil)))))
+    (is (thrown? Exception (dbize-query nil)))))
 
 (deftest dbize-expression-test
   (testing "attribute-ref"
@@ -339,7 +339,7 @@
     (testing "with nil it should be the empty query"
       (is (= rel/the-empty (f nil))))
     (testing "with non query arguments it should throw"
-      (is (thrown? Error (f '(5)))))))
+      (is (thrown? Exception (f '(5)))))))
 
 (deftest apply-restriction-test
   (let [apply-restrictions #'sqlosure.galaxy/apply-restrictions
@@ -363,7 +363,7 @@
       (is (= rel/the-empty (apply-restrictions [] nil)))
       (is (= rel/the-empty (apply-restrictions [r1 r2] nil))))
     (testing "with something other than a query it should fail"
-      (is (thrown? Error (apply-restrictions [] 5))))))
+      (is (thrown? Exception (apply-restrictions [] 5))))))
 
 (deftest restrict-to-scheme-test
   (let [underlying (rel/make-project {"one" (rel/make-attribute-ref "k")}
