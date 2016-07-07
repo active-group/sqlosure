@@ -8,9 +8,8 @@
             [clojure.pprint :refer [pprint]]))
 
 (define-record-type relation
-  ^{:doc "`relation` is used as the state of the query monad. This is used to
-track the current state and later rebuild the resulting, correct references when
-running the query monad."}
+  ^{:doc "`relation` is used to track the current state and later rebuild the resulting,
+correct references when running the query monad."}
   (make-relation alias scheme) relation?
   [^{:doc "The current alias."}
    alias relation-alias
