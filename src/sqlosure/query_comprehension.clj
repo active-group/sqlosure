@@ -228,7 +228,6 @@ running the query monad."}
                       [k (rel/make-attribute-ref (fresh-name k alias))])
                     (rel/rel-scheme-columns scheme))
          query (::query state)])
-   (put-state! (merge state the-empty-state))
    (return [(rel/make-project alist query) scheme])))
 
 (defn- build-query!
