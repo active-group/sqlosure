@@ -303,8 +303,6 @@ to 0."}
   ([q]
    (query-scheme q the-empty-environment))
   ([q env]
-   (when-not (or (nil? q) (query? q))
-     (assertion-violation `query-scheme "invalid query" q))
    (rel-scheme-cache-scheme (get (meta q) ::rel-scheme-cache) env)))
 
 (defn compose-environments
