@@ -73,7 +73,7 @@ We can now use sqlosure to formulate queries. A few examples:
 ```clojure
 ;; SELECT * FROM person
 (run-query conn (query [person (<- person-table)]
-                       [return person]))
+                       (return person)))
 
 ;; SELECT first, last FROM person WHERE id < 10
 (run-query conn (query [person (<- person-table)]
