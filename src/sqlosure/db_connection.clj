@@ -273,7 +273,7 @@
     (if-let [con (jdbc/db-find-connection db)]
       (run-query-with-params con)
       (with-open [con (jdbc/get-connection db)]
-        (doall (run-query-with-params con))))))
+        (run-query-with-params con)))))
 
 (defn- delete-statement-string
   [table-name crit-s]
