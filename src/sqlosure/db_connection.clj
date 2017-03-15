@@ -4,6 +4,7 @@
              [record :refer [define-record-type]]]
             [clojure.java.jdbc :as jdbc]
             [clojure.set :as set]
+            [clojure.data :as data]
             [sqlosure
              [optimization :as o]
              [relational-algebra :as rel]
@@ -204,17 +205,17 @@
         (c/assertion-violation
          `validate-scheme
          "scheme contains extra keys not present in relation"
-         (clojure.data/diff full-columns columns))
+         (data/diff full-columns columns))
         (not missing)
         (c/assertion-violation
          `validate-scheme
          "scheme is missing non-nullable keys"
-         (clojure.data/diff full-m m))
+         (data/diff full-m m))
         (not type-diff)
         (c/assertion-violation
          `validate-scheme
          "scheme contains values that do not match types with relation"
-         (clojure.data/diff full-m m))
+         (data/diff full-m m))
         :else true))))
 
 (defn- insert-statement-string
