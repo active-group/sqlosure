@@ -244,11 +244,13 @@
 (defn $date [val] (rel/make-const t/date% val))
 (defn $timestamp [val] (rel/make-const t/timestamp% val))
 (defn $blob [val] (rel/make-const t/blob% val))
+(defn $bytea [val] (rel/make-const t/bytea% val))
 ;; Nullable types
 (defn $string-null [val] (rel/make-const t/string%-nullable val))
 (defn $integer-null [val] (rel/make-const t/integer%-nullable val))
 (defn $double-null [val] (rel/make-const t/double%-nullable val))
 (defn $blob-null [val] (rel/make-const t/blob%-nullable val))
+(defn $bytea-null [val] (rel/make-const t/bytea%-nullable val))
 
 ;; Type shortcuts
 (def $string-t t/string%)
@@ -258,10 +260,13 @@
 (def $date-t t/date%)
 (def $timestamp-t t/timestamp%)
 (def $blob-t t/blob%)
+(def $bytea-t t/bytea%)
 ;; Nullable types
 (def $string-null-t t/string%-nullable)
 (def $integer-null-t t/integer%-nullable)
 (def $double-null-t t/double%-nullable)
+(def $blob-null-t t/blob%-nullable)
+(def $bytea-null-t t/bytea%-nullable)
 
 ;; -----------------------------------------------------------------------------
 ;; -- Helper

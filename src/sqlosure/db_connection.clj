@@ -120,6 +120,14 @@
   (fn [^PreparedStatement stmt ix val] (.setBlob stmt ix val))
   (fn [^ResultSet rs ix] (.getBlob rs ix)))
 
+(define-type-method-implementations t/bytea%
+  (fn [^PreparedStatement stmt ix val] (.setBytes stmt ix val))
+  (fn [^ResultSet rs ix] (.getBytes rs ix)))
+
+(define-type-method-implementations t/bytea%-nullable
+  (fn [^PreparedStatement stmt ix val] (.setBytes stmt ix val))
+  (fn [^ResultSet rs ix] (.getBytes rs ix)))
+
 (define-type-method-implementations t/clob%
   (fn [^PreparedStatement stmt ix val] (.setClob stmt ix val))
   (fn [^ResultSet rs ix] (.getClob rs ix)))
