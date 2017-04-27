@@ -4,6 +4,7 @@
              [record :refer [define-record-type]]]
             [clojure.java.jdbc :as jdbc]
             [clojure.set :as set]
+            [clojure.data :as data]
             [sqlosure
              [optimization :as o]
              [relational-algebra :as rel]
@@ -119,6 +120,14 @@
   (fn [^PreparedStatement stmt ix val] (.setBlob stmt ix val))
   (fn [^ResultSet rs ix] (.getBlob rs ix)))
 
+(define-type-method-implementations t/bytea%
+  (fn [^PreparedStatement stmt ix val] (.setBytes stmt ix val))
+  (fn [^ResultSet rs ix] (.getBytes rs ix)))
+
+(define-type-method-implementations t/bytea%-nullable
+  (fn [^PreparedStatement stmt ix val] (.setBytes stmt ix val))
+  (fn [^ResultSet rs ix] (.getBytes rs ix)))
+
 (define-type-method-implementations t/clob%
   (fn [^PreparedStatement stmt ix val] (.setClob stmt ix val))
   (fn [^ResultSet rs ix] (.getClob rs ix)))
@@ -204,17 +213,17 @@
         (c/assertion-violation
          `validate-scheme
          "scheme contains extra keys not present in relation"
-         (clojure.data/diff full-columns columns))
+         (data/diff full-columns columns))
         (not missing)
         (c/assertion-violation
          `validate-scheme
          "scheme is missing non-nullable keys"
-         (clojure.data/diff full-m m))
+         (data/diff full-m m))
         (not type-diff)
         (c/assertion-violation
          `validate-scheme
          "scheme contains values that do not match types with relation"
-         (clojure.data/diff full-m m))
+         (data/diff full-m m))
         :else true))))
 
 (defn- insert-statement-string
@@ -273,7 +282,7 @@
     (if-let [con (jdbc/db-find-connection db)]
       (run-query-with-params con)
       (with-open [con (jdbc/get-connection db)]
-        (doall (run-query-with-params con))))))
+        (run-query-with-params con)))))
 
 (defn- delete-statement-string
   [table-name crit-s]

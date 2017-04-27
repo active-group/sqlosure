@@ -323,6 +323,15 @@
           _ (print ")")]
       v)
     (sql/sql-expr-case? expr)
+    ;; FIXME : Case wird dargestellt:
+    ;; CASE val?
+    ;; (WHEN ... THEN ...)+
+    ;; (ELSE ...)? END
+    ;; -> val optional! (kann Zeile, Expression oder Subquery mit
+    ;; Einelementigem Rückgabewert sein)
+    ;; (-> ELSE muss nicht vorhanden sein)
+    ;; -> END fehlt
+    ;; (an PostgreSQL getestet)
     (let [_ (print "(CASE ")
           v1 (mapcat #(put-when %) (sql/sql-expr-case-branches expr))
           _ (print " ELSE ")

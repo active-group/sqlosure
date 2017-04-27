@@ -213,6 +213,13 @@
   (make-sql-expr-tuple expressions) sql-expr-tuple?
   [expressions sql-expr-tuple-expressions])
 
+;; FIXME : Case wird dargestellt:
+;; CASE val?
+;; (WHEN ... THEN ...)+
+;; (ELSE ...)? END
+;; -> val optional (kann Zeile, Expression oder Subquery mit
+;; Einelementigem Rückgabewert sein)
+;; (an PostgreSQL getestet)
 (define-record-type sql-expr-case
   (make-sql-expr-case branches default) sql-expr-case?
   [branches sql-expr-case-branches  ;; list(pair(sql-expr, sql-expr))

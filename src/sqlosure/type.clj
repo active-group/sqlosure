@@ -278,6 +278,9 @@
 (def blob% (make-base-type 'blob byte-array? 'lose 'lose))
 (def clob% (make-base-type 'clob char-array? 'lose 'lose))
 
+(def bytea% (make-base-type 'bytea byte-array? 'lose 'lose))
+(def bytea%-nullable (make-base-type 'bytea byte-array? 'lose 'lose))
+
 (def string%-nullable (make-nullable-type string%))
 (def integer%-nullable (make-nullable-type integer%))
 (def double%-nullable (make-nullable-type double%))
