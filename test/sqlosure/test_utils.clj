@@ -42,9 +42,10 @@
   []
   (= 0 (rand-int 2)))
 
-(def db-spec {:classname "org.sqlite.JDBC"
-              :subprotocol "sqlite"
-              :subname ":memory:"})
+(def db-spec {:classname "org.h2.Driver"
+              :subprotocol "h2:mem"
+              :subname "tests;MODE=PostgreSQL"
+              :mode "PostgreSQL"})
 
 (defn make-person-table
   [db]
@@ -81,7 +82,7 @@
    (jdbc/create-table-ddl
     "movie"
     [[:id :int]
-     [:title "TEXT"]
+     [:title "varchar(100)"]
      [:release "DATE"]
      [:good :boolean]])))
 

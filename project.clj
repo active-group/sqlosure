@@ -6,6 +6,7 @@
   :dependencies [[org.clojure/clojure "1.7.0"]
                  [org.clojure/java.jdbc "0.6.0"]
                  ;; Refer to your required driver here.
+                 ;; [com.h2database/h2 "1.4.195"]
                  [org.postgresql/postgresql "9.4.1208"]
                  [active-clojure "0.12.0"]]
   :plugins [[lein-cloverage "1.0.6"]
@@ -14,7 +15,8 @@
 
   :codox {:metadata {:doc/format :markdown}}
 
-  :profiles {:test {:dependencies [[pjstadig/humane-test-output "0.8.0"]]
+  :profiles {:test {:dependencies [[pjstadig/humane-test-output "0.8.0"]
+                                   [com.h2database/h2 "1.4.195"]]
                     :injections [(require 'pjstadig.humane-test-output)
                                  (pjstadig.humane-test-output/activate!)]}
              :repl {:dependencies [[pjstadig/humane-test-output "0.8.0"]]
@@ -23,7 +25,7 @@
                                  (require 'active.clojure.condition-hooks)
                                  (active.clojure.condition-hooks/activate-clojure-test!)]}
              :dev {:dependencies [[pjstadig/humane-test-output "0.8.0"]
-                                  [org.xerial/sqlite-jdbc "3.8.11.2"]
+                                  [com.h2database/h2 "1.4.195"]
                                   [org.clojure/tools.nrepl "0.2.12"]]
                    :injections [(require 'pjstadig.humane-test-output)
                                 (pjstadig.humane-test-output/activate!)
