@@ -275,5 +275,7 @@
   "`put-query` takes a (relational algebra) query and returns it's (SQL-) string
   representation. Uses the default printer from `sqlosure.sql-put`."
   [q]
-  (->> q opt/optimize-query rsql/query->sql
-       (put/sql-select->string put/default-sql-put-parameterization)))
+  (->> q
+       opt/optimize-query
+       rsql/query->sql
+       put/sql-select->string))
