@@ -114,7 +114,7 @@
   this function returns a vector containing `[type universe]`."
   [name predicate const->datum-proc datum->const-proc
    & {:keys [universe numeric? ordered? data]
-      :or [universe nil numeric? false ordered? false data nil]}]
+      :or   {universe nil numeric? false ordered? false data nil}}]
   (let [t (make-atomic-type name false
                             (boolean numeric?) (boolean ordered?)
                             predicate
