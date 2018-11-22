@@ -1,10 +1,8 @@
 (ns sqlosure.type
-  (:require [active.clojure
-             [condition :refer [assertion-violation]]
-             [record :refer [define-record-type]]]
-            [sqlosure
-             [universe :refer [register-type! universe-lookup-type]]
-             [utils :refer [zip]]])
+  (:require [active.clojure.condition :refer [assertion-violation]]
+            [active.clojure.record :refer [define-record-type]]
+            [sqlosure.universe :refer [register-type! universe-lookup-type]]
+            [sqlosure.utils :refer [zip]])
   (:import java.io.Writer
            [java.time LocalDate LocalDateTime]))
 

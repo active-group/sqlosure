@@ -1,16 +1,13 @@
-(ns ^{:doc "Implementation of relational algebra based on Mike Sperbers
-relational-algebra.scm.
-Replaced alist with hash-map."
-      :author "Marco Schneider, based on Mike Sperbers schemeql2"}
-    sqlosure.relational-algebra
-  (:require [sqlosure.universe :as u]
-            [sqlosure.type :as t]
-            [sqlosure.utils :refer [third fourth]]
-            [clojure.set :refer [difference union intersection]]
+(ns ^{:author "Marco Schneider"}
+ sqlosure.relational-algebra
+  "Implementation of relational algebra based on Mike Sperbers relational-algebra.scm."
+  (:require [active.clojure.condition :as c :refer [assertion-violation]]
+            [active.clojure.lens :as lens]
             [active.clojure.record :refer [define-record-type]]
-            [active.clojure.condition :as c]
-            [active.clojure.condition :refer [assertion-violation]]
-            [active.clojure.lens :as lens]))
+            [clojure.set :refer [difference union]]
+            [sqlosure.type :as t]
+            [sqlosure.universe :as u]
+            [sqlosure.utils :refer [fourth third]]))
 
 (define-record-type rel-scheme
   (^:private really-make-rel-scheme columns map grouped) rel-scheme?
