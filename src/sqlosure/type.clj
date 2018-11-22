@@ -174,16 +174,6 @@
     (empty? v)
     (nil? v)))
 
-(defn all?
-  [bs]
-  (when bs
-    (reduce #(and %1 %2) true bs)))
-
-(defn any?
-  [bs]
-  (when bs
-    (reduce #(or %1 %2) false bs)))
-
 (defn type-member?
   "Checks if `thing` is a member of a type."
   [thing ty]
@@ -223,12 +213,12 @@
 
 ;; Standard types
 
-(defn double?
+(defn is-double?
   "checks if a value is of type double."
   [x]
   (instance? Double x))
 
-(defn boolean?
+(defn is-boolean?
   "Checks if a value if of type boolean. This includes booleans and nil."
   [x]
   (or (nil? x) (instance? Boolean x)))
@@ -260,9 +250,9 @@
                              :ordered? true))
 (def integer% (make-base-type 'integer integer? identity identity
                               :numeric? true :ordered? true))
-(def double% (make-base-type 'double double? identity identity
+(def double% (make-base-type 'double is-double? identity identity
                               :numeric? true :ordered? true))
-(def boolean% (make-base-type 'boolean boolean? identity identity))
+(def boolean% (make-base-type 'boolean is-boolean? identity identity))
 
 ;; Used to represent the type of sql NULL. Corresponds to nil in Clojure.
 (def null% (make-base-type 'unknown nil? identity identity))  ;; FIXME Does this have any real purpose?
