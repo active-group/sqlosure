@@ -1,8 +1,7 @@
 (ns sqlosure.type-implementation
-  (:require [active.clojure.record :refer [define-record-type]]
-            [sqlosure.type :as t]
-            [active.clojure.condition :as c])
-  (:import [java.sql PreparedStatement ResultSet]))
+  (:require [active.clojure.condition :as c]
+            [active.clojure.record :refer [define-record-type]]
+            [sqlosure.type :as t]))
 
 ;;   A type implementation is a backend specific definition of a SQLosure type.
 ;;   Types differ from backend to backend in the way they are 1. rendered and

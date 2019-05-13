@@ -265,6 +265,7 @@
 (def $double-null-t t/double%-nullable)
 (def $blob-null-t t/blob%-nullable)
 (def $bytea-null-t t/bytea%-nullable)
+(def $date-null-t t/date%-nullable)
 
 ;; -----------------------------------------------------------------------------
 ;; -- Helper

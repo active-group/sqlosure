@@ -39,7 +39,9 @@
 (defn default-put-alias
   "When alias is not nil, print \" AS alias\"."
   [alias]
-  (when alias (print " AS" alias)))
+  (if alias
+    (print " AS" alias)
+    (print " AS" (gensym))))
 
 (defn put-dummy-alias
   "Always print \" AS alias\", even if there is none."
