@@ -1,4 +1,7 @@
 (ns sqlosure.backends.base
+  "This namespace defines the default implementation for all supported SQLosure
+  types. Backends will want to implement their specific types be reifying the
+  type implementations provided here."
   (:require [active.clojure.lens :as lens]
             [sqlosure.time :as time]
             [sqlosure.type :as type]
