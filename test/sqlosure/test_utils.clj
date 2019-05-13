@@ -1,10 +1,8 @@
 (ns sqlosure.test-utils
   (:require [clojure.java.jdbc :as jdbc]
-            [clojure.walk :refer [stringify-keys]]
-            [sqlosure
-             [core :refer :all]
-             [db-connection :as dbs]
-             [time :as time]]))
+            [sqlosure.core :refer :all]
+            [sqlosure.db-connection :as dbs]
+            [sqlosure.time :as time]))
 
 (defn jdbc-out
   [db q & row-fns]
@@ -60,15 +58,15 @@
 
 (def person-table
   (table "person"
-         {"id" $integer-t
-          "first" $string-t
-          "last" $string-t
+         {"id"       $integer-t
+          "first"    $string-t
+          "last"     $string-t
           "birthday" $date-t
-          "sex" $boolean-t}))
+          "sex"      $boolean-t}))
 
 (defn create-people
-  [db]
-  (let [conn (db-connect db)]
+  [db backend]
+  (let [conn (db-connect db backend)]
     (dotimes [_ 100]
       (dbs/insert! conn
                    person-table
@@ -88,14 +86,14 @@
 
 (def movie-table
   (table "movie"
-         {"id" $integer-t
-          "title" $string-t
-          "release" $date-t
-          "good" $boolean-t}))
+         [["id" $integer-t]
+          ["title" $string-t]
+          ["release" $date-t]
+          ["good" $boolean-t]]))
 
 (defn create-movies
-  [db]
-  (let [conn (db-connect db)]
+  [db backend]
+  (let [conn (db-connect db backend)]
     (dotimes [_ 20]
       (dbs/insert!
        conn movie-table
@@ -112,12 +110,12 @@
 
 (def actor-movie-table
   (table "actor_movie"
-         {"actor_id" $integer-t
-          "movie_id" $integer-t}))
+         [["actor_id" $integer-t]
+          ["movie_id" $integer-t]]))
 
 (defn create-actors
-  [db]
-  (let [conn (db-connect db)]
+  [db backend]
+  (let [conn (db-connect db backend)]
     (dotimes [_ 30]
       (dbs/insert! conn actor-movie-table
                    (rand-int @current-person-id)
@@ -128,16 +126,15 @@
   as an argument. Use to run tests against an in-memory instance of sqlite3.
   This function creates three tables: 'person', 'movie' and 'actor_movie' and
   inserts some default records with random values and unique ids per table."
-  [spec func]
+  [spec backend func]
   (jdbc/with-db-connection [db spec]
     (make-person-table db)
     (make-movie-table db)
     (make-actor-movie-table db)
-    (create-people db)
-    (create-movies db)
-    (create-actors db)
+    (create-people db backend)
+    (create-movies db backend)
+    (create-actors db backend)
     (let [res (func db)]
       (reset! current-movie-id 0)
       (reset! current-person-id 0)
       res)))
-

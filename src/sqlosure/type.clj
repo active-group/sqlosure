@@ -1,6 +1,7 @@
 (ns sqlosure.type
   (:require [active.clojure.condition :refer [assertion-violation]]
             [active.clojure.record :refer [define-record-type]]
+            [active.clojure.lens :as lens]
             [sqlosure.universe :refer [register-type! universe-lookup-type]]
             [sqlosure.utils :refer [zip]])
   (:import java.io.Writer
@@ -17,7 +18,6 @@
   (-ordered? [this] "Is this type ordered?")
   (-const->datum [this val] "Convert value to datum.")
   (-datum->const [this datum] "Convert datum to value.")
-  (-method-map-atom [this] "Get us an an atom pointing to a map of type-specific methods.")
   (-data [this] "Domain-specific data, for outside use."))
 
 (defn nullable-type?
@@ -31,63 +31,32 @@
   [t]
   (-name t))
 
-(define-record-type type-method
-  (really-make-type-method name default-implementation)
-  type-method?
-  [name type-method-name
-   default-implementation type-method-default-implementation])
-
-(defn make-type-method
-  [name & [default-implementation]]
-  (really-make-type-method name default-implementation))
-
-(defn define-type-method-implementation
-  [ty method fun]
-  (swap! (-method-map-atom ty)
-         assoc (type-method-name method) fun))
-
-(defn type-method-implementation
-  [ty method]
-  (or (get @(-method-map-atom ty) (type-method-name method))
-      (type-method-default-implementation method)))
-
-(defn invoke-type-method
-  "Looks up the type-method-implementation for ty and method and applies it's
-  result (fn) to the rest-args."
-  [ty method & args]
-  (apply (type-method-implementation ty method) args))
-
 (declare make-atomic-type)
 
 (define-record-type atomic-type
   (make-atomic-type name nullable? numeric? ordered? predicate
-                    const->datum-fn datum->const-fn
-                    method-map-atom data)
+                    const->datum-fn datum->const-fn data)
   atomic-type?
   [name atomic-type-name
-   nullable? atomic-type-nullable?
+   (nullable? atomic-type-nullable? atomic-type-nullable?-lens)
    numeric? atomic-type-numeric?
    ordered? atomic-type-ordered?
    predicate atomic-type-predicate
    const->datum-fn atomic-type-const->datum-fn
    datum->const-fn atomic-type-datum->const-fn
-   method-map-atom atomic-type-method-map-atom
    data atomic-type-data]
   base-type-protocol
   (-name [_] name)
   (-contains? [_ val] (predicate val))
   (-nullable? [_] nullable?)
   (-nullable [_] (make-atomic-type name true numeric? ordered? predicate
-                                   const->datum-fn datum->const-fn
-                                   method-map-atom data))
+                                   const->datum-fn datum->const-fn data))
   (-non-nullable [_] (make-atomic-type name false numeric? ordered? predicate
-                                       const->datum-fn datum->const-fn
-                                       method-map-atom data))
+                                       const->datum-fn datum->const-fn data))
   (-numeric? [_] numeric?)
   (-ordered? [_] ordered?)
   (-const->datum [_ val] (const->datum-fn val))
   (-datum->const [_ datum] (datum->const-fn datum))
-  (-method-map-atom [_] method-map-atom)
   (-data [_] data))
 
 (defmethod print-method atomic-type [r, ^Writer w]
@@ -113,19 +82,19 @@
   [name predicate const->datum-proc datum->const-proc
    & {:keys [universe numeric? ordered? data]
       :or   {universe nil numeric? false ordered? false data nil}}]
-  (let [t (make-atomic-type name false
-                            (boolean numeric?) (boolean ordered?)
+  (let [t (make-atomic-type name
+                            false
+                            (boolean numeric?)
+                            (boolean ordered?)
                             predicate
-                            const->datum-proc datum->const-proc
-                            (atom {})
+                            const->datum-proc
+                            datum->const-proc
                             data)]
     (when universe
       (register-type! universe name t))
     t))
 
 (declare really-make-bounded-string-type)
-
-(def ^:private bounded-string-type-method-map-atom (atom {}))
 
 (define-record-type bounded-string-type
   (really-make-bounded-string-type max-size nullable?) bounded-string-type?
@@ -140,8 +109,7 @@
   (-numeric? [_] false)
   (-ordered? [_] true)
   (-const->datum [_ val] val)
-  (-datum->const [_ datum] datum)
-  (-method-map-atom [_] bounded-string-type-method-map-atom))
+  (-datum->const [_ datum] datum))
 
 (defn make-bounded-string-type
   "Create string type with given maximum number of chars."
@@ -248,11 +216,18 @@
 ;; Some base types
 (def string% (make-base-type 'string string? identity identity
                              :ordered? true))
+(def string%-nullable (make-nullable-type string%))
+
 (def integer% (make-base-type 'integer integer? identity identity
                               :numeric? true :ordered? true))
+(def integer%-nullable (make-nullable-type integer%))
+
 (def double% (make-base-type 'double is-double? identity identity
                               :numeric? true :ordered? true))
+(def double%-nullable (make-nullable-type double%))
+
 (def boolean% (make-base-type 'boolean is-boolean? identity identity))
+(def boolean%-nullable (make-nullable-type boolean%))
 
 ;; Used to represent the type of sql NULL. Corresponds to nil in Clojure.
 (def null% (make-base-type 'unknown nil? identity identity))  ;; FIXME Does this have any real purpose?
@@ -260,19 +235,20 @@
 
 (def date% (make-base-type 'date date? identity identity
                            :ordered? true))
+(def date%-nullable (make-nullable-type date%))
+
 (def timestamp% (make-base-type 'timestamp timestamp? identity identity
                                 :ordered? true))
+(def timestamp%-nullable (make-nullable-type timestamp%))
 
 (def blob% (make-base-type 'blob byte-array? 'lose 'lose))
+(def blob%-nullable (make-nullable-type blob%))
+
 (def clob% (make-base-type 'clob char-array? 'lose 'lose))
+(def clob%-nullable (make-nullable-type clob%))
 
 (def bytea% (make-base-type 'bytea byte-array? 'lose 'lose))
-(def bytea%-nullable (make-base-type 'bytea byte-array? 'lose 'lose))
-
-(def string%-nullable (make-nullable-type string%))
-(def integer%-nullable (make-nullable-type integer%))
-(def double%-nullable (make-nullable-type double%))
-(def blob%-nullable (make-nullable-type blob%))
+(def bytea%-nullable (make-nullable-type bytea%))
 
  ;; Serialization
 

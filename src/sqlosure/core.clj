@@ -13,8 +13,8 @@
 (defn db-connect
   "`db-connect` takes a connection map and returns a `db-connection`-record for
   that backend. Dispatches on the `:classname` key in `db-spec`."
-  [db-spec]
-  (db/make-db-connection db-spec))
+  [db-spec backend]
+  (db/make-db-connection db-spec backend))
 
 (defn table
   "Returns a `sqlosure.relational-algebra/base-relation`.

@@ -3,6 +3,7 @@
              [condition :as c]
              [record :refer [define-record-type]]]
             [clojure.java.jdbc :as jdbc]
+            [sqlosure.backend :as backend]
             [clojure.set :as set]
             [clojure.data :as data]
             [sqlosure
@@ -12,139 +13,57 @@
              [sql :as sql]
              [sql-put :as put]
              [time :as time]
-             [type :as t]])
-    (:import [java.sql PreparedStatement ResultSet]))
+             [type :as t]]
+            [sqlosure.backend :as backend]
+            [sqlosure.type-implementation :as ti])
+  (:import [java.sql PreparedStatement ResultSet]))
 
 (define-record-type
   ^{:doc "`db-connection` serves as a container for storing the current
           db-connection as well as backend specific conversion and printer
           functions."}
   db-connection
-  (make-db-connection conn) db-connection?
+  (make-db-connection conn backend) db-connection?
   [^{:doc "The database connection map as used by jdbc."}
-   conn db-connection-conn])
-
-(def get-from-result-set-method
-  "Creates the type method `::get-from-result-set` with a default get function
-  using `.getObject` on every input value and type."
-  (t/make-type-method ::get-from-result-set
-                      (fn [^ResultSet rs ix]
-                        (.getObject rs ix))))
+   conn db-connection-conn
+   backend db-connection-backend])
 
 (defn result-set-seq
   "Creates and returns a lazy sequence of maps corresponding to the rows in the
    java.sql.ResultSet rs."
-  [^ResultSet rs col-types]
+  [^ResultSet rs col-types backend]
   (let [row-values (fn []
                      ;; should cache the method implementations
                      (map-indexed
                       (fn [^Integer i ty]
-                        (t/invoke-type-method
-                         ty
-                         get-from-result-set-method
-                         rs
-                         (inc i)))
+                        (let [type-implementation (backend/get-type-implementation backend ty)
+                              sql->type           (ti/type-implementation-from-sql type-implementation)]
+                          (sql->type rs (inc i))
+                          #_(t/invoke-type-method
+                           ty
+                           get-from-result-set-method
+                           rs
+                           (inc i))))
                       col-types))
-        rows ((fn thisfn []
-                (if (.next rs)
-                  (cons (vec (row-values))
-                        (lazy-seq (thisfn)))
-                  (.close rs))))]
+        rows       ((fn thisfn []
+                      (if (.next rs)
+                        (cons (vec (row-values))
+                              (lazy-seq (thisfn)))
+                        (.close rs))))]
     rows))
-
-(def set-parameter-method
-  "Creates the type method `::set-parameter` with a default set function
-  using `.setObject` on every input value and type."
-  (t/make-type-method ::set-parameter
-                      (fn [^PreparedStatement stmt ix val]
-                        (.setObject stmt ix val))))
 
 (defn- set-parameters
   "Add the parameters to the given statement.
   Uses the approriate jdbc get and set functions depending on the type attached
   to the value.
   `param-types+args` is a sequence of vectors `[[$sqlosure-type val] ...]`."
-  [stmt param-types+args]
+  [stmt param-types+args backend]
   ;; FIXME: don't do map
   (dorun (map-indexed (fn [ix [ty val]]
-                        (t/invoke-type-method ty
-                                              set-parameter-method
-                                              stmt
-                                              (inc ix)
-                                              val))
+                        (let [type-implementation (backend/get-type-implementation backend ty)
+                              type->sql (ti/type-implementation-to-sql type-implementation)]
+                          (type->sql stmt (inc ix) val)))
                       param-types+args)))
-
-(defn define-type-method-implementations
-  "Conveniently define the `set-parameter` and `get-parameter` of a type
-  simultaniously."
-  [ty set-parameter-fn get-parameter-fn]
-  (swap! (t/-method-map-atom ty)
-         assoc
-         (t/type-method-name set-parameter-method) set-parameter-fn
-         (t/type-method-name get-from-result-set-method) get-parameter-fn))
-
-;; Type method implementations
-(define-type-method-implementations t/string%
-  (fn [^PreparedStatement stmt ix val] (.setString stmt ix val))
-  (fn [^ResultSet rs ix] (.getString rs ix)))
-
-(define-type-method-implementations t/string%-nullable
-  (fn [^PreparedStatement stmt ix val] (.setString stmt ix val))
-  (fn [^ResultSet rs ix] (.getString rs ix)))
-
-(define-type-method-implementations t/integer%
-  (fn [^PreparedStatement stmt ix val] (.setInt stmt ix val))
-  (fn [^ResultSet rs ix] (.getInt rs ix)))
-
-(define-type-method-implementations t/integer%-nullable
-  (fn [^PreparedStatement stmt ix val] (.setInt stmt ix val))
-  (fn [^ResultSet rs ix] (.getInt rs ix)))
-
-(define-type-method-implementations t/double%
-  (fn [^PreparedStatement stmt ix val] (.setDouble stmt ix val))
-  (fn [^ResultSet rs ix] (.getDouble rs ix)))
-
-(define-type-method-implementations t/double%-nullable
-  (fn [^PreparedStatement stmt ix val] (.setDouble stmt ix val))
-  (fn [^ResultSet rs ix] (.getDouble rs ix)))
-
-(define-type-method-implementations t/boolean%
-  (fn [^PreparedStatement stmt ix val] (.setBoolean stmt ix val))
-  (fn [^ResultSet rs ix] (.getBoolean rs ix)))
-
-(define-type-method-implementations t/blob%
-  (fn [^PreparedStatement stmt ix val] (.setBlob stmt ix val))
-  (fn [^ResultSet rs ix] (.getBlob rs ix)))
-
-(define-type-method-implementations t/blob%-nullable
-  (fn [^PreparedStatement stmt ix val] (.setBlob stmt ix val))
-  (fn [^ResultSet rs ix] (.getBlob rs ix)))
-
-(define-type-method-implementations t/bytea%
-  (fn [^PreparedStatement stmt ix val] (.setBytes stmt ix val))
-  (fn [^ResultSet rs ix] (.getBytes rs ix)))
-
-(define-type-method-implementations t/bytea%-nullable
-  (fn [^PreparedStatement stmt ix val] (.setBytes stmt ix val))
-  (fn [^ResultSet rs ix] (.getBytes rs ix)))
-
-(define-type-method-implementations t/clob%
-  (fn [^PreparedStatement stmt ix val] (.setClob stmt ix val))
-  (fn [^ResultSet rs ix] (.getClob rs ix)))
-
-(define-type-method-implementations t/date%
-  ;; NOTE `val` here is a `java.time.LocalDate` which has to be coerced to and
-  ;;      from `java.sql.Date` first.
-  (fn [^PreparedStatement stmt ix val]
-    (.setDate stmt ix (time/to-sql-date val)))
-  (fn [^ResultSet rs ix]
-    (time/from-sql-date (.getDate rs ix))))
-
-(define-type-method-implementations t/timestamp%
-  (fn [^PreparedStatement stmt ix val]
-    (.setTimestamp stmt ix (time/to-sql-timestamp val)))
-  (fn [^ResultSet rs ix]
-    (time/from-sql-timestamp (.getTimestamp rs ix))))
 
 (defn run-query
   "Takes a database connection and a query and runs it against the database.
@@ -161,19 +80,20 @@
                                     ($integer 10)))
                         (project {\"value\" (! kv \"value\")})))"
   [conn q & {:keys [optimize?] :or {optimize? true} :as opts-map}]
-  (let [qq (if optimize? (o/optimize-query q) q)
-        scheme (rel/query-scheme qq)
-        col-types (rel/rel-scheme-types scheme)
-        asql (rsql/query->sql qq)
+  (let [qq                       (if optimize? (o/optimize-query q) q)
+        scheme                   (rel/query-scheme qq)
+        col-types                (rel/rel-scheme-types scheme)
+        asql                     (rsql/query->sql qq)
         [sql & param-types+args] (put/sql-select->string asql)
-        db (db-connection-conn conn)
+        db                       (db-connection-conn conn)
         run-query-with-params
         (^{:once true} fn* [con]
          (let [^PreparedStatement stmt
-               (apply jdbc/prepare-statement con sql (dissoc opts-map :optimize?))]
-           (set-parameters stmt param-types+args)
+               (apply jdbc/prepare-statement con sql (dissoc opts-map :optimize?))
+               backend (db-connection-backend conn)]
+           (set-parameters stmt param-types+args backend)
            (.closeOnCompletion stmt)
-           (result-set-seq (.executeQuery stmt) col-types)))]
+           (result-set-seq (.executeQuery stmt) col-types backend)))]
     (if-let [con (jdbc/db-find-connection db)]
       (doall
        (run-query-with-params con))
@@ -276,7 +196,7 @@
                types+vals (map (fn [ty val]
                                  [ty val])
                                (rel/rel-scheme-types scheme) vals)]
-           (set-parameters stmt types+vals)
+           (set-parameters stmt types+vals (db-connection-backend conn))
            (.closeOnCompletion stmt)
            (.executeUpdate stmt)))]
     (if-let [con (jdbc/db-find-connection db)]
@@ -322,7 +242,7 @@
                 (delete-statement-string
                  (rel/base-relation-name sql-table)
                  crit-s))]
-           (set-parameters stmt crit-vals)
+           (set-parameters stmt crit-vals (db-connection-backend conn))
            (.closeOnCompletion stmt)
            (.executeUpdate stmt)))]
     (if-let [con (jdbc/db-find-connection db)]
@@ -392,7 +312,7 @@
                (jdbc/prepare-statement
                 con
                 update-string)]
-           (set-parameters stmt update-types+vals)
+           (set-parameters stmt update-types+vals (db-connection-backend conn))
            (.closeOnCompletion stmt)
            (.executeUpdate stmt)))]
     ;; update-types+vals

@@ -9,12 +9,13 @@
              [test-utils :refer [actor-movie-table db-spec jdbc-out movie-table person-table sqlosure-out with-actor-db]]
              [time :as time]]
             [sqlosure.sql-put :as put]
+            [sqlosure.backends.h2 :as h2]
             [sqlosure.relational-algebra-sql :as rsql]))
 
 (deftest insert!-test
-  (with-actor-db db-spec
+  (with-actor-db db-spec h2/implementation
     (fn [db]
-      (let [conn (db-connect db)
+      (let [conn (db-connect db h2/implementation)
             axel [-1 "Axel" "Hacke" (time/make-date 1956 1 20) false]
             get-1 (query [person (<- person-table)]
                          (restrict ($= (! person "id") ($integer -1)))
@@ -48,9 +49,9 @@
                              -1 "Cormac")))))))))
 
 (deftest delete!-test
-  (with-actor-db db-spec
+  (with-actor-db db-spec h2/implementation
     (fn [db]
-      (let [conn (db-connect db)]
+      (let [conn (db-connect db h2/implementation)]
         (testing "deletion of one record"
           (let [r (first (db/run-query conn (query [p (<- person-table)]
                                                    (return p))))]
@@ -81,9 +82,9 @@
             (is (empty? (db/run-query conn q)))))))))
 
 (deftest update!-test
-  (with-actor-db db-spec
+  (with-actor-db db-spec h2/implementation
     (fn [db]
-      (let [conn (db-connect db)
+      (let [conn (db-connect db h2/implementation)
             vian [-1 "Boris" "Vian" (time/make-date 1920 3 10) false]
             foucault [-1 "Michel" "Foucault" (time/make-date 1926 10 15) false]
             person=-1 (query [p (<- person-table)]
@@ -106,9 +107,9 @@
 ;; A set of example tests to illustrate one possible way to test with an
 ;; in-memory instance of sqlite3.
 (deftest simple-test
-  (with-actor-db db-spec
+  (with-actor-db db-spec h2/implementation
     (fn [db]
-      (let [conn (db-connect db)]
+      (let [conn (db-connect db h2/implementation)]
         (testing "order"
           (let [row-fn (fn [row]
                          (update-in row [1] time/from-sql-date))]
@@ -120,8 +121,8 @@
                        conn
                        (query [movie (<- movie-table)]
                               (order {(! movie "release") :descending})
-                              (project {"title" (! movie "title")
-                                        "release" (! movie "release")}))))))
+                              (project [["title" (! movie "title")]
+                                        ["release" (! movie "release")]]))))))
           (is (= (into
                   #{}
                   (map #(->> % first time/from-sql-date vector)
@@ -131,7 +132,7 @@
                  (sqlosure-out
                   conn (query [movie (<- movie-table)]
                               (order {(! movie "release") :ascending})
-                              (project {"release" (! movie "release")}))))))
+                              (project [["release" (! movie "release")]]))))))
         (testing "top"
           (let [row-fn (fn [row]
                          (update-in row [2] time/from-sql-date))]
@@ -149,26 +150,10 @@
                                              (return movie)))))))
         ;; FIXME This does currently not work with h2 if there are identically
         ;;       named fields in multiple tables.
-        #_(testing "count(*)"
+        (testing "count(*)"
           (is (= (jdbc-out db "SELECT count(*) AS count FROM movie")
                  (sqlosure-out conn (query [movie (<- movie-table)]
-                                           (project {"count" $count*})))))
-          (is (= (jdbc-out db "SELECT count(*) AS count FROM movie, person")
-                 (sqlosure-out conn (query [movie (<- movie-table)
-                                            person (<- person-table)]
-                                           (project {"count" $count*})))))
-          (testing "with nested SELECTs"
-            (is (= (jdbc-out db (str "SELECT count(*) AS count "
-                                     "FROM movie, (SELECT * "
-                                     "FROM person WHERE id < 10)"))
-                   (sqlosure-out
-                    conn
-                    (query [movie (<- movie-table)]
-                           [person (<- (query [people (<- person-table)]
-                                              (restrict ($< (! people "id")
-                                                            ($integer 10)))
-                                              (return people)))]
-                           (project {"count" $count*})))))))
+                                           (project [["count" $count*]]))))))
         (testing "group"
           (testing "statement can be moved"
             (let [qs (str "SELECT p.id, count(m.id) AS movies "
@@ -186,8 +171,8 @@
                                                    (! am "actor_id"))))
                                ;; Note the order of the statements.
                                (group [p "id"])
-                               (project {"id" (! p "id")
-                                         "movies" ($count (! m "id"))}))))
+                               (project [["id" (! p "id")]
+                                         ["movies" ($count (! m "id"))]]))))
               (is (jdbc-out db qs)
                   (sqlosure-out
                    conn
@@ -199,8 +184,8 @@
                                               (! m "id"))
                                           ($= (! p "id")
                                               (! am "actor_id"))))
-                          (project {"id" (! p "id")
-                                    "movies" ($count (! m "id"))})))))
+                          (project [["id" (! p "id")]
+                                    ["movies" ($count (! m "id"))]])))))
             (testing "with grouping in nested table"
               (is (= (jdbc-out
                       db
@@ -222,11 +207,10 @@
                                                         ($= (! m "id")
                                                             (! am "movie_id"))))
                                         (group [a "id"])
-                                        (project {"id"    (! a "id")
-                                                  "count" ($count (! m "id"))}))
-                                 )]
+                                        (project [["id"    (! a "id")]
+                                                  ["count" ($count (! m "id"))]])))]
                              (restrict ($and ($>= (! m "count") ($integer 2))
                                              ($=  (! m "id") (! p "id"))))
-                             (project {"first" (! p "first")
-                                       "last"  (! p "last")
-                                       "count" (! m "count")}))))))))))))
+                             (project [["first" (! p "first")]
+                                       ["last"  (! p "last")]
+                                       ["count" (! m "count")]]))))))))))))
