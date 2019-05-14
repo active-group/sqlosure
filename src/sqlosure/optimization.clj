@@ -74,6 +74,7 @@
 
            (r/top? q) (r/make-top (r/top-offset q) (r/top-count q)
                                   (worker live (r/top-query q)))
+           (r/distinct? q) (r/make-distinct (worker live (r/distinct-query q)))
            (r/combine? q)
            (let [r (r/combine-rel-op q)
                  q1 (r/combine-query-1 q)
@@ -150,6 +151,7 @@
                                (merge-project (r/group-query q)))
 
     (r/top? q) (r/make-top (r/top-offset q) (r/top-count q) (merge-project (r/top-query q)))
+    (r/distinct? q) (r/make-distinct (merge-project (r/distinct-query q)))
     (r/combine? q) (r/make-combine (r/combine-rel-op q)
                                    (merge-project (r/combine-query-1 q))
                                    (merge-project (r/combine-query-2 q)))
@@ -320,6 +322,7 @@
                         new
                         (push-restrict new)))
         :else (r/make-top offset count (push-restrict tq))))
+    (r/distinct? q) (r/make-distinct (push-restrict (r/distinct-query q)))
     (r/combine? q) (r/make-combine (r/combine-rel-op q)
                                    (push-restrict (r/combine-query-1 q))
                                    (push-restrict (r/combine-query-2 q)))

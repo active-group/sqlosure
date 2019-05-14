@@ -129,6 +129,10 @@
   ([n] (qc/top nil n))
   ([offset n] (qc/top offset n)))
 
+(def distinct!
+  "`distinct!` is used to define queries that only return distinct rows.
+  Will result in a `DISTINCT` clause in the resulting SQL."
+  qc/distinct!)
 
 ;; -----------------------------------------------------------------------------
 ;; -- Shortcuts for aggretations functions.

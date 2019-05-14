@@ -54,7 +54,7 @@
   [;; [ string ]
    ;; DISTINCT, ALL, etc.
    ;; FIXME: right now, this is never actually used.
-   options sql-select-options
+   (options sql-select-options sql-select-options-lens)
    ;; list [sql-column sql-expr]
    ;; [] is for '*'
    ;; nil means open - can still add some

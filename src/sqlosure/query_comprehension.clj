@@ -341,3 +341,7 @@ correct references when running the query monad."}
    (monadic
     [old current-query]
     (set-query! (rel/make-top offset n old)))))
+
+(def distinct!
+  (monadic [old current-query]
+           (set-query! (rel/make-distinct old))))
