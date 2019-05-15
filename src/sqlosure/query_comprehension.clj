@@ -210,6 +210,7 @@ correct references when running the query monad."}
   (let [[res state] (run-query-comprehension* prod nil)]
     res))
 
+;; FIXME: useless alias?
 (defn- generate-query
   "Returns `[retval state]`."
   [prod state]
@@ -272,6 +273,7 @@ correct references when running the query monad."}
                                    old-query))
      (return (make-relation alias (compute-scheme scheme1 scheme2))))))
 
+;; FIXME combine combination* and combination?
 (defn- combination
   [rel-op compute-scheme prod1 prod2]
   (monadic
@@ -289,6 +291,7 @@ correct references when running the query monad."}
   [s1 s2]
   s1)
 
+;; Why is only this one n-ary?
 (defn union
   [p1 & prods]
   (if (empty? prods)
@@ -309,11 +312,11 @@ correct references when running the query monad."}
   (combination :difference first-scheme prod1 prod2))
 
 (defn order
-  "`order` takes an alist of [[attribute-ref] :descending/:ascending] to order
+  "`order` takes an alist of [[attribute-ref :descending/:ascending] to order
   the result by this attribute.
 
   Example: (monadic [t (embed t-table)]
-                    (order {(! t \"foo\") :ascending})
+                    (order [[(! t \"foo\") :ascending]])
                     (project {\"foo\" (! t \"foo\")}))
 
   The corresponding SQL statemant would be \"SELECT foo FROM t ORDER BY foo ASC\"."

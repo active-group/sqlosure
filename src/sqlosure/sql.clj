@@ -75,6 +75,7 @@
    (having sql-select-having sql-select-having-lens)
    ;; [ {sql-expr sql-order} ]
    ;; ORDER BY
+   ;; FIXME: only column names allowed here
    (order-by sql-select-order-by sql-select-order-by-lens)
    ;; [ string ]
    ;; TOP n, etc.

@@ -440,6 +440,7 @@ Replaced alist with hash-map."
 
 (define-record-type order
   (really-make-order alist query) order?
+  ;; FIXME: SQL allows only column name here
   [alist order-alist  ;; list of pairs (expr direction), where direction = :ascending | :descending
    query order-query])
 
@@ -500,6 +501,7 @@ Replaced alist with hash-map."
   (make-tuple expressions) tuple?
   [expressions tuple-expressions])
 
+; FIXME should be separate for aggregation and aggregation*
 (def ^{:private true} aggregations-op #{:count :count-all :sum :avg :min :max :std-dev
                                         :std-dev-p :var :var-p})
 
@@ -511,11 +513,14 @@ Replaced alist with hash-map."
   [op aggregation-operator  ;; Aggregation-op or string.
    expr aggregation-expr])
 
+; FIXME: better name for this - aggregation-all?
 (define-record-type aggregation*
   (really-make-aggregation* op) aggregation*?
   [op aggregation*-operator])
 
 (defn make-aggregation
+  ;; FIXME use overloading
+  ;; FIXME: also isn't it so that there are aggregations with args and those without?
   [op & expr]
   (cond
     (empty? expr) (really-make-aggregation* op)
@@ -592,17 +597,17 @@ Replaced alist with hash-map."
        (when-not (t/type=? t/boolean% p) (assertion-violation `expression-type "non-boolean test in case" p r))
        (when-not (t/type=? t r) (assertion-violation `expression-type "type mismatch in case" p r)))
      t)
-   (fn [subquery] (let [scheme (query-scheme subquery env)
-                        alist (rel-scheme-map scheme)]
+   (fn [subquery] (let [scheme (query-scheme subquery env)]
                     (when-not (rel-scheme-unary? scheme)
                       (assertion-violation `expression-type "must be a unary relation" subquery))
-                    (val (first alist))))
+                    (get (rel-scheme-map scheme)
+                         (first (rel-scheme-columns scheme)))))
    ;; FIXME what should the result here really be?
-   (fn [subquery] (let [scheme (query-scheme subquery env)
-                        alist (rel-scheme-map scheme)]
+   (fn [subquery] (let [scheme (query-scheme subquery env)]
                     (when-not (rel-scheme-unary? scheme)
                       (assertion-violation `expression-type "must be a unary relation" subquery))
-                    (t/make-set-type (key (first alist)))))
+                    (t/make-set-type (get (rel-scheme-map scheme)
+                                          (first (rel-scheme-columns scheme))))))
    expr))
 
 (defn aggregate?
@@ -651,9 +656,10 @@ Replaced alist with hash-map."
                     (check-grouped grouped e))
     (aggregation? expr) nil
     (aggregation*? expr) nil
-    (case-expr? expr) (doseq [[k v] (case-expr-alist expr)]
-                        (check-grouped grouped k)
-                        (check-grouped grouped v)
+    (case-expr? expr) (do
+                        (doseq [[k v] (case-expr-alist expr)]
+                          (check-grouped grouped k)
+                          (check-grouped grouped v))
                         (check-grouped grouped (case-expr-default expr)))
     (scalar-subquery? expr) nil
     (set-subquery? expr) nil
@@ -811,6 +817,7 @@ Replaced alist with hash-map."
     (when (seq non-nils) (set non-nils))))
 
 (defn expression-attribute-names
+  ;; FIXME: return a set
   "Takes an expression and returns a seq all attribute-ref's names."
   [expr]
   (filter-and-non-nil
@@ -829,10 +836,14 @@ Replaced alist with hash-map."
     query-attribute-names
     expr)))
 
+;; FIXME: this is almost completely wrong - check Scheme code or Sqala
+;; Also, don't we want to pass an environment to query scheme?
+
 (defn query-attribute-names
   "Takes a query and returns a set of all attribute-ref's names."
   [q]
   (cond
+    ; FIXME: empty sets
     (empty-query? q) nil
     (base-relation? q) nil
     (project? q)
