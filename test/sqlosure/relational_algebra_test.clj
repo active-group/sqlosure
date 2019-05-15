@@ -2,6 +2,7 @@
   (:require [sqlosure.relational-algebra :refer :all]
             [sqlosure.universe :refer :all]
             [sqlosure.sql :as sql :refer :all]
+            [sqlosure.test-utils :as tu]
             [sqlosure.type :refer :all]
             [active.clojure.lens :as lens]
             [clojure.pprint :refer :all]
@@ -529,7 +530,28 @@
                             tbl1)))
   (is (not (query? [(make-attribute-ref 42)])))
   (is (not (query? [])))
-  (is (not (query? nil))))
+  (is (not (query? nil)))
+  (testing "combine with aggreagation"
+    (let [combine (make-project
+                   [["count" (make-attribute-ref "count_2")]]
+                   (make-project
+                    [["count_2" (make-aggregation :count-all)]]
+                    (make-combine
+                     :product
+                     (make-project
+                      [["id_0" (make-attribute-ref "id")]
+                       ["title_0" (make-attribute-ref "title")]
+                       ["release_0" (make-attribute-ref "release")]
+                       ["good_0" (make-attribute-ref "good")]]
+                      tu/movie-table)
+                     (make-project
+                      [["id_1" (make-attribute-ref "id")]
+                       ["first_1" (make-attribute-ref "first")]
+                       ["last_1" (make-attribute-ref "last")]
+                       ["birthday_1" (make-attribute-ref "birthday")]
+                       ["sex_1" (make-attribute-ref "sex")]]
+                      tu/person-table))))]
+      (is (query? combine)))))
 
 (deftest expression->datum-test
   (is (= (list 'attribute-ref "two") (expression->datum
@@ -985,3 +1007,16 @@
                              aggr)]
       (is (= 0 (count-aggregations c1)))
       (is (= 1 (count-aggregations c2))))))
+
+
+(deftest project-aggregate?-test
+  (testing "with an aggregate on the rhs"
+    (testing "and only one column"
+      (is (project-aggregate? (make-project
+                               [["count" (make-aggregation :count-all)]]
+                               tu/person-table))))
+    (testing "and multiple columns"
+      (is (project-aggregate? (make-project
+                               [["count" (make-aggregation :count)]
+                                ["first" (make-attribute-ref "first")]]
+                               (make-group #{"first"} tu/person-table)))))))

@@ -13,20 +13,20 @@
 
 
 (deftest double?-test
-  (is (double? 0.3))
-  (is (double? 42.0))
-  (is (not (double? 1)))
-  (is (not (double? nil)))
-  (is (not (double? "string")))
-  (is (not (double? :keyword))))
+  (is (is-double? 0.3))
+  (is (is-double? 42.0))
+  (is (not (is-double? 1)))
+  (is (not (is-double? nil)))
+  (is (not (is-double? "string")))
+  (is (not (is-double? :keyword))))
 
-(deftest boolean?-test
-  (is (boolean? true))
-  (is (boolean? false))
-  (is (boolean? nil))
-  (is (not (boolean? 42)))
-  (is (not (boolean? "string")))
-  (is (not (boolean? :keyword))))
+(deftest is-boolean?-test
+  (is (is-boolean? true))
+  (is (is-boolean? false))
+  (is (is-boolean? nil))
+  (is (not (is-boolean? 42)))
+  (is (not (is-boolean? "string")))
+  (is (not (is-boolean? :keyword))))
 
 (deftest date?-test
   (is (date? (time/make-date 2000 1 1)))
@@ -56,20 +56,6 @@
   (is (null? {}))
   (is (null? #{}))
   (is (null? nil)))
-
-(deftest all?-test
-  (is (all? [true true]))
-  (is (not (any? [])))
-  (is (not (all? nil)))
-  (is (not (all? [true false])))
-  (is (not (all? [false true]))))
-
-(deftest any?-test
-  (is (not (any? [false false])))
-  (is (any? [true false]))
-  (is (any? [true true]))
-  (is (not (any? nil)))
-  (is (not (any? []))))
 
 (deftest type-member?-test
   (testing "base types"

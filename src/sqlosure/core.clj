@@ -1,16 +1,14 @@
 (ns sqlosure.core
-  (:require [active.clojure
-             [condition :refer [assertion-violation]]
-             [monad :refer :all]]
-            [sqlosure
-             [db-connection :as db]
-             [optimization :as opt]
-             [query-comprehension :as qc]
-             [relational-algebra :as rel]
-             [relational-algebra-sql :as rsql]
-             [sql :as sql]
-             [sql-put :as put]
-             [type :as t]]))
+  (:require [active.clojure.condition :refer [assertion-violation]]
+            [active.clojure.monad :refer :all]
+            [sqlosure.db-connection :as db]
+            [sqlosure.optimization :as opt]
+            [sqlosure.query-comprehension :as qc]
+            [sqlosure.relational-algebra :as rel]
+            [sqlosure.relational-algebra-sql :as rsql]
+            [sqlosure.sql :as sql]
+            [sqlosure.sql-put :as put]
+            [sqlosure.type :as t]))
 
 (defn db-connect
   "`db-connect` takes a connection map and returns a `db-connection`-record for
@@ -275,5 +273,7 @@
   "`put-query` takes a (relational algebra) query and returns it's (SQL-) string
   representation. Uses the default printer from `sqlosure.sql-put`."
   [q]
-  (->> q opt/optimize-query rsql/query->sql
-       (put/sql-select->string put/default-sql-put-parameterization)))
+  (->> q
+       opt/optimize-query
+       rsql/query->sql
+       put/sql-select->string))

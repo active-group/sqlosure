@@ -3,31 +3,24 @@
   :url "https://github.com/active-group/sqlosure"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.7.0"]
-                 [org.clojure/java.jdbc "0.6.0"]
+  :dependencies [[org.clojure/clojure "1.9.0"]
+                 [org.clojure/java.jdbc "0.7.8"]
                  ;; Refer to your required driver here.
-                 [org.postgresql/postgresql "9.4.1208"]
-                 [active-clojure "0.12.0"]]
+                 ;; [com.h2database/h2 "1.4.195"]
+                 ;; [org.postgresql/postgresql "9.4.1208"]
+                 [active-clojure "0.26.0"]]
   :plugins [[lein-cloverage "1.0.6"]
             [lein-kibit "0.1.2"]
             [lein-codox "0.9.4"]]
 
   :codox {:metadata {:doc/format :markdown}}
 
-  :profiles {:test {:dependencies [[pjstadig/humane-test-output "0.8.0"]]
-                    :injections [(require 'pjstadig.humane-test-output)
-                                 (pjstadig.humane-test-output/activate!)]}
-             :repl {:dependencies [[pjstadig/humane-test-output "0.8.0"]]
-                    :injections [(require 'pjstadig.humane-test-output)
-                                 (pjstadig.humane-test-output/activate!)
-                                 (require 'active.clojure.condition-hooks)
+  :profiles {:test {:dependencies [[com.h2database/h2 "1.4.197"]]}
+             :repl {
+                    :injections [(require 'active.clojure.condition-hooks)
                                  (active.clojure.condition-hooks/activate-clojure-test!)]}
-             :dev {:dependencies [[pjstadig/humane-test-output "0.8.0"]
-                                  [org.xerial/sqlite-jdbc "3.8.11.2"]
-                                  [org.clojure/tools.nrepl "0.2.12"]]
-                   :injections [(require 'pjstadig.humane-test-output)
-                                (pjstadig.humane-test-output/activate!)
-                                (require 'active.clojure.condition-hooks)
+             :dev {:dependencies [[com.h2database/h2 "1.4.197"]]
+                   :injections [(require 'active.clojure.condition-hooks)
                                 (active.clojure.condition-hooks/activate-clojure-test!)]}}
 
   :repl-options {:caught active.clojure.condition-hooks/repl-caught}
