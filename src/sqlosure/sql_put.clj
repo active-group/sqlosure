@@ -336,7 +336,7 @@
           v1 (mapcat #(put-when %) (sql/sql-expr-case-branches expr))
           _ (print " ELSE ")
           v2 (put-sql-expression (sql/sql-expr-case-default expr))
-          _ (print ")")]
+          _ (print "END)")]
       (concat v1 v2))
     (sql/sql-expr-exists? expr)
     (let [_ (print "EXISTS ")
