@@ -10,9 +10,9 @@
 ;;   backend specific implementation.
 (define-record-type TypeImplementation
   (make-type-implementation base-type to-sql from-sql) type-implementation?
-  [(base-type type-implementation-base-type type-implementation-base-type-lens)
-   (to-sql type-implementation-to-sql type-implementation-to-sql-lens)
-   (from-sql type-implementation-from-sql type-implementation-from-sql-lens)])
+  [base-type type-implementation-base-type
+   to-sql type-implementation-to-sql
+   from-sql type-implementation-from-sql])
 
 (defn implement
   [ty to-sql from-sql]

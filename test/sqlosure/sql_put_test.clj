@@ -53,14 +53,14 @@
            (constant-alias res-str)))
     (is (empty? res-args)))
   (let [q1 (-> (new-sql-select)
-               (lens/shove sql-select-tables-lens
+               (lens/shove sql-select-tables
                            [["S" (make-sql-select-table "SUPPLIERS")]
                             [nil (make-sql-select-table "CUSTOMERS")]])
-               (lens/shove sql-select-attributes-lens
+               (lens/shove sql-select-attributes
                            {"UID" (make-sql-expr-column "UID")})
-               (lens/shove sql-select-order-by-lens
+               (lens/shove sql-select-order-by
                            [[(make-sql-expr-column "uid") :ascending]])
-               (lens/shove sql-select-criteria-lens
+               (lens/shove sql-select-criteria
                            [(make-sql-expr-app op-<
                                                (make-sql-expr-column "foo")
                                                (make-sql-expr-const integer% 10))
@@ -68,10 +68,10 @@
                                                (make-sql-expr-column "uid")
                                                (make-sql-expr-const integer% 5))]))
         q2 (-> (new-sql-select)
-               (lens/shove sql-select-attributes-lens
+               (lens/shove sql-select-attributes
                            {"cost" (make-sql-expr-column "cost")})
                (add-table (make-sql-select-table "PARTS"))
-               (lens/shove sql-select-criteria-lens
+               (lens/shove sql-select-criteria
                            [(make-sql-expr-app op-<
                                                (make-sql-expr-column "cost")
                                                (make-sql-expr-const integer% 100))]))]
@@ -154,14 +154,14 @@
 
 (deftest default-put-combine-test
   (let [q1 (-> (new-sql-select)
-               (lens/shove sql-select-tables-lens
+               (lens/shove sql-select-tables
                            [["S" (make-sql-select-table "SUPPLIERS")]
                             [nil (make-sql-select-table "CUSTOMERS")]])
-               (lens/shove sql-select-attributes-lens
+               (lens/shove sql-select-attributes
                            {"UID" (make-sql-expr-column "UID")})
-               (lens/shove sql-select-order-by-lens
+               (lens/shove sql-select-order-by
                            [[(make-sql-expr-column "uid") :ascending]])
-               (lens/shove sql-select-criteria-lens
+               (lens/shove sql-select-criteria
                            [(make-sql-expr-app op-<
                                                (make-sql-expr-column "foo")
                                                (make-sql-expr-const integer% 10))
@@ -169,10 +169,10 @@
                                                (make-sql-expr-column "uid")
                                                (make-sql-expr-const integer% 5))]))
         q2 (-> (new-sql-select)
-               (lens/shove sql-select-attributes-lens
+               (lens/shove sql-select-attributes
                            {"cost" (make-sql-expr-column "cost")})
                (add-table (make-sql-select-table "PARTS"))
-               (lens/shove sql-select-criteria-lens
+               (lens/shove sql-select-criteria
                            [(make-sql-expr-app op-<
                                                (make-sql-expr-column "cost")
                                                (make-sql-expr-const integer% 100))]))

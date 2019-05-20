@@ -38,7 +38,7 @@
                     const->datum-fn datum->const-fn data)
   atomic-type?
   [name atomic-type-name
-   (nullable? atomic-type-nullable? atomic-type-nullable?-lens)
+   nullable? atomic-type-nullable?
    numeric? atomic-type-numeric?
    ordered? atomic-type-ordered?
    predicate atomic-type-predicate

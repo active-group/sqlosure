@@ -23,26 +23,26 @@
 
 (define-record-type Backend
   (make-backend type-implementations functions) backend?
-  [(type-implementations backend-type-implementations backend-type-implementations-lens)
-   (functions backend-functions backend-functions-lens)])
+  [type-implementations backend-type-implementations
+   functions backend-functions])
 
 (def backend (make-backend base/types {}))
 
 (defn add-type-implementation
   "Add a type `t` to a backend `backend`."
   [backend t]
-  (lens/overhaul backend backend-type-implementations-lens conj t))
+  (lens/overhaul backend backend-type-implementations conj t))
 
 (defn reify-type-implementation
   "Reify a specific aspect of a type-implementation of type `t`. Applies `f` at
   `lens` of the implementation of type t."
   [backend t lens f]
-  (lens/overhaul backend (lens/>> backend-type-implementations-lens (lens/member t) lens) f))
+  (lens/overhaul backend (lens/>> backend-type-implementations (lens/member t) lens) f))
 
 (defn get-type-implementation
   "Get the implementation for a type `ty` from a `backend`-implementation."
   [backend ty]
-  (if-let [res (lens/yank backend (lens/>> backend-type-implementations-lens
+  (if-let [res (lens/yank backend (lens/>> backend-type-implementations
                                            (lens/member ty)))]
     res
     (c/assertion-violation `get-type-implementation "no implementation for type" ty)))
@@ -50,12 +50,12 @@
 (defn add-function
   "Add a function `f` to a backend `backend`."
   [backend f]
-  (lens/overhaul backend backend-functions-lens conj f))
+  (lens/overhaul backend backend-functions conj f))
 
 (defn get-function
   "Get the implementation for a function `f` from a `backend`-implementation."
   [backend f]
-  (if-let [res (lens/yank backend (lens/>> backend-functions-lens
+  (if-let [res (lens/yank backend (lens/>> backend-functions
                                            (lens/member f)))]
     res
     (c/assertion-violation `get-function "no implementation for function" f)))

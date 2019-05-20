@@ -1,5 +1,5 @@
 (ns ^{:author "Marco Schneider"}
- sqlosure.relational-algebra
+  sqlosure.relational-algebra
   "Implementation of relational algebra based on Mike Sperbers relational-algebra.scm."
   (:require [active.clojure.condition :as c :refer [assertion-violation]]
             [active.clojure.lens :as lens]
@@ -16,7 +16,7 @@
    ^{:doc "Map of labels to types."}
    map rel-scheme-map
    ^{:doc "`nil` or set of grouped column labels"}
-   (grouped rel-scheme-grouped rel-scheme-grouped-lens)])
+   grouped rel-scheme-grouped])
 
 (defn make-rel-scheme [columns map grouped]
   (c/assert (not (set? columns)))
@@ -414,7 +414,7 @@
                                  (query-scheme query-2 env))
            (assertion-violation `make-combine "scheme mismatch" rel-op s1 query-2))
          s1)))))
-               
+
 (defn make-left-outer-product [query-1 query-2]
   (make-combine :left-outer-product query-1 query-2))
 
@@ -490,7 +490,7 @@
      (really-make-group columns query)
      (fn [env]
        (lens/overhaul (query-scheme query env)
-                      rel-scheme-grouped-lens
+                      rel-scheme-grouped
                       union columns)))))
 
 (define-record-type Distinct

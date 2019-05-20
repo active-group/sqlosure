@@ -12,8 +12,8 @@
   "Takes a type-implementation and returns an implementation with it's
   atomic-type set to nullable."
   [impl]
-  (lens/shove impl (lens/>> ti/type-implementation-base-type-lens
-                            type/atomic-type-nullable?-lens)
+  (lens/shove impl (lens/>> ti/type-implementation-base-type
+                            type/atomic-type-nullable?)
               true))
 
 (def string%
