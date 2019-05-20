@@ -241,9 +241,9 @@
                           (str "LIMIT " (rel/top-count q)))
                         (sql/sql-select-extra sql))))
 
-    (rel/distinct? q)
-    (let [sql (x->sql-select (query->sql (rel/distinct-query q)))]
-      (lens/overhaul sql sql/sql-select-options-lens conj "DISTINCT"))
+    (rel/distinct-q? q)
+    (let [sql (x->sql-select (query->sql (rel/distinct-q-query q)))]
+      (lens/overhaul sql sql/sql-select-options conj "DISTINCT"))
 
     (rel/empty-query? q) sql/the-sql-select-empty
     :else                (c/assertion-violation `query->sql "unknown query" (pr-str q))))

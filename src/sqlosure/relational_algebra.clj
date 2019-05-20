@@ -493,16 +493,18 @@
                       rel-scheme-grouped
                       union columns)))))
 
-(define-record-type Distinct
-  (really-make-distinct query) distinct?
-  [query distinct-query])
+(define-record-type DistinctQ
+  (really-make-distinct-q query) distinct-q?
+  [query distinct-q-query])
 
 (defn make-distinct
   [query]
   (attach-rel-scheme-cache
-   (really-make-distinct query)
+   (really-make-distinct-q query)
    (fn [env]
      (query-scheme query env))))
+
+;; END QUERIES
 
 (define-record-type tuple
   (make-tuple expressions) tuple?
@@ -671,7 +673,7 @@
   "Returns true if the `obj` is a query."
   [obj]
   (or (empty-query? obj) (base-relation? obj) (project? obj) (restrict? obj) (restrict-outer? obj)
-      (combine? obj) (order? obj) (group? obj) (top? obj) (distinct? obj)))
+      (combine? obj) (order? obj) (group? obj) (top? obj) (distinct-q? obj)))
 
 (declare query->datum)
 
@@ -717,7 +719,7 @@
                      (group-columns q)
                      (query->datum (group-query q)))
     (top? q) (list 'top (top-offset q) (top-count q) (query->datum (top-query q)))
-    (distinct? q) (list 'distinct (query->datum (distinct-query q)))
+    (distinct-q? q) (list 'distinct (query->datum (distinct-q-query q)))
     :else (assertion-violation `query->datum "unknown query" q)))
 
 (declare datum->expression)
@@ -878,7 +880,7 @@
     (recur (group-query q))
     
     (top? q)      (query-attribute-names (top-query q))
-    (distinct? q) (query-attribute-names (distinct-query q))
+    (distinct-q? q) (query-attribute-names (distinct-q-query q))
     :else         (assertion-violation `query-attribute-names "unknown query" q)))
 
 (declare query-substitute-attribute-refs)
@@ -944,7 +946,7 @@
                              (next-step (group-query q)))
       
       (top? q)      (make-top (top-offset q) (top-count q) (next-step (top-query q)))
-      (distinct? q) (make-distinct (next-step (distinct-query q)))
+      (distinct-q? q) (make-distinct (next-step (distinct-q-query q)))
       :else         (assertion-violation `query-substitute-attribute-refs "unknown query" q))))
 
 (defn count-aggregations
