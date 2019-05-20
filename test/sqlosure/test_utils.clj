@@ -138,3 +138,9 @@
       (reset! current-movie-id 0)
       (reset! current-person-id 0)
       res)))
+
+(defn constant-alias
+  "Takes a string representing a SQL query and returns it
+   will all the auto-generated aliases set to \"alias\"."
+  [s]
+  (clojure.string/replace s #"G__\d+" "alias"))

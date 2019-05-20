@@ -1,6 +1,7 @@
 (ns sqlosure.query-comprehension-test
   (:require [active.clojure.monad :refer :all]
             [clojure.test :refer :all]
+            [sqlosure.test-utils :refer [constant-alias]]
             [sqlosure
              [optimization :as opt]
              [query-comprehension :refer :all]
@@ -35,14 +36,15 @@
    (query->sql query)))
 
 (deftest const-restrict-test
-  (is (= ["SELECT two AS foo FROM tbl1 WHERE (one = ?)" [string% "foobar"]]
-         (sqlosure.sql-put/sql-select->string
-          (query->sql (opt/optimize-query
-                       (get-query (monadic
-                                   [t1 (embed tbl1)]
-                                   (restrict (=$ (! t1 "one")
-                                                 (make-const string% "foobar")))
-                                   (project [["foo" (! t1 "two")]])))))))))
+  (is (= ["SELECT two AS foo FROM tbl1 AS alias WHERE (one = ?)" [string% "foobar"]]
+         (let [[s args] (sqlosure.sql-put/sql-select->string
+                          (query->sql (opt/optimize-query
+                                        (get-query (monadic
+                                                     [t1 (embed tbl1)]
+                                                     (restrict (=$ (! t1 "one")
+                                                                   (make-const string% "foobar")))
+                                                     (project [["foo" (! t1 "two")]]))))))]
+           [(constant-alias s) args]))))
 
 (deftest group-test
   (is (rel-scheme=?
