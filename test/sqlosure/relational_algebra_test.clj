@@ -438,12 +438,12 @@
     (testing "grouping"
       (is (= (lens/shove (alist->rel-scheme [["one" string%]
                                              ["two" integer%]])
-                         rel-scheme-grouped-lens
+                         rel-scheme-grouped
                          #{"one"})
              (query-scheme (make-group #{"one"} tbl1))))
       (is (= (lens/shove (alist->rel-scheme [["one" string%]
                                              ["two" integer%]])
-                         rel-scheme-grouped-lens
+                         rel-scheme-grouped
                          #{"one" "two"})
              (query-scheme (make-group #{"two"} (make-group #{"one"} tbl1)))))
       ;; Note: make-extend is used by query-comprehension/project,

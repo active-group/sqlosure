@@ -3,6 +3,7 @@
             [sqlosure.sql :refer :all]
             [sqlosure.relational-algebra-sql :refer :all]
             [sqlosure.relational-algebra :refer :all]
+            [sqlosure.test-utils :refer [constant-alias]]
             [sqlosure.type :refer [string% integer% double% boolean%]]
             [clojure.test :refer :all]
             [clojure.string :as s]
@@ -48,17 +49,18 @@
         q (query->sql o)
         [res-str res-args] (with-out-str-and-value
                              (put-sql-select q))]
-    (is (= "SELECT * FROM tbl1 ORDER BY one ASC" res-str))
-    (is (= res-args '())))
+    (is (= "SELECT * FROM tbl1 AS alias ORDER BY one ASC" 
+           (constant-alias res-str)))
+    (is (empty? res-args)))
   (let [q1 (-> (new-sql-select)
-               (lens/shove sql-select-tables-lens
+               (lens/shove sql-select-tables
                            [["S" (make-sql-select-table "SUPPLIERS")]
                             [nil (make-sql-select-table "CUSTOMERS")]])
-               (lens/shove sql-select-attributes-lens
+               (lens/shove sql-select-attributes
                            {"UID" (make-sql-expr-column "UID")})
-               (lens/shove sql-select-order-by-lens
+               (lens/shove sql-select-order-by
                            [[(make-sql-expr-column "uid") :ascending]])
-               (lens/shove sql-select-criteria-lens
+               (lens/shove sql-select-criteria
                            [(make-sql-expr-app op-<
                                                (make-sql-expr-column "foo")
                                                (make-sql-expr-const integer% 10))
@@ -66,23 +68,31 @@
                                                (make-sql-expr-column "uid")
                                                (make-sql-expr-const integer% 5))]))
         q2 (-> (new-sql-select)
-               (lens/shove sql-select-attributes-lens
+               (lens/shove sql-select-attributes
                            {"cost" (make-sql-expr-column "cost")})
                (add-table (make-sql-select-table "PARTS"))
-               (lens/shove sql-select-criteria-lens
+               (lens/shove sql-select-criteria
                            [(make-sql-expr-app op-<
                                                (make-sql-expr-column "cost")
                                                (make-sql-expr-const integer% 100))]))]
-    (let [[res-str res-args]
-          (with-out-str-and-value (put-sql-select q1))]
-      (is (= "SELECT UID FROM SUPPLIERS AS S, CUSTOMERS WHERE (foo < ?) AND (uid = ?) ORDER BY uid ASC"
-             res-str))
+    (let [[res-str res-args] (with-out-str-and-value (put-sql-select q1))]
+      (is (= (str "SELECT UID FROM SUPPLIERS AS S, CUSTOMERS AS alias "
+                  "WHERE (foo < ?) AND (uid = ?) "
+                  "ORDER BY uid ASC")
+             (constant-alias res-str)))
       (is (= [[integer% 10] [integer% 5]] res-args)))
     (let [[res-str res-args]
           (with-out-str-and-value (put-sql-select
                                    (make-sql-select-combine :union q1 q2)))]
-      (is (= "(SELECT UID FROM SUPPLIERS AS S, CUSTOMERS WHERE (foo < ?) AND (uid = ?) ORDER BY uid ASC) UNION (SELECT cost FROM PARTS WHERE (cost < ?))"
-             res-str))
+      (is (= (str "(SELECT UID "
+                  "FROM SUPPLIERS AS S, CUSTOMERS AS alias "
+                  "WHERE (foo < ?) AND (uid = ?) "
+                  "ORDER BY uid ASC) "
+                  "UNION "
+                  "(SELECT cost "
+                  "FROM PARTS AS alias "
+                  "WHERE (cost < ?))")
+             (constant-alias res-str)))
       (is (= [[integer% 10] [integer% 5] [integer% 100]] res-args)))))
 
 (deftest put-sql-outer-join-test
@@ -97,8 +107,8 @@
           sql (query->sql r)]
       (let [[res-str res-args]
             (with-out-str-and-value (put-sql-select sql))]
-        (is (= "SELECT * FROM t1 LEFT JOIN t2 ON (C = D)"
-               res-str)))))
+        (is (= "SELECT * FROM t1 AS alias LEFT JOIN t2 AS alias ON (C = D)"
+               (constant-alias res-str))))))
   (testing "multiple tables on the left"
     (let [t1 (make-sql-table "t1"
                              (alist->rel-scheme [["C" string%]]))
@@ -113,8 +123,10 @@
       
       (let [[res-str res-args]
             (with-out-str-and-value (put-sql-select sql))]
-        (is (= "SELECT * FROM (SELECT * FROM t1, t2) LEFT JOIN t3 ON (C = E)"
-               res-str))))))
+        (is (= (str "SELECT * "
+                    "FROM (SELECT * FROM t1 AS alias, t2 AS alias) AS alias "
+                    "LEFT JOIN t3 AS alias ON (C = E)")
+               (constant-alias res-str)))))))
 
 
 (deftest put-joining-infix-test
@@ -124,13 +136,14 @@
          (with-out-str (put-joining-infix ["foo" "bar" "baz"] "-" print)))))
 
 (deftest put-tables-test
-  (is (= "foo"
-         (with-out-str (put-tables [[nil (make-sql-select-table "foo")]]
-                                   ", "))))
-  (is (= "foo, bar AS b"
-         (with-out-str (put-tables [[nil (make-sql-select-table "foo")]
+  (let [res (with-out-str (put-tables [[nil (make-sql-select-table "foo")]] ", "))]
+        (is (s/includes? res "foo"))
+        (is (s/includes? res "G__")))
+  (let [res (with-out-str (put-tables [[nil (make-sql-select-table "foo")]
                                     ["b" (make-sql-select-table "bar")]]
-                                   ", ")))))
+                                   ", "))]
+    (is (s/includes? res "foo AS G__"))
+    (is (s/includes? res "bar AS b"))))
 
 (deftest default-put-literal-test
   (is (= ["?" [[integer% 42]]] (with-out-str-and-value (default-put-literal integer% 42))))
@@ -141,14 +154,14 @@
 
 (deftest default-put-combine-test
   (let [q1 (-> (new-sql-select)
-               (lens/shove sql-select-tables-lens
+               (lens/shove sql-select-tables
                            [["S" (make-sql-select-table "SUPPLIERS")]
                             [nil (make-sql-select-table "CUSTOMERS")]])
-               (lens/shove sql-select-attributes-lens
+               (lens/shove sql-select-attributes
                            {"UID" (make-sql-expr-column "UID")})
-               (lens/shove sql-select-order-by-lens
+               (lens/shove sql-select-order-by
                            [[(make-sql-expr-column "uid") :ascending]])
-               (lens/shove sql-select-criteria-lens
+               (lens/shove sql-select-criteria
                            [(make-sql-expr-app op-<
                                                (make-sql-expr-column "foo")
                                                (make-sql-expr-const integer% 10))
@@ -156,23 +169,28 @@
                                                (make-sql-expr-column "uid")
                                                (make-sql-expr-const integer% 5))]))
         q2 (-> (new-sql-select)
-               (lens/shove sql-select-attributes-lens
+               (lens/shove sql-select-attributes
                            {"cost" (make-sql-expr-column "cost")})
                (add-table (make-sql-select-table "PARTS"))
-               (lens/shove sql-select-criteria-lens
+               (lens/shove sql-select-criteria
                            [(make-sql-expr-app op-<
                                                (make-sql-expr-column "cost")
                                                (make-sql-expr-const integer% 100))]))
         [res-str res-args] (with-out-str-and-value (default-put-combine :union q1 q2))]
-    (is (= "(SELECT UID FROM SUPPLIERS AS S, CUSTOMERS WHERE (foo < ?) AND (uid = ?) ORDER BY uid ASC) UNION (SELECT cost FROM PARTS WHERE (cost < ?))" res-str))
+    (is (= (str "(SELECT UID "
+                "FROM SUPPLIERS AS S, CUSTOMERS AS alias "
+                "WHERE (foo < ?) AND (uid = ?) "
+                "ORDER BY uid ASC) "
+                "UNION "
+                "(SELECT cost FROM PARTS AS alias "
+                "WHERE (cost < ?))")
+           (constant-alias res-str)))
     (is (= [[integer% 10] [integer% 5] [integer% 100]] res-args))))
 
 (deftest put-when-test
   (is (= ["WHEN ? THEN ?" [[string% "foo"] [string% "bar"]]]
          (with-out-str-and-value (put-when [(make-sql-expr-const string% "foo")
                                             (make-sql-expr-const string% "bar")])))))
-
-(= '("foo" "bar") ["foo" "bar"] (list "foo" "bar"))
 
 (deftest put-where-test
   (is (= ["WHERE (cost = ?) AND (foo = ?)" [[integer% 100] [string% "bar"]]]
@@ -205,24 +223,25 @@
 (deftest put-having-test
   (is (= ["HAVING (year < ?)" [[integer% 2000]]]
          (with-out-str-and-value (put-having [(make-sql-expr-app
-                                               op-<
-                                               (make-sql-expr-column "year")
-                                               (make-sql-expr-const integer% 2000))]))))
+                                                op-<
+                                                (make-sql-expr-column "year")
+                                                (make-sql-expr-const integer% 2000))]))))
   (is (= ["HAVING ((year < ?), (director = ?))" [[integer% 2000] [string% "Luc Besson"]]]
          (with-out-str-and-value (put-having
-                                  [(make-sql-expr-tuple
-                                    [(make-sql-expr-app
-                                      op-<
-                                      (make-sql-expr-column "year")
-                                      (make-sql-expr-const integer% 2000))
-                                     (make-sql-expr-app
-                                      op-=
-                                      (make-sql-expr-column "director")
-                                      (make-sql-expr-const string% "Luc Besson"))])])))))
+                                   [(make-sql-expr-tuple
+                                      [(make-sql-expr-app
+                                         op-<
+                                         (make-sql-expr-column "year")
+                                         (make-sql-expr-const integer% 2000))
+                                       (make-sql-expr-app
+                                         op-=
+                                         (make-sql-expr-column "director")
+                                         (make-sql-expr-const string% "Luc Besson"))])])))))
 
 (deftest put-attributes-test
   (is (= "*" (with-out-str (put-attributes nil))))
-  (is (= "foo, bar AS something-else, same"
-         (with-out-str (put-attributes [[nil (make-sql-expr-column "foo")]
-                                        ["something-else" (make-sql-expr-column "bar")]
-                                        ["same" (make-sql-expr-column "same")]])))))
+  (is (= "foo AS alias, bar AS something-else, same"
+         (constant-alias
+           (with-out-str (put-attributes [[nil (make-sql-expr-column "foo")]
+                                          ["something-else" (make-sql-expr-column "bar")]
+                                          ["same" (make-sql-expr-column "same")]]))))))

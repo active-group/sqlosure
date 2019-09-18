@@ -13,8 +13,8 @@
 (defn db-connect
   "`db-connect` takes a connection map and returns a `db-connection`-record for
   that backend. Dispatches on the `:classname` key in `db-spec`."
-  [db-spec]
-  (db/make-db-connection db-spec))
+  [db-spec backend]
+  (db/make-db-connection db-spec backend))
 
 (defn table
   "Returns a `sqlosure.relational-algebra/base-relation`.
@@ -129,6 +129,10 @@
   ([n] (qc/top nil n))
   ([offset n] (qc/top offset n)))
 
+(def distinct!
+  "`distinct!` is used to define queries that only return distinct rows.
+  Will result in a `DISTINCT` clause in the resulting SQL."
+  qc/distinct!)
 
 ;; -----------------------------------------------------------------------------
 ;; -- Shortcuts for aggretations functions.
@@ -215,7 +219,7 @@
 (def $and sql/and$)
 (def $>= sql/>=$)
 (def $<= sql/<=$)
-(def $> sql/<$)
+(def $> sql/>$)
 (def $< sql/<$)
 (def $plus sql/plus$)
 (def $minus sql/minus$)
@@ -265,6 +269,7 @@
 (def $double-null-t t/double%-nullable)
 (def $blob-null-t t/blob%-nullable)
 (def $bytea-null-t t/bytea%-nullable)
+(def $date-null-t t/date%-nullable)
 
 ;; -----------------------------------------------------------------------------
 ;; -- Helper
@@ -272,8 +277,9 @@
 (defn put-query
   "`put-query` takes a (relational algebra) query and returns it's (SQL-) string
   representation. Uses the default printer from `sqlosure.sql-put`."
-  [q]
-  (->> q
-       opt/optimize-query
-       rsql/query->sql
-       put/sql-select->string))
+  [q & {:keys [optimize?]}]
+  (let [optimize (if optimize? opt/optimize-query identity)]
+    (->> q
+         optimize
+         rsql/query->sql
+         put/sql-select->string)))

@@ -2,26 +2,29 @@
   :description "Compositional relational queries."
   :url "https://github.com/active-group/sqlosure"
   :license {:name "Eclipse Public License"
-            :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.9.0"]
-                 [org.clojure/java.jdbc "0.7.8"]
+            :url  "http://www.eclipse.org/legal/epl-v10.html"}
+  :dependencies [[org.clojure/clojure "1.10.0"]
+                 [org.clojure/java.jdbc "0.7.10"]
                  ;; Refer to your required driver here.
                  ;; [com.h2database/h2 "1.4.195"]
-                 ;; [org.postgresql/postgresql "9.4.1208"]
-                 [active-clojure "0.26.0"]]
+                 [org.postgresql/postgresql "42.2.8"]
+                 [active-clojure "0.27.0"]]
   :plugins [[lein-cloverage "1.0.6"]
             [lein-kibit "0.1.2"]
             [lein-codox "0.9.4"]]
 
   :codox {:metadata {:doc/format :markdown}}
 
-  :profiles {:test {:dependencies [[com.h2database/h2 "1.4.197"]]}
-             :repl {
-                    :injections [(require 'active.clojure.condition-hooks)
+  :profiles {:test {:dependencies [[com.h2database/h2 "1.4.199"]]}
+             :repl {:injections [(require 'active.clojure.condition-hooks)
                                  (active.clojure.condition-hooks/activate-clojure-test!)]}
-             :dev {:dependencies [[com.h2database/h2 "1.4.197"]]
-                   :injections [(require 'active.clojure.condition-hooks)
-                                (active.clojure.condition-hooks/activate-clojure-test!)]}}
+             :dev  {:dependencies [[com.h2database/h2 "1.4.199"]]
+                    :injections   [(require 'active.clojure.condition-hooks)
+                                   (active.clojure.condition-hooks/activate-clojure-test!)]}}
+
+  :test-selectors {:default   (complement :northwind)
+                   :northwind :northwind
+                   :all       (constantly true)}
 
   :repl-options {:caught active.clojure.condition-hooks/repl-caught}
 

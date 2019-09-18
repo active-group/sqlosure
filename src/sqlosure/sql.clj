@@ -59,34 +59,33 @@
    ;; [] is for '*'
    ;; nil means open - can still add some
    ;; result
-   (attributes sql-select-attributes sql-select-attributes-lens)
+   attributes sql-select-attributes
    ;; true if the select represents a nullary relation. In this case,
    ;; attributes should contain a single dummy attribute.
    ;; TODO / FIXME: Is this comment still true?
-   (nullary? sql-select-nullary? sql-select-nullary?-lens)
+   nullary? sql-select-nullary?
    ;; [ [alias sql-select-talbe] ]
    ;; FROM
-   (tables sql-select-tables sql-select-tables-lens) ;; (vec-of ["alias" sql-select-table])
+   tables sql-select-tables ;; (vec-of ["alias" sql-select-table])
    ;; [ sql-expr ]
    ;; WHERE
    ;; [ sql-expr ]
    ;; GROUP-BY
-   (outer-tables sql-select-outer-tables sql-select-outer-tables-lens)
-   (criteria sql-select-criteria sql-select-criteria-lens)
-   (outer-criteria sql-select-outer-criteria sql-select-outer-criteria-lens)
+   outer-tables sql-select-outer-tables
+   criteria sql-select-criteria
+   outer-criteria sql-select-outer-criteria
 
    ^{:doc "set of SQL column names or `nil`."}
-   (group-by sql-select-group-by sql-select-group-by-lens)
+   group-by sql-select-group-by
 
    ^{:doc "List of SQL expressions or nil."}
-   (having sql-select-having sql-select-having-lens)
+   having sql-select-having
    ;; [ {sql-expr sql-order} ]
    ;; ORDER BY
-   ;; FIXME: only column names allowed here
-   (order-by sql-select-order-by sql-select-order-by-lens)
+   order-by sql-select-order-by
    ;; [ string ]
    ;; TOP n, etc.
-   (extra sql-select-extra sql-select-extra-lens)])
+   extra sql-select-extra])
 
 (defn new-sql-select
   "Create a new, empty sql-select."

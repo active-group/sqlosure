@@ -5,7 +5,8 @@
             [active.clojure.monad :refer :all]
             [active.clojure.record :refer [define-record-type]]
             [active.clojure.condition :refer [assertion-violation]]
-            [clojure.pprint :refer [pprint]]))
+            [clojure.pprint :refer [pprint]]
+            [active.clojure.condition :as c]))
 
 (define-record-type relation
   ^{:doc "`relation` is used to track the current state and later rebuild the resulting,
@@ -74,7 +75,7 @@ correct references when running the query monad."}
    [alias new-alias]
    [query current-query]
    (let [query' ((if extend? rel/make-extend rel/make-project)
-                 (map (fn [[k v]] [(fresh-name k alias) v])
+                 (mapv (fn [[k v]] [(fresh-name k alias) v])
                       alist)
                  query)])
    (set-query! query')
@@ -87,21 +88,27 @@ correct references when running the query monad."}
                       [k (rel/expression-type env v)])
                     alist)))))))
 
+(defn assert-alist
+  [caller coll]
+  (if (or (list? coll) (vector? coll))
+    coll
+    (c/assertion-violation caller "alist must be an ordered collection" coll)))
+
 (defn project
   "Project some columns of the current query. Returns the resulting state.
 
   Example: (monadic [t (<- embed t-table)]
-                    (project {\"foo\" (! t \"foo\")
-                              \"bar\" (! t \"bar\"))
+                    (project [[\"foo\" (! t \"foo\")]
+                              [\"bar\" (! t \"bar\")]])
 
   The corresponding SQL statemant would be \"SELECT foo, bar FROM t\"."
   [alist]
-  (project0 alist true))
+  (project0 (assert-alist `project alist) true))
 
 (defn project-only ;; FIXME: temporary solution? Can't detect automatically what's needed?
   "Project the some columns of the current query."
   [alist]
-  (project0 alist false))
+  (project0 (assert-alist `project-only alist) false))
 
 ;; FIXME: add !
 (defn restrict
@@ -337,3 +344,7 @@ correct references when running the query monad."}
    (monadic
     [old current-query]
     (set-query! (rel/make-top offset n old)))))
+
+(def distinct!
+  (monadic [old current-query]
+           (set-query! (rel/make-distinct old))))

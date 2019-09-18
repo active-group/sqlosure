@@ -1,5 +1,5 @@
 (ns ^{:author "Marco Schneider"}
- sqlosure.relational-algebra
+  sqlosure.relational-algebra
   "Implementation of relational algebra based on Mike Sperbers relational-algebra.scm."
   (:require [active.clojure.condition :as c :refer [assertion-violation]]
             [active.clojure.lens :as lens]
@@ -16,7 +16,7 @@
    ^{:doc "Map of labels to types."}
    map rel-scheme-map
    ^{:doc "`nil` or set of grouped column labels"}
-   (grouped rel-scheme-grouped rel-scheme-grouped-lens)])
+   grouped rel-scheme-grouped])
 
 (defn make-rel-scheme [columns map grouped]
   (c/assert (not (set? columns)))
@@ -414,7 +414,7 @@
                                  (query-scheme query-2 env))
            (assertion-violation `make-combine "scheme mismatch" rel-op s1 query-2))
          s1)))))
-               
+
 (defn make-left-outer-product [query-1 query-2]
   (make-combine :left-outer-product query-1 query-2))
 
@@ -491,8 +491,21 @@
      (really-make-group columns query)
      (fn [env]
        (lens/overhaul (query-scheme query env)
-                      rel-scheme-grouped-lens
+                      rel-scheme-grouped
                       union columns)))))
+
+(define-record-type DistinctQ
+  (really-make-distinct-q query) distinct-q?
+  [query distinct-q-query])
+
+(defn make-distinct
+  [query]
+  (attach-rel-scheme-cache
+   (really-make-distinct-q query)
+   (fn [env]
+     (query-scheme query env))))
+
+;; END QUERIES
 
 (define-record-type tuple
   (make-tuple expressions) tuple?
@@ -666,7 +679,7 @@
   "Returns true if the `obj` is a query."
   [obj]
   (or (empty-query? obj) (base-relation? obj) (project? obj) (restrict? obj) (restrict-outer? obj)
-      (combine? obj) (order? obj) (group? obj) (top? obj)))
+      (combine? obj) (order? obj) (group? obj) (top? obj) (distinct-q? obj)))
 
 (declare query->datum)
 
@@ -712,6 +725,7 @@
                      (group-columns q)
                      (query->datum (group-query q)))
     (top? q) (list 'top (top-offset q) (top-count q) (query->datum (top-query q)))
+    (distinct-q? q) (list 'distinct (query->datum (distinct-q-query q)))
     :else (assertion-violation `query->datum "unknown query" q)))
 
 (declare datum->expression)
@@ -844,7 +858,7 @@
     (empty-query? q) nil
     (base-relation? q) nil
     (project? q)
-    (let [subq (project-query q)
+    (let [subq  (project-query q)
           alist (project-alist q)]
       (apply union
              (set (rel-scheme-columns (query-scheme subq)))
@@ -856,9 +870,9 @@
        (set (rel-scheme-columns (query-scheme sub)))
        (query-attribute-names sub)
        (expression-attribute-names (restrict-exp q))))
-    (combine? q) (union
-                  (query-attribute-names (combine-query-1 q))
-                  (query-attribute-names (combine-query-2 q)))
+    (combine? q)       (union
+                        (query-attribute-names (combine-query-1 q))
+                        (query-attribute-names (combine-query-2 q)))
     (restrict-outer? q)
     (let [sub (restrict-outer-query q)]
       (union
@@ -866,7 +880,7 @@
        (query-attribute-names sub)
        (expression-attribute-names (restrict-outer-exp q))))
     (order? q)
-    (let [subq (order-query q)
+    (let [subq  (order-query q)
           alist (order-alist q)]
       (apply union
              (set (rel-scheme-columns (query-scheme subq)))
@@ -876,8 +890,9 @@
     (group? q)
     (recur (group-query q))
     
-    (top? q) (query-attribute-names (top-query q))
-    :else (assertion-violation `query-attribute-names "unknown query" q)))
+    (top? q)      (query-attribute-names (top-query q))
+    (distinct-q? q) (query-attribute-names (distinct-q-query q))
+    :else         (assertion-violation `query-attribute-names "unknown query" q)))
 
 (declare query-substitute-attribute-refs)
 
@@ -911,19 +926,19 @@
   [alist q]
   (letfn [(next-step [qq] (query-substitute-attribute-refs alist qq))]
     (cond
-      (empty-query? q) q
-      (base-relation? q) q
-      (project? q) (let [sub (project-query q)
-                         culled (cull-substitution-alist alist sub)]
-                     (make-project
-                      (map (fn [[k v]] [k (substitute-attribute-refs culled v)])
-                           (project-alist q))
-                      (next-step sub)))
-      (restrict? q) (let [sub (restrict-query q)
-                          culled (cull-substitution-alist alist sub)]
-                      (make-restrict (substitute-attribute-refs culled (restrict-exp q))
-                                     (next-step sub)))
-      (restrict-outer? q) (let [sub (restrict-outer-query q)
+      (empty-query? q)    q
+      (base-relation? q)  q
+      (project? q)        (let [sub    (project-query q)
+                                culled (cull-substitution-alist alist sub)]
+                            (make-project
+                             (map (fn [[k v]] [k (substitute-attribute-refs culled v)])
+                                  (project-alist q))
+                             (next-step sub)))
+      (restrict? q)       (let [sub    (restrict-query q)
+                                culled (cull-substitution-alist alist sub)]
+                            (make-restrict (substitute-attribute-refs culled (restrict-exp q))
+                                           (next-step sub)))
+      (restrict-outer? q) (let [sub    (restrict-outer-query q)
                                 culled (cull-substitution-alist alist sub)]
                             (make-restrict-outer (substitute-attribute-refs culled (restrict-outer-exp q))
                                                  (next-step sub)))
@@ -931,18 +946,19 @@
       (combine? q) (make-combine (combine-rel-op q)
                                  (next-step (combine-query-1 q))
                                  (next-step (combine-query-2 q)))
-      (order? q) (let [sub (order-query q)
-                       culled (cull-substitution-alist alist sub)]
-                   (make-order (map (fn [[k v]]
-                                      [(substitute-attribute-refs culled k) v])
-                                    (order-alist q))
-                               (next-step sub)))
+      (order? q)   (let [sub    (order-query q)
+                         culled (cull-substitution-alist alist sub)]
+                     (make-order (map (fn [[k v]]
+                                        [(substitute-attribute-refs culled k) v])
+                                      (order-alist q))
+                                 (next-step sub)))
 
       (group? q) (make-group (group-columns q)
                              (next-step (group-query q)))
       
-      (top? q) (make-top (top-offset q) (top-count q) (next-step (top-query q)))
-      :else (assertion-violation `query-substitute-attribute-refs "unknown query" q))))
+      (top? q)      (make-top (top-offset q) (top-count q) (next-step (top-query q)))
+      (distinct-q? q) (make-distinct (next-step (distinct-q-query q)))
+      :else         (assertion-violation `query-substitute-attribute-refs "unknown query" q))))
 
 (defn count-aggregations
   "Count all aggregations in an expression."

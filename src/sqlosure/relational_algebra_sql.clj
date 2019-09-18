@@ -11,23 +11,23 @@
     (sql/sql-select-empty? sql) (sql/new-sql-select)
 
     (sql/sql-select-table? sql)
-    (lens/shove (sql/new-sql-select) sql/sql-select-tables-lens [[nil sql]])
+    (lens/shove (sql/new-sql-select) sql/sql-select-tables [[nil sql]])
 
     (sql/sql-select-combine? sql)
-    (lens/shove (sql/new-sql-select) sql/sql-select-tables-lens [[nil sql]])
+    (lens/shove (sql/new-sql-select) sql/sql-select-tables [[nil sql]])
 
     (sql/sql-select? sql)
     (cond
       (nil? (sql/sql-select-attributes sql)) sql
 
       (some? (sql/sql-select-group-by sql))
-      (lens/shove (sql/new-sql-select) sql/sql-select-tables-lens [[nil sql]])
+      (lens/shove (sql/new-sql-select) sql/sql-select-tables [[nil sql]])
 
        :else
       (-> (sql/new-sql-select)
-          (lens/shove sql/sql-select-tables-lens
-                      [[nil (lens/shove sql sql/sql-select-group-by-lens nil)]])
-          (lens/shove sql/sql-select-group-by-lens (sql/sql-select-group-by sql))))))
+          (lens/shove sql/sql-select-tables
+                      [[nil (lens/shove sql sql/sql-select-group-by nil)]])
+          (lens/shove sql/sql-select-group-by (sql/sql-select-group-by sql))))))
 
 (defn aggregation-op->sql
   "Takes an op keyword and returns the corresponding sql-op. If there is no
@@ -90,7 +90,7 @@
 (defn add-table
   "Takes an sql-select statement and adds a table to its select-tables list."
   [sql q]
-  (lens/shove sql sql/sql-select-tables-lens
+  (lens/shove sql sql/sql-select-tables
               (conj (sql/sql-select-tables sql) [nil q])))
 
 (defn project->sql
@@ -99,9 +99,9 @@
   (let [alist (rel/project-alist q)]
     (lens/shove
      (lens/shove (x->sql-select (query->sql (rel/project-query q)))
-                 sql/sql-select-attributes-lens
+                 sql/sql-select-attributes
                  (project-alist->sql alist))
-     sql/sql-select-nullary?-lens
+     sql/sql-select-nullary?
      (empty? alist))))
 
 (defn query->sql
@@ -109,26 +109,26 @@
   abstract sql."
   [q]
   (cond
-    (rel/empty-query? q) (sql/the-sql-select-empty)
+    (rel/empty-query? q)    (sql/the-sql-select-empty)
     (rel/base-relation? q)
     (if-not (sql/sql-table? (rel/base-relation-handle q))
       (c/assertion-violation `query->sql "base relation not a SQL table" q)
       ;; FIXME: results in select * from, but should select in the order of column in rel:
       (sql/make-sql-select-table (sql/sql-table-name (rel/base-relation-handle q))))
-    (rel/project? q) (project->sql q)
-    (rel/restrict? q) (let [sql (x->sql-select (query->sql
-                                                (rel/restrict-query q)))
-                            exp (rel/restrict-exp q)]
-                        (if (rel/aggregate? exp)
-                          (lens/shove sql sql/sql-select-having-lens
-                                      (cons (expression->sql exp)
-                                            (sql/sql-select-having sql)))
-                          (lens/shove sql sql/sql-select-criteria-lens
-                                      (cons (expression->sql exp)
-                                            (sql/sql-select-criteria sql)))))
+    (rel/project? q)        (project->sql q)
+    (rel/restrict? q)       (let [sql (x->sql-select (query->sql
+                                                      (rel/restrict-query q)))
+                                  exp (rel/restrict-exp q)]
+                              (if (rel/aggregate? exp)
+                                (lens/shove sql sql/sql-select-having
+                                            (cons (expression->sql exp)
+                                                  (sql/sql-select-having sql)))
+                                (lens/shove sql sql/sql-select-criteria
+                                            (cons (expression->sql exp)
+                                                  (sql/sql-select-criteria sql)))))
     (rel/restrict-outer? q) (let [sql (x->sql-select (query->sql
                                                       (rel/restrict-outer-query q)))]
-                              (lens/shove sql sql/sql-select-outer-criteria-lens
+                              (lens/shove sql sql/sql-select-outer-criteria
                                           (cons (expression->sql (rel/restrict-outer-exp q))
                                                 (sql/sql-select-outer-criteria sql))))
     (rel/combine? q)
@@ -148,7 +148,7 @@
             (add-table sql2 sql1)
 
             :else
-            (lens/shove (sql/new-sql-select) sql/sql-select-tables-lens
+            (lens/shove (sql/new-sql-select) sql/sql-select-tables
                         [[nil sql1]
                          [nil sql2]])))
 
@@ -160,33 +160,33 @@
           ;; make-restrict-outer) to wrap another SQL query around the
           ;; whole thing, thus moving the ON to a place where it's invalid
           (-> (sql/new-sql-select)
-              (lens/shove sql/sql-select-tables-lens [[nil sql1]])
-              (lens/shove sql/sql-select-outer-tables-lens [[nil sql2]])))
+              (lens/shove sql/sql-select-tables [[nil sql1]])
+              (lens/shove sql/sql-select-outer-tables [[nil sql2]])))
 
         :quotient
-        (let [scheme-1 (rel/query-scheme q1)
-              scheme-2 (rel/query-scheme q2)
+        (let [scheme-1    (rel/query-scheme q1)
+              scheme-2    (rel/query-scheme q2)
               diff-scheme (rel/rel-scheme-difference scheme-1 scheme-2)]
           (if (rel/rel-scheme-unary? scheme-2)
-            (let [sql1 (query->sql q1)
-                  sql2 (query->sql q2)
-                  name-2 (first (rel/rel-scheme-columns scheme-2))
+            (let [sql1         (query->sql q1)
+                  sql2         (query->sql q2)
+                  name-2       (first (rel/rel-scheme-columns scheme-2))
                   diff-columns (rel/rel-scheme-columns diff-scheme)
-                  sql (sql/new-sql-select)]
+                  sql          (sql/new-sql-select)]
               (-> sql
                   (add-table sql1)
-                  (lens/shove sql/sql-select-attributes-lens
+                  (lens/shove sql/sql-select-attributes
                               (map
                                (fn [k] [k (sql/make-sql-expr-column k)]) diff-columns))
-                  (lens/shove sql/sql-select-criteria-lens
+                  (lens/shove sql/sql-select-criteria
                               (list (sql/make-sql-expr-app
                                      sql/op-in
                                      (sql/make-sql-expr-column name-2)
                                      (sql/make-sql-expr-subquery sql2))))
-                  (lens/shove sql/sql-select-group-by-lens
+                  (lens/shove sql/sql-select-group-by
                               (map
                                (fn [k] (sql/make-sql-expr-column k)) diff-columns))
-                  (lens/shove sql/sql-select-having-lens
+                  (lens/shove sql/sql-select-having
                               [(sql/make-sql-expr-app
                                 sql/op-=
                                 (sql/make-sql-expr-app
@@ -197,16 +197,16 @@
                                  (let [sql* (sql/new-sql-select)]
                                    (-> sql*
                                        (add-table sql2)
-                                       (lens/shove sql/sql-select-attributes-lens
+                                       (lens/shove sql/sql-select-attributes
                                                    (list [nil (sql/make-sql-expr-app
                                                                sql/op-count
                                                                (sql/make-sql-expr-column name-2))]))))))])))
 
             (let [diff-project-alist (map (fn [k] [k (rel/make-attribute-ref k)])
                                           (rel/rel-scheme-columns diff-scheme))
-                  q1-project-alist (map (fn [k] [k (rel/make-attribute-ref k)])
-                                        (rel/rel-scheme-columns scheme-1))
-                  pruned (rel/make-project diff-project-alist q1)]
+                  q1-project-alist   (map (fn [k] [k (rel/make-attribute-ref k)])
+                                          (rel/rel-scheme-columns scheme-1))
+                  pruned             (rel/make-project diff-project-alist q1)]
               (query->sql (rel/make-difference pruned
                                                (rel/make-project diff-project-alist
                                                                  (rel/make-difference
@@ -217,22 +217,22 @@
         (sql/make-sql-select-combine op (query->sql q1) (query->sql q2))))
 
     (rel/order? q)
-    (let [sql (x->sql-select (query->sql (rel/order-query q)))
+    (let [sql       (x->sql-select (query->sql (rel/order-query q)))
           new-order (map (fn [[k v]] [(expression->sql k) v])
                          (rel/order-alist q))]
-      (lens/shove sql sql/sql-select-order-by-lens
+      (lens/shove sql sql/sql-select-order-by
                   (concat new-order (sql/sql-select-order-by sql))))
 
 
     (rel/group? q)
     (let [sql (x->sql-select (query->sql (rel/group-query q)))]
-      (lens/shove sql sql/sql-select-group-by-lens
+      (lens/shove sql sql/sql-select-group-by
                   (set/union (sql/sql-select-group-by sql)
                              (rel/group-columns q))))
-    
+
     (rel/top? q)
     (let [sql (x->sql-select (query->sql (rel/top-query q)))]
-      (lens/shove sql sql/sql-select-extra-lens
+      (lens/shove sql sql/sql-select-extra
                   (cons (if-let [off (rel/top-offset q)]
                           ;; TODO: there are a lot of different syntax versions for this
                           ;; (http://stackoverflow.com/questions/1528604/how-universal-is-the-limit-statement-in-sql)
@@ -240,5 +240,10 @@
                           ;; no offset should be the same as offset 0 though:
                           (str "LIMIT " (rel/top-count q)))
                         (sql/sql-select-extra sql))))
+
+    (rel/distinct-q? q)
+    (let [sql (x->sql-select (query->sql (rel/distinct-q-query q)))]
+      (lens/overhaul sql sql/sql-select-options conj "DISTINCT"))
+
     (rel/empty-query? q) sql/the-sql-select-empty
-    :else (c/assertion-violation `query->sql "unknown query" (pr-str q))))
+    :else                (c/assertion-violation `query->sql "unknown query" (pr-str q))))
