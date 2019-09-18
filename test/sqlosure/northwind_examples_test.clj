@@ -184,7 +184,7 @@
                (project [["product_name" (! p "product_name")]
                          ["quantity_per_unit" (! p "quantity_per_unit")]])))
 
-(deftest query-1-test
+(deftest ^:northwind query-1-test
   (is (= 77 (count (run-query q1)))))
 
 ;; 2. Write a query to get current product list (product id and name).
@@ -199,7 +199,7 @@
 
 (def q2 (products false))
 
-(deftest query-2-test
+(deftest ^:northwind query-2-test
   (is (= 67 (count (run-query q2)))))
 
 ;; 3. Write a query to get discontinued Product list (Product ID and name). 
@@ -217,7 +217,7 @@
         [42 "Singaporean Hokkien Fried Mee"]
         [29 "Thüringer Rostbratwurst"]))
 
-(deftest query-3-test
+(deftest ^:northwind query-3-test
   (is (= q3-res (run-query q3))))
 
 ;; 4. Write a query to get most expense and least expensive Product list (name and unit price).
@@ -226,7 +226,7 @@
                (project [["product_name" (! p "product_name")]
                          ["unit_price" (! p "unit_price")]])))
 
-(deftest query-4-test
+(deftest ^:northwind query-4-test
   (let [res (run-query q4)]
     (is (= ["Côte de Blaye" 263.5] (first res)))
     (is (= ["Geitost" 2.5] (last res)))))
@@ -240,7 +240,7 @@
                          ["product_name" (! p "product_name")]
                          ["unit_price" (! p "unit_price")]])))
 
-(deftest query-5-test
+(deftest ^:northwind query-5-test
   (let [res (run-query q5)]
     (is (= [57 "Ravioli Angelo" 19.5] (first res)))
     (is (= [33 "Geitost" 2.5] (last res)))))
@@ -254,7 +254,7 @@
                (project [["product_name" (! p "product_name")]
                          ["unit_price" (! p "unit_price")]])))
 
-(deftest query-6-test
+(deftest ^:northwind query-6-test
   (let [res (run-query q6)]
     (is (= ["Grandma's Boysenberry Spread" 25.0] (first res)))
     (is (= ["Röd Kaviar" 15.0] (last res)))))

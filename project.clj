@@ -22,6 +22,10 @@
                     :injections   [(require 'active.clojure.condition-hooks)
                                    (active.clojure.condition-hooks/activate-clojure-test!)]}}
 
+  :test-selectors {:default   (complement :northwind)
+                   :northwind :northwind
+                   :all       (constantly true)}
+
   :repl-options {:caught active.clojure.condition-hooks/repl-caught}
 
   ;; Use `lein cover` to run cloverage. Reason: cloverage is not happy with lets
