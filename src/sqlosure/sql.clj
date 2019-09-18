@@ -82,6 +82,7 @@
    having sql-select-having
    ;; [ {sql-expr sql-order} ]
    ;; ORDER BY
+   ;; FIXME: only column names allowed here
    order-by sql-select-order-by
    ;; [ string ]
    ;; TOP n, etc.
