@@ -219,7 +219,7 @@
 (def $and sql/and$)
 (def $>= sql/>=$)
 (def $<= sql/<=$)
-(def $> sql/<$)
+(def $> sql/>$)
 (def $< sql/<$)
 (def $plus sql/plus$)
 (def $minus sql/minus$)
@@ -277,8 +277,9 @@
 (defn put-query
   "`put-query` takes a (relational algebra) query and returns it's (SQL-) string
   representation. Uses the default printer from `sqlosure.sql-put`."
-  [q]
-  (->> q
-       opt/optimize-query
-       rsql/query->sql
-       put/sql-select->string))
+  [q & {:keys [optimize?]}]
+  (let [optimize (if optimize? opt/optimize-query identity)]
+    (->> q
+         optimize
+         rsql/query->sql
+         put/sql-select->string)))
