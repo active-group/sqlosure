@@ -79,7 +79,7 @@
                         (restrict ($> (! k \"key\")
                                     ($integer 10)))
                         (project {\"value\" (! kv \"value\")})))"
-  [conn q & {:keys [optimize?] :or {optimize? true} :as opts-map}]
+  [conn q & {:keys [optimize?] :or {optimize? false} :as opts-map}]
   (let [qq                       (if optimize? (o/optimize-query q) q)
         scheme                   (rel/query-scheme qq)
         col-types                (rel/rel-scheme-types scheme)
