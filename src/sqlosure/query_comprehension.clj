@@ -100,6 +100,7 @@ correct references when running the query monad."}
                (map (fn [[k v]]
                       [k (rel/expression-type env v)])
                     alist)))))))
+(defn restrict
   "Restrict the current query by a condition.
 
   expr -> query(nil)
@@ -205,12 +206,6 @@ correct references when running the query monad."}
   (let [[res state] (run-query-comprehension* prod nil)]
     res))
 
-;; FIXME: useless alias?
-(defn- generate-query
-  "Returns `[retval state]`."
-  [prod state]
-  (run-query-comprehension* prod state))
-
 (defn- build-query+scheme!
   "Monadic command to create the final query from the given relation and the current monad
   state, and return it and the scheme. Also resets the state."
@@ -246,40 +241,34 @@ correct references when running the query monad."}
   (let [[query _] (get-query+scheme prod)]
     query))
 
-(defn- combination*
-  [op old-query rel1 q1 rel2 q2 compute-scheme alias]
-  (let [a1 (relation-alias rel1)
-        a2 (relation-alias rel2)
-        scheme1 (relation-scheme rel1)
-        scheme2 (relation-scheme rel2)
-        p1 (rel/make-project (map (fn [k]
-                                    [(fresh-name k alias)
-                                     (rel/make-attribute-ref (fresh-name k a1))])
-                                  (rel/rel-scheme-columns scheme1))
-                             q1)
-        p2 (rel/make-project (map (fn [k]
-                                    [(fresh-name k alias)
-                                     (rel/make-attribute-ref (fresh-name k a2))])
-                                  (rel/rel-scheme-columns scheme2))
-                             q2)]
-    (monadic
-     (set-alias! (inc alias))
-     (set-query! (rel/make-product (rel/make-combine op p1 p2)
-                                   old-query))
-     (return (make-relation alias (compute-scheme scheme1 scheme2))))))
-
-;; FIXME combine combination* and combination?
 (defn- combination
   [rel-op compute-scheme prod1 prod2]
   (monadic
    [query0 current-query
     alias0 current-alias]
-    (let [[rel1 state1] (generate-query prod1 (make-state query0 alias0))
-          [rel2 state2] (generate-query prod2 (make-state query0 (::alias state1)))])
-    (combination* rel-op query0
-                  rel1 (::query state1) rel2 (::query state2)
-                  compute-scheme
-                  alias0)))
+    (let [[rel1 state1] (run-query-comprehension* prod1 (make-state query0 alias0))
+          [rel2 state2] (run-query-comprehension* prod2 (make-state query0 (::alias state1)))
+          a1 (relation-alias rel1)
+          a2 (relation-alias rel2)
+          scheme1 (relation-scheme rel1)
+          scheme2 (relation-scheme rel2)
+          q1 (::query state1)
+          q2 (::query state2)
+          p1 (rel/make-project (map (fn [k]
+                                      [(fresh-name k alias0)
+                                       (rel/make-attribute-ref (fresh-name k a1))])
+                                    (rel/rel-scheme-columns scheme1))
+                               q1)
+          p2 (rel/make-project (map (fn [k]
+                                      [(fresh-name k alias0)
+                                       (rel/make-attribute-ref (fresh-name k a2))])
+                                    (rel/rel-scheme-columns scheme2))
+                               q2)])
+    (monadic
+     (set-alias! (inc alias0))
+     (set-query! (rel/make-product (rel/make-combine rel-op p1 p2)
+                                   query0))
+     (return (make-relation alias0 (compute-scheme scheme1 scheme2))))))
 
 (defn- first-scheme
   "Takes two schemes and returns the first one."
