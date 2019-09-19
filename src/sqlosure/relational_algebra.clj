@@ -4,7 +4,7 @@
   (:require [active.clojure.condition :as c :refer [assertion-violation]]
             [active.clojure.lens :as lens]
             [active.clojure.record :refer [define-record-type]]
-            [clojure.set :refer [difference union]]
+            [clojure.set :as set :refer [difference union]]
             [sqlosure.type :as t]
             [sqlosure.universe :as u]
             [sqlosure.utils :refer [fourth third]]))
@@ -822,29 +822,23 @@
 
 (declare query-attribute-names)
 
-(defn- filter-and-non-nil [s]
-  (let [non-nils (filter some? s)]
-    (when (seq non-nils) (set non-nils))))
-
 (defn expression-attribute-names
-  ;; FIXME: return a set
-  "Takes an expression and returns a seq all attribute-ref's names."
+  "Takes an expression and returns a set of all attribute-ref's names."
   [expr]
-  (filter-and-non-nil
-   (fold-expression
-    list
-    (constantly nil)
-    (constantly nil)
-    (fn [rator rands] (flatten (map vec rands)))
-    (fn [exprs] (flatten (map vec exprs))) ;; tuple
-    (fn [_ expr] expr)
-    (fn [_] "*")
-    (fn [alist default]
-      (vec (concat default
-                   (distinct (flatten (vec alist))))))  ;; case
-    query-attribute-names
-    query-attribute-names
-    expr)))
+  (fold-expression
+   (fn [attr-name] #{attr-name})
+   (constantly #{})
+   (constantly #{})
+   (fn [rator rands] (apply set/union rands))
+   (fn [exprs] (apply set/union exprs)) ;; tuple
+   (fn [_ expr] expr)                   ;; on-aggregate
+   (fn [_] #{"*"})                      ;; on-aggregate-all
+   (fn [alist default]                  ;; on-case
+     (let [flattened-alist (->> alist (apply concat) (apply set/union))]
+       (set/union default flattened-alist)))
+   query-attribute-names
+   query-attribute-names
+   expr))
 
 ;; FIXME: this is almost completely wrong - check Scheme code or Sqala
 ;; Also, don't we want to pass an environment to query scheme?
