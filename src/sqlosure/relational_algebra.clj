@@ -511,7 +511,7 @@
   (make-tuple expressions) tuple?
   [expressions tuple-expressions])
 
-; FIXME should be separate for aggregation and aggregation*
+; FIXME should be separate for aggregation and aggregation-all
 (def ^{:private true} aggregations-op #{:count :count-all :sum :avg :min :max :std-dev
                                         :std-dev-p :var :var-p})
 
@@ -523,17 +523,16 @@
   [op aggregation-operator  ;; Aggregation-op or string.
    expr aggregation-expr])
 
-; FIXME: better name for this - aggregation-all?
-(define-record-type aggregation*
-  (really-make-aggregation* op) aggregation*?
-  [op aggregation*-operator])
+(define-record-type aggregation-all
+  (really-make-aggregation-all op) aggregation-all?
+  [op aggregation-all-operator])
 
 (defn make-aggregation
   ;; FIXME use overloading
   ;; FIXME: also isn't it so that there are aggregations with args and those without?
   [op & expr]
   (cond
-    (empty? expr) (really-make-aggregation* op)
+    (empty? expr) (really-make-aggregation-all op)
     (= 1 (count expr)) (apply really-make-aggregation op expr)
     :else (assertion-violation `make-aggregation "invalid number of expressions (must be 0 or 1)" expr)))
 
@@ -551,10 +550,10 @@
   [query set-subquery-query])
 
 (defn fold-expression
-  [on-attribute-ref on-const on-null on-application on-tuple on-aggregation on-aggregation*
+  [on-attribute-ref on-const on-null on-application on-tuple on-aggregation on-aggregation-all
    on-case on-scalar-subquery on-set-subquery expr]
   (let [next-step #(fold-expression on-attribute-ref on-const on-null on-application
-                               on-tuple on-aggregation on-aggregation* on-case
+                               on-tuple on-aggregation on-aggregation-all on-case
                                on-scalar-subquery on-set-subquery %)]
     (cond
       (attribute-ref? expr) (on-attribute-ref (attribute-ref-name expr))
@@ -565,7 +564,7 @@
       (tuple? expr) (on-tuple (map next-step (tuple-expressions expr)))
       (aggregation? expr) (on-aggregation (aggregation-operator expr)
                                           (next-step (aggregation-expr expr)))
-      (aggregation*? expr) (on-aggregation* (aggregation*-operator expr))
+      (aggregation-all? expr) (on-aggregation-all (aggregation-all-operator expr))
       (case-expr? expr) (on-case (into {} (map (fn [[k v]] [(next-step k)
                                                             (next-step v)])
                                                (case-expr-alist expr)))
@@ -597,7 +596,7 @@
                     (contains? #{:min :max} op)
                     (when-not (t/ordered-type? t) (assertion-violation `expression-type "not an ordered type" op t)))
                   t)))
-   ;; aggregation*
+   ;; aggregation-all
    (fn [op] (if (= :count-all op)
               t/integer%
               (assertion-violation `expression-type "unknown aggregation" op)))
@@ -630,7 +629,7 @@
     (application? expr) (some aggregate? (application-rands expr))
     (tuple? expr) (some aggregate? (tuple-expressions expr))
     (aggregation? expr) true
-    (aggregation*? expr) true
+    (aggregation-all? expr) true
     (case-expr? expr) (or (some (fn [[k v]] (or (aggregate? k)
                                                 (aggregate? v)))
                                 (case-expr-alist expr))
@@ -665,7 +664,7 @@
     (tuple? expr) (doseq [e (tuple-expressions expr)]
                     (check-grouped grouped e))
     (aggregation? expr) nil
-    (aggregation*? expr) nil
+    (aggregation-all? expr) nil
     (case-expr? expr) (do
                         (doseq [[k v] (case-expr-alist expr)]
                           (check-grouped grouped k)
@@ -695,7 +694,7 @@
    (fn [rator rands] (list 'application (rator-name rator) rands))
    (fn [exprs] (cons 'tuple exprs))
    (fn [op expr] (list 'aggregation op expr))
-   (fn [op] (list 'aggregation* op))
+   (fn [op] (list 'aggregation-all op))
    (fn [alist default] (list 'case-expr alist default))
    (fn [subquery] (list 'scalar-subquery (query->datum subquery)))
    (fn [subquery] (list 'set-subquery-query (query->datum subquery)))
@@ -780,7 +779,7 @@
       tuple (make-tuple (map next-step (rest d)))
       aggregation (make-aggregation (second d)
                                     (next-step (third d)))
-      aggregation* (make-aggregation (second d))
+      aggregation-all (make-aggregation (second d))
       case-expr (make-case-expr (into {}
                                       (map (fn [[k v]] [(next-step k)
                                                         (next-step v)])

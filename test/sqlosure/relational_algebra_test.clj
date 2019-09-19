@@ -237,10 +237,10 @@
       (is (aggregation? aggr))
       (is (= :count (aggregation-operator aggr)))
       (is (= (make-attribute-ref "one") (aggregation-expr aggr)))))
-  (testing "for aggregation*"
+  (testing "for aggregation-all"
     (let [aggr (make-aggregation :count)]
-      (is (aggregation*? aggr))
-      (is (= :count (aggregation*-operator aggr)))))
+      (is (aggregation-all? aggr))
+      (is (= :count (aggregation-all-operator aggr)))))
   (testing "for an invalid number of aruguments it should throw an assertion"
     (is (thrown? Exception (make-aggregation :count
                                              (make-attribute-ref "one")
@@ -769,9 +769,9 @@
              (make-aggregation
               :count (make-tuple [(make-const integer% 40)
                                   (make-const integer% 2)])))))
-    (testing "aggregation*"
+    (testing "aggregation-all"
       (is (= (make-aggregation :count-all)
-             (datum->expression (list 'aggregation* :count-all)
+             (datum->expression (list 'aggregation-all :count-all)
                                 sql-universe))))
     (testing "case expression"
       (is (= (datum->expression (expression->datum

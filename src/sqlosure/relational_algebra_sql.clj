@@ -66,10 +66,10 @@
                              (aggregation-op->sql
                               (rel/aggregation-operator expr))
                              (expression->sql (rel/aggregation-expr expr)))
-    (rel/aggregation*? expr) (sql/make-sql-expr-app
-                              (aggregation-op->sql
-                               (rel/aggregation*-operator expr))
-                              (sql/make-sql-expr-column "*"))
+    (rel/aggregation-all? expr) (sql/make-sql-expr-app
+                                 (aggregation-op->sql
+                                  (rel/aggregation-all-operator expr))
+                                 (sql/make-sql-expr-column "*"))
     (rel/case-expr? expr) (sql/make-sql-expr-case
                            (into {} (map (fn [[k v]]
                                            [(expression->sql k)
