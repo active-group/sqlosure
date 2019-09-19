@@ -36,14 +36,18 @@
    (query->sql query)))
 
 (deftest const-restrict-test
-  (is (= ["SELECT two AS foo FROM tbl1 AS alias WHERE (one = ?)" [string% "foobar"]]
+  (is (= [(str "SELECT foo_1 AS foo "
+               "FROM (SELECT two_0 AS foo_1, one_0, two_0 "
+                     "FROM (SELECT one AS one_0, two AS two_0 FROM tbl1 AS alias) AS alias "
+                     "WHERE (one_0 = ?)) AS alias" )
+          [string% "foobar"]]
          (let [[s args] (sqlosure.sql-put/sql-select->string
-                          (query->sql (opt/optimize-query
-                                        (get-query (monadic
-                                                     [t1 (embed tbl1)]
-                                                     (restrict (=$ (! t1 "one")
-                                                                   (make-const string% "foobar")))
-                                                     (project [["foo" (! t1 "two")]]))))))]
+                          (query->sql (get-query (monadic
+                                                  [t1 (embed tbl1)]
+                                                  (restrict (=$ (! t1 "one")
+                                                                (make-const string% "foobar")))
+                                                  (project [["foo" (! t1 "two")]])))))]
+
            [(constant-alias s) args]))))
 
 (deftest group-test

@@ -68,26 +68,6 @@ correct references when running the query monad."}
   [q]
   (add-to-product rel/make-left-outer-product rel/rel-scheme-nullable q))
 
-(defn- project0
-  "Project the some columns of the current query."
-  [alist extend?]
-  (monadic
-   [alias new-alias]
-   [query current-query]
-   (let [query' ((if extend? rel/make-extend rel/make-project)
-                 (mapv (fn [[k v]] [(fresh-name k alias) v])
-                      alist)
-                 query)])
-   (set-query! query')
-   (return (make-relation
-            alias
-            (let [scheme (rel/query-scheme query)
-                  env (rel/rel-scheme->environment scheme)]
-              (rel/alist->rel-scheme
-               (map (fn [[k v]]
-                      [k (rel/expression-type env v)])
-                    alist)))))))
-
 (defn assert-alist
   [caller coll]
   (if (or (list? coll) (vector? coll))
@@ -103,15 +83,23 @@ correct references when running the query monad."}
 
   The corresponding SQL statemant would be \"SELECT foo, bar FROM t\"."
   [alist]
-  (project0 (assert-alist `project alist) true))
-
-(defn project-only ;; FIXME: temporary solution? Can't detect automatically what's needed?
-  "Project the some columns of the current query."
-  [alist]
-  (project0 (assert-alist `project-only alist) false))
-
-;; FIXME: add !
-(defn restrict
+  (assert-alist `project alist)
+  (monadic
+   [alias new-alias
+    query current-query]
+   (let [query' ((if (rel/empty-query? query) rel/make-project rel/make-extend )
+                 (mapv (fn [[k v]] [(fresh-name k alias) v])
+                       alist)
+                 query)])
+   (set-query! query')
+   (return (make-relation
+            alias
+            (let [scheme (rel/query-scheme query)
+                  env    (rel/rel-scheme->environment scheme)]
+              (rel/alist->rel-scheme
+               (map (fn [[k v]]
+                      [k (rel/expression-type env v)])
+                    alist)))))))
   "Restrict the current query by a condition.
 
   expr -> query(nil)
