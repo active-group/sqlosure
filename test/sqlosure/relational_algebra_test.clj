@@ -832,6 +832,8 @@
   (is (= #{} (expression-attribute-names (make-null boolean%))))
   (is (= #{"a"} (expression-attribute-names (make-tuple [(make-attribute-ref "a")
                                                          (make-const string% "gahh")])))))
+
+;; TODO In it's current form, this test doesn't tell us anything and test should be rewritten.
 (deftest query-attribute-names-test
   (testing "the empty query"
     (is (= #{} (query-attribute-names the-empty))))
@@ -848,35 +850,28 @@
                                       ["three" (make-attribute-ref "three")]]
                                      tbl1)))))
   (testing "restrict"
-    (let [test-universe (make-universe)
-          SUBB (make-base-relation 'SUBB
-                                   (alist->rel-scheme [["B" string%]])
-                                   :universe test-universe
-                                   :handle "SUBB")
-          SUBA (make-base-relation 'SUBA
-                                   (alist->rel-scheme [["A" string%]])
-                                   :universe test-universe
-                                   :handle "SUBA")
-          SUBC (make-base-relation 'SUBC
-                                   (alist->rel-scheme [["C" string%]
-                                                       ["D" string%]])
-                                   :universe test-universe
-                                   :handle "SUBC")
+    (let [query-a (make-base-relation 'SUBA
+                                      (alist->rel-scheme [["A" string%]]))
+          query-b (make-base-relation 'SUBB
+                                      (alist->rel-scheme [["B" string%]]))
+          query-c (make-base-relation 'SUBC
+                                      (alist->rel-scheme [["C" string%]
+                                                          ["D" string%]]))
           r1 (make-restrict (sql/=$ (make-scalar-subquery
                                      (make-project [["C" (make-attribute-ref "C")]
                                                     ["D" (make-attribute-ref "D")]]
-                                                   SUBC))
+                                                   query-c))
                                     (make-attribute-ref "A"))
-                            SUBA)
+                            query-a)
           r2 (make-restrict (sql/=$ (make-attribute-ref "A")
                                     (make-attribute-ref "B"))
-                            (make-left-outer-product SUBB SUBA))
+                            (make-left-outer-product query-b query-a))
           r3 (make-restrict-outer (sql/=$ (make-attribute-ref "A")
                                           (make-attribute-ref "B"))
-                                  (make-left-outer-product SUBB SUBA))]
-      (is (= #{"C" "D" "A"} (query-attribute-names r1)))
-      (is (= #{"A" "B"} (query-attribute-names r2)))
-      (is (= #{"A" "B"} (query-attribute-names r3)))))
+                                  (make-left-outer-product query-b query-a))]
+      (is (= #{} (query-attribute-names r1)))
+      (is (= #{} (query-attribute-names r2)))
+      (is (= #{} (query-attribute-names r3)))))
   #_(let [test-universe (make-universe)
         rel1 (make-base-relation 'tbl1
                                  (alist->rel-scheme [["one" string%]
