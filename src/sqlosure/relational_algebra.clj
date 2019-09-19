@@ -843,49 +843,74 @@
 ;; FIXME: this is almost completely wrong - check Scheme code or Sqala
 ;; Also, don't we want to pass an environment to query scheme?
 
-(defn query-attribute-names
-  "Takes a query and returns a set of all attribute-ref's names."
+(defn query-scheme-attribute-names
   [q]
-  (cond
-    ; FIXME: empty sets
-    (empty-query? q) nil
-    (base-relation? q) nil
-    (project? q)
-    (let [subq  (project-query q)
-          alist (project-alist q)]
-      (apply union
-             (set (rel-scheme-columns (query-scheme subq)))
-             (query-attribute-names subq)
-             (map expression-attribute-names (map second alist))))
-    (restrict? q)
-    (let [sub (restrict-query q)]
-      (union
-       (set (rel-scheme-columns (query-scheme sub)))
-       (query-attribute-names sub)
-       (expression-attribute-names (restrict-exp q))))
-    (combine? q)       (union
-                        (query-attribute-names (combine-query-1 q))
-                        (query-attribute-names (combine-query-2 q)))
-    (restrict-outer? q)
-    (let [sub (restrict-outer-query q)]
-      (union
-       (set (rel-scheme-columns (query-scheme sub)))
-       (query-attribute-names sub)
-       (expression-attribute-names (restrict-outer-exp q))))
-    (order? q)
-    (let [subq  (order-query q)
-          alist (order-alist q)]
-      (apply union
-             (set (rel-scheme-columns (query-scheme subq)))
-             (query-attribute-names subq)
-             (map expression-attribute-names (keys alist))))
+  (into #{} (keys (rel-scheme->environment (query-scheme q)))))
 
-    (group? q)
-    (recur (group-query q))
-    
-    (top? q)      (query-attribute-names (top-query q))
-    (distinct-q? q) (query-attribute-names (distinct-q-query q))
-    :else         (assertion-violation `query-attribute-names "unknown query" q)))
+(defn query-attribute-names
+  "Assuming this is a sub-query of an expression, determine what attribute names
+  of the underlying query it uses."
+  [q]
+  (let [compute-names
+        (fn [exp-names scheme-names query-names]
+          (set/union (set/difference exp-names scheme-names) query-names))]
+    (cond
+      (or (empty-query? q)
+          (base-relation? q))
+      #{}
+
+      (project? q)
+      (let [alist        (project-alist q)
+            query        (project-query q)
+            exp-names    (apply set/union (map (fn [[_ exp]] (expression-attribute-names exp)) alist))
+            scheme-names (query-scheme-attribute-names query)
+            query-names  (query-attribute-names query)]
+        (compute-names exp-names scheme-names query-names))
+
+      (restrict? q)
+      (let [exp          (restrict-exp q)
+            query        (restrict-query q)
+            exp-names    (expression-attribute-names exp)
+            scheme-names (query-scheme-attribute-names query)
+            query-names  (query-attribute-names query)]
+        (compute-names exp-names scheme-names query-names))
+
+      (restrict-outer? q)
+      (let [exp          (restrict-outer-exp q)
+            query        (restrict-outer-query q)
+            exp-names    (expression-attribute-names exp)
+            scheme-names (query-scheme-attribute-names query)
+            query-names  (query-attribute-names query)]
+        (compute-names exp-names scheme-names query-names))
+
+      (combine? q)
+      (let [q1 (combine-query-1 q)
+            q2 (combine-query-2 q)]
+        (set/union (query-attribute-names q1) (query-attribute-names q2)))
+
+      (order? q)
+      (let [alist        (order-alist q)
+            query        (order-query q)
+            exp-names    (apply set/union (map (fn [[exp _]] (expression-attribute-names exp)) alist))
+            scheme-names (query-scheme-attribute-names query)
+            query-names  (query-attribute-names query)]
+        (compute-names exp-names scheme-names query-names))
+
+      (group? q)
+      (let [cols         (into #{} (group-columns q))
+            query        (group-query q)
+            scheme-names (query-scheme-attribute-names query)
+            query-names  (query-attribute-names query)]
+        (compute-names cols scheme-names query-attribute-names))
+
+      (top? q)
+      (query-attribute-names (top-query q))
+
+      (distinct-q? q)
+      (query-attribute-names (distinct-q-query q))
+
+      :else
+      (assertion-violation `query-attribute-names "unknown query" q))))
 
 (declare query-substitute-attribute-refs)
 
