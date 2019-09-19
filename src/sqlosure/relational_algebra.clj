@@ -435,8 +435,8 @@
 
 (define-record-type order
   (really-make-order alist query) order?
-  ;; FIXME: SQL allows only column name here
-  [alist order-alist  ;; list of pairs (expr direction), where direction = :ascending | :descending
+  [alist order-alist  ;; list of pairs ((make-attribute-ref "foo") direction),
+                      ;; where direction = :ascending | :descending
    query order-query])
 
 (defn make-order
@@ -847,9 +847,6 @@
    query-attribute-names
    query-attribute-names
    expr))
-
-;; FIXME: this is almost completely wrong - check Scheme code or Sqala
-;; Also, don't we want to pass an environment to query scheme?
 
 (defn query-scheme-attribute-names
   [q]

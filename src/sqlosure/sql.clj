@@ -62,7 +62,6 @@
    attributes sql-select-attributes
    ;; true if the select represents a nullary relation. In this case,
    ;; attributes should contain a single dummy attribute.
-   ;; TODO / FIXME: Is this comment still true?
    nullary? sql-select-nullary?
    ;; [ [alias sql-select-talbe] ]
    ;; FROM
