@@ -58,8 +58,6 @@
   - union grouped-sets"
   [s1 s2]
   (cond
-    ;; FIXME I guess this should rather be an assertion violation?
-    ;; (or (nil? s1) (nil? s2)) (assertion-violation `rel-scheme-concat "arguments must not be nil")
     (nil? s1) s2
     (nil? s2) s1
     :else
@@ -512,11 +510,21 @@
   [expressions tuple-expressions])
 
 ; FIXME should be separate for aggregation and aggregation-all
-(def ^{:private true} aggregations-op #{:count :count-all :sum :avg :min :max :std-dev
-                                        :std-dev-p :var :var-p})
+(def ^{:private true} aggregations-op
+  #{:count :count-all :sum :avg :min :max :std-dev :std-dev-p :var :var-p})
 
-(defn aggregations-op? [k]
+(defn aggregations-op?
+  "Is a thing an aggregation operation?"
+  [k]
   (contains? aggregations-op k))
+
+(defn ensure-aggregations-op!
+  "Takes a `k` and runs function `f` if `k` is an [[aggregations-op?]].
+  Otherwise, throws an assertion violation."
+  [k f]
+  (if-not (aggregations-op? k)
+    (c/assertion-violation `ensure-aggregations-op! "now an aggregation operation" k)
+    (f)))
 
 (define-record-type aggregation
   (really-make-aggregation op expr) aggregation?
@@ -528,13 +536,13 @@
   [op aggregation-all-operator])
 
 (defn make-aggregation
-  ;; FIXME use overloading
-  ;; FIXME: also isn't it so that there are aggregations with args and those without?
-  [op & expr]
-  (cond
-    (empty? expr) (really-make-aggregation-all op)
-    (= 1 (count expr)) (apply really-make-aggregation op expr)
-    :else (assertion-violation `make-aggregation "invalid number of expressions (must be 0 or 1)" expr)))
+  "Returns an aggregation. If supplied with only the `op`, returns aggregation
+  that operates on the whole query. If supplied with an expression, returns
+  aggregation that operates on the result of this expression only."
+  ([op]
+   (ensure-aggregations-op! op #(really-make-aggregation-all op)))
+  ([op expr]
+   (ensure-aggregations-op! op #(really-make-aggregation op expr))))
 
 (define-record-type case-expr
   (make-case-expr alist default) case-expr?
