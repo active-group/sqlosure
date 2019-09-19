@@ -37,7 +37,6 @@
         b-scheme (alist->rel-scheme b)
         ab-scheme (alist->rel-scheme (concat a b))]
     (testing "with either one of the inputs nil"
-      ;; FIXME I guess this should rather be an assertion violation?
       (is (= a-scheme (rel-scheme-concat a-scheme nil)))
       (is (= a-scheme (rel-scheme-concat nil a-scheme))))
     (testing "with either one of the input alists empty"

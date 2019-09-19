@@ -92,12 +92,12 @@
   (is (= (make-sql-select-table "tbl1")
          (query->sql tbl1)))
   (testing "project"
-    (let [p (make-project [["two" (make-attribute-ref "two")]
-                           ["one" (make-attribute-ref "one")]]
-                          tbl1)
-          res (lens/shove (x->sql-select (query->sql tbl1))
-                          sql-select-attributes
-                          (project-alist->sql (project-alist p)))
+    (let [p         (make-project [["two" (make-attribute-ref "two")]
+                                   ["one" (make-attribute-ref "one")]]
+                                  tbl1)
+          res       (lens/shove (x->sql-select (query->sql tbl1))
+                                sql-select-attributes
+                                (project-alist->sql (project-alist p)))
           nullary-p (make-project [] tbl1)]
       (is (sql-select-nullary? (query->sql nullary-p)))
       (is (= res (query->sql p)))
@@ -117,46 +117,75 @@
           (is (= #{"one"} (sql-select-group-by grouping-p)))))))
   (testing "restrict"
     (let [test-universe (make-universe)
-          t1 (make-sql-table 't1
-                             (alist->rel-scheme [["C" string%]])
-                             :universe test-universe
-                             :handle "t1")
-          r (make-restrict (>=$ (make-const integer% 42)
-                                (make-attribute-ref "C"))
-                           t1)]
+          t1            (make-sql-table 't1
+                                        (alist->rel-scheme [["C" string%]])
+                                        :universe test-universe
+                                        :handle "t1")
+          r             (make-restrict (>=$ (make-const integer% 42)
+                                            (make-attribute-ref "C"))
+                                       t1)]
       (is (= (mapv second (sql-select-tables (query->sql r)))
              [(query->sql t1)]))
       (is (= [(expression->sql (>=$ (make-const integer% 42)
                                     (make-attribute-ref "C")))]
              (sql-select-criteria (query->sql r))))))
 
-  ;; FIXME: missing test for product
-  
+  (testing "product"
+
+    (let [t1 (make-sql-table "t1"
+                             (alist->rel-scheme [["A" string%]]))
+          t2 (make-sql-table "t2"
+                             (alist->rel-scheme [["B" integer%]]))
+          q (make-product t1 t2)
+          sql (query->sql q)]
+      (is (= [[nil (make-sql-select-table "t1")]
+              [nil (make-sql-select-table "t2")]]
+             (sql-select-tables sql))))
+    (testing "nested queries just get pushed into the SQL-tables"
+      (let [t1 (make-sql-table "t1"
+                               (alist->rel-scheme [["A" string%]]))
+            q2 (make-project [["B" (make-attribute-ref "B")]]
+                             (make-sql-table "t2"
+                                             (alist->rel-scheme [["B" integer%]])))
+            q (make-product t1 q2)
+            sql (query->sql q)]
+        (is (= [[nil (make-sql-select-table "t1")]
+                [nil (query->sql q2)]]
+               (sql-select-tables sql))))))
+
   (testing "outer product"
-    (let [test-universe (make-universe)
-          t1 (make-sql-table 't1
-                             (alist->rel-scheme [["C" string%]])
-                             :universe test-universe
-                             :handle "t1")
-          t2 (make-sql-table 't2
-                             (alist->rel-scheme [["D" integer%]])
-                             :universe test-universe
-                             :handle "t2")
-          r (make-restrict (=$ (make-attribute-ref "C")
-                               (make-attribute-ref "D"))
-                           (make-left-outer-product t1 t2))
+    (let [test-universe
+          (make-universe)
+          t1  (make-sql-table 't1
+                              (alist->rel-scheme [["C" string%]])
+                              :universe test-universe
+                              :handle "t1")
+          t2  (make-sql-table 't2
+                              (alist->rel-scheme [["D" integer%]])
+                              :universe test-universe
+                              :handle "t2")
+          r   (make-restrict (=$ (make-attribute-ref "C")
+                                 (make-attribute-ref "D"))
+                             (make-left-outer-product t1 t2))
           sql (query->sql r)]
       (is (= [[nil (make-sql-select-table 't1)]]
              (sql-select-tables sql)))
       (is (= [[nil (make-sql-select-table 't2)]]
              (sql-select-outer-tables sql)))))
-    
+
   (testing "order"
-    (let [o (make-order {(make-attribute-ref "one") :ascending}
-                        (make-sql-table "tbl1"
-                                        (alist->rel-scheme [["one" string%]
-                                                            ["two" integer%]])))
-          q (query->sql o)])) ;, FIXME: where's the test?
+    (let [tbl (make-sql-table "tbl1"
+                              (alist->rel-scheme [["one" string%]
+                                                  ["two" integer%]]))
+          o   (make-order {(make-attribute-ref "one") :ascending}
+                          (make-sql-table "tbl1"
+                                          (alist->rel-scheme [["one" string%]
+                                                              ["two" integer%]])))
+          sql (query->sql o)]
+      (is (= [[nil (make-sql-select-table "tbl1")]]
+             (sql-select-tables sql)))
+      (is (= [[(make-sql-expr-column "one") :ascending]]
+             (sql-select-order-by sql)))))
 
   (testing "combining grouping with empty projection"
     (let [s (query->sql
