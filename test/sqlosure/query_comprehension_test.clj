@@ -14,15 +14,15 @@
 
 (def test-universe (make-universe))
 
-(def tbl1 (make-sql-table "tbl1"
-                          (alist->rel-scheme [["one" string%]
-                                              ["two" integer%]])
-                          :universe test-universe))
+(def tbl1 (base-relation "tbl1"
+                         (alist->rel-scheme [["one" string%]
+                                             ["two" integer%]])
+                         :universe test-universe))
 
-(def tbl2 (make-sql-table "tbl2"
-                          (alist->rel-scheme [["three" blob%]
-                                              ["four" string%]])
-                          :universe test-universe))
+(def tbl2 (base-relation "tbl2"
+                         (alist->rel-scheme [["three" blob%]
+                                             ["four" string%]])
+                         :universe test-universe))
 
 (defn put-query [query]
   (put/sql-select->string

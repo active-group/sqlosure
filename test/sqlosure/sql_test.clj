@@ -6,12 +6,12 @@
             [clojure.test :refer :all]
             [clojure.pprint :refer [pprint]]))
 
-(deftest make-sql-table-test
+(deftest base-relation-test
   (let [test-universe (make-universe)
-        test-table (make-sql-table "tbl1"
-                                   (alist->rel-scheme [["one" string%]
-                                                       ["two" integer%]]))
-        test-table2 (make-sql-table
+        test-table (base-relation "tbl1"
+                                  (alist->rel-scheme [["one" string%]
+                                                      ["two" integer%]]))
+        test-table2 (base-relation
                      "tbl2"
                      (alist->rel-scheme [["one" string%]
                                          ["two" integer%]])

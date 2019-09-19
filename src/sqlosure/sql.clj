@@ -22,8 +22,9 @@
    scheme sql-table-scheme  ;; (sql-table -> rel-scheme)
    ])
 
-;; FIXME: clean up public api: (sql-table-name (make-sql-table "abc" ...)) would break, e.g. 
-(defn make-sql-table
+(defn base-relation
+  "Takes a name and a rel-scheme and returns a relation that can be used as a
+  SQL table."
   [name scheme & {:keys [universe]
                   :or {universe nil}}]
   (rel/make-base-relation
@@ -53,7 +54,6 @@
   sql-select?
   [;; [ string ]
    ;; DISTINCT, ALL, etc.
-   ;; FIXME: right now, this is never actually used.
    options sql-select-options
    ;; list [sql-column sql-expr]
    ;; [] is for '*'

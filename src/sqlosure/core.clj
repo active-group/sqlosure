@@ -24,9 +24,9 @@
   [sql-name map & opts]
   (let [opts-m (apply hash-map opts)
         universe? (get opts-m :universe)]
-    (sql/make-sql-table sql-name
-                        (rel/alist->rel-scheme map)
-                        :universe universe?)))
+    (sql/base-relation sql-name
+                       (rel/alist->rel-scheme map)
+                       :universe universe?)))
 
 (defmacro query
   "`query` takes a series of relational algebra statements (projection,

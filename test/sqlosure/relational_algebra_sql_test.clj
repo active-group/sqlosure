@@ -10,17 +10,17 @@
 
 (def test-universe (make-sql-universe))
 
-(def tbl1 (make-sql-table "tbl1"
-                          (alist->rel-scheme
-                           [["one" string%]
-                            ["two" integer%]])
-                          :universe test-universe))
+(def tbl1 (base-relation "tbl1"
+                         (alist->rel-scheme
+                          [["one" string%]
+                           ["two" integer%]])
+                         :universe test-universe))
 
-(def tbl2 (make-sql-table "tbl2"
-                          (alist->rel-scheme
-                           [["three" blob%]
-                            ["four" double%]])
-                          :universe test-universe))
+(def tbl2 (base-relation "tbl2"
+                         (alist->rel-scheme
+                          [["three" blob%]
+                           ["four" double%]])
+                         :universe test-universe))
 
 (deftest x->sql-select-test
   (is (= (new-sql-select) (x->sql-select the-sql-select-empty)))
@@ -117,10 +117,10 @@
           (is (= #{"one"} (sql-select-group-by grouping-p)))))))
   (testing "restrict"
     (let [test-universe (make-universe)
-          t1            (make-sql-table 't1
-                                        (alist->rel-scheme [["C" string%]])
-                                        :universe test-universe
-                                        :handle "t1")
+          t1            (base-relation 't1
+                                       (alist->rel-scheme [["C" string%]])
+                                       :universe test-universe
+                                       :handle "t1")
           r             (make-restrict (>=$ (make-const integer% 42)
                                             (make-attribute-ref "C"))
                                        t1)]
@@ -132,21 +132,21 @@
 
   (testing "product"
 
-    (let [t1 (make-sql-table "t1"
-                             (alist->rel-scheme [["A" string%]]))
-          t2 (make-sql-table "t2"
-                             (alist->rel-scheme [["B" integer%]]))
+    (let [t1 (base-relation "t1"
+                            (alist->rel-scheme [["A" string%]]))
+          t2 (base-relation "t2"
+                            (alist->rel-scheme [["B" integer%]]))
           q (make-product t1 t2)
           sql (query->sql q)]
       (is (= [[nil (make-sql-select-table "t1")]
               [nil (make-sql-select-table "t2")]]
              (sql-select-tables sql))))
     (testing "nested queries just get pushed into the SQL-tables"
-      (let [t1 (make-sql-table "t1"
-                               (alist->rel-scheme [["A" string%]]))
+      (let [t1 (base-relation "t1"
+                              (alist->rel-scheme [["A" string%]]))
             q2 (make-project [["B" (make-attribute-ref "B")]]
-                             (make-sql-table "t2"
-                                             (alist->rel-scheme [["B" integer%]])))
+                             (base-relation "t2"
+                                            (alist->rel-scheme [["B" integer%]])))
             q (make-product t1 q2)
             sql (query->sql q)]
         (is (= [[nil (make-sql-select-table "t1")]
@@ -156,14 +156,14 @@
   (testing "outer product"
     (let [test-universe
           (make-universe)
-          t1  (make-sql-table 't1
-                              (alist->rel-scheme [["C" string%]])
-                              :universe test-universe
-                              :handle "t1")
-          t2  (make-sql-table 't2
-                              (alist->rel-scheme [["D" integer%]])
-                              :universe test-universe
-                              :handle "t2")
+          t1  (base-relation 't1
+                             (alist->rel-scheme [["C" string%]])
+                             :universe test-universe
+                             :handle "t1")
+          t2  (base-relation 't2
+                             (alist->rel-scheme [["D" integer%]])
+                             :universe test-universe
+                             :handle "t2")
           r   (make-restrict (=$ (make-attribute-ref "C")
                                  (make-attribute-ref "D"))
                              (make-left-outer-product t1 t2))
@@ -174,13 +174,13 @@
              (sql-select-outer-tables sql)))))
 
   (testing "order"
-    (let [tbl (make-sql-table "tbl1"
-                              (alist->rel-scheme [["one" string%]
-                                                  ["two" integer%]]))
+    (let [tbl (base-relation "tbl1"
+                             (alist->rel-scheme [["one" string%]
+                                                 ["two" integer%]]))
           o   (make-order {(make-attribute-ref "one") :ascending}
-                          (make-sql-table "tbl1"
-                                          (alist->rel-scheme [["one" string%]
-                                                              ["two" integer%]])))
+                          (base-relation "tbl1"
+                                         (alist->rel-scheme [["one" string%]
+                                                             ["two" integer%]])))
           sql (query->sql o)]
       (is (= [[nil (make-sql-select-table "tbl1")]]
              (sql-select-tables sql)))
@@ -192,8 +192,8 @@
              (make-project [["all" (make-aggregation :count-all)]]
                            (make-project []
                                          (make-group #{"one"}
-                                                     (make-sql-table "tbl1"
-                                                                     (alist->rel-scheme [["one" string%]
-                                                                                         ["two" integer%]]))))))]
+                                                     (base-relation "tbl1"
+                                                                    (alist->rel-scheme [["one" string%]
+                                                                                        ["two" integer%]]))))))]
       ;; we want a subquery
       (is (sql-select? (second (first (sql-select-tables s))))))))

@@ -9,11 +9,11 @@
             [clojure.string :as s]
             [active.clojure.lens :as lens]))
 
-(def tbl1 (make-sql-table "tbl1"
-                          {"one" string%
-                           "two" double%}
-                          :universe sql-universe
-                          :handle "tbl1"))
+(def tbl1 (base-relation "tbl1"
+                         {"one" string%
+                          "two" double%}
+                         :universe sql-universe
+                         :handle "tbl1"))
 
 (deftest put-space-test
   (is (= (with-out-str (print \space)) " ")))
@@ -43,9 +43,9 @@
          (with-out-str
            (put-sql-select (make-sql-select-table "CUSTOMERS")))))
   (let [o (make-order {(make-attribute-ref "one") :ascending}
-                      (make-sql-table "tbl1"
-                                      (alist->rel-scheme [["one" string%]
-                                                          ["two" integer%]])))
+                      (base-relation "tbl1"
+                                     (alist->rel-scheme [["one" string%]
+                                                         ["two" integer%]])))
         q (query->sql o)
         [res-str res-args] (with-out-str-and-value
                              (put-sql-select q))]
@@ -97,10 +97,10 @@
 
 (deftest put-sql-outer-join-test
   (testing "simple case"
-    (let [t1 (make-sql-table "t1"
-                             (alist->rel-scheme [["C" string%]]))
-          t2 (make-sql-table "t2"
-                             (alist->rel-scheme [["D" integer%]]))
+    (let [t1 (base-relation "t1"
+                            (alist->rel-scheme [["C" string%]]))
+          t2 (base-relation "t2"
+                            (alist->rel-scheme [["D" integer%]]))
           r (make-restrict-outer (=$ (make-attribute-ref "C")
                                      (make-attribute-ref "D"))
                                  (make-left-outer-product t1 t2))
@@ -110,12 +110,12 @@
         (is (= "SELECT * FROM t1 AS alias LEFT JOIN t2 AS alias ON (C = D)"
                (constant-alias res-str))))))
   (testing "multiple tables on the left"
-    (let [t1 (make-sql-table "t1"
-                             (alist->rel-scheme [["C" string%]]))
-          t2 (make-sql-table "t2"
-                             (alist->rel-scheme [["D" integer%]]))
-          t3 (make-sql-table "t3"
-                             (alist->rel-scheme [["E" integer%]]))
+    (let [t1 (base-relation "t1"
+                            (alist->rel-scheme [["C" string%]]))
+          t2 (base-relation "t2"
+                            (alist->rel-scheme [["D" integer%]]))
+          t3 (base-relation "t3"
+                            (alist->rel-scheme [["E" integer%]]))
           r (make-restrict-outer (=$ (make-attribute-ref "C")
                                      (make-attribute-ref "E"))
                                  (make-left-outer-product (make-product t1 t2) t3))
