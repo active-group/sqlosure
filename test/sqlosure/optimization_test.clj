@@ -1,18 +1,24 @@
 (ns sqlosure.optimization-test
-  (:require [sqlosure.optimization :refer :all]
+  (:require [active.clojure.monad :as m :refer [monadic]]
+            [sqlosure.optimization :as opt :refer :all]
             [sqlosure.sql :refer :all]
-            [sqlosure.type :refer :all]
-            [sqlosure.relational-algebra :refer :all]
+            [sqlosure.type :as t :refer :all]
+            [sqlosure.query-comprehension :as q]
+            [sqlosure.relational-algebra :as rel :refer :all]
             [sqlosure.universe :refer [make-universe]]
             [clojure.test :refer :all]
             [clojure.pprint :refer [pprint]]
             [sqlosure.sql :as sql]))
 
-(def tbl1 (make-base-relation 'tbl1
-                              (alist->rel-scheme [["one" string%]
-                                                  ["two" integer%]])
-                              :universe (make-universe)
-                              :handle "tbl1"))
+(let [u (make-universe)]
+  (def tbl1 (sql/base-relation 'tbl1
+                               (alist->rel-scheme [["one" string%]
+                                                   ["two" integer%]])
+                               :univese u))
+  (def tbl2 (sql/base-relation 'tbl2
+                               (alist->rel-scheme [["three" blob%]
+                                                   ["four" string%]])
+                               :universe u)))
 
 (deftest project-alist-substitute-attribute-refs-test
   (is (= [["one" (make-const integer% 42)]]
@@ -23,14 +29,6 @@
          (project-alist-substitute-attribute-refs {"one" (make-const integer% 42)}
                                                   [["one" (make-attribute-ref "one")]
                                                    ["two" (make-attribute-ref "two")]]))))
-
-(deftest order-alist-attribute-names-test
-  (let [alist [[(make-attribute-ref "one") :ascending]
-               [(make-attribute-ref "two") :descending]]]
-    (is (= #{"one" "two"}
-           (order-alist-attribute-names alist)))
-    (is (empty?
-           (order-alist-attribute-names nil)))))
 
 (deftest query->alist-test
   (let [p (make-project {"one" (make-attribute-ref "one")} tbl1)
@@ -47,53 +45,45 @@
     (is (= {"one" string%} (query->alist p2)))
     (is (= {"one" string% "two" integer%} (query->alist p3)))))
 
-(deftest intersect-live-test
-  (let [tbl1 (make-base-relation "tbl1"
-                                 (alist->rel-scheme [["one" string%]
-                                                     ["two" integer%]])
-                                 :handle "tbl1")
-        p (make-project [["one" (make-attribute-ref "one")]
-                         ["two" (make-attribute-ref "two")]]
-                        tbl1)]
-    (is (= #{"one"}
-           (intersect-live #{"one"} p)))
-    (is (= #{"two" "one"}
-           (intersect-live #{"one" "two"} p)))))
-
 (deftest remove-dead-test
-  (let [tbl1 (make-base-relation "tbl1"
-                                 (alist->rel-scheme [["one" string%]
-                                                     ["two" integer%]
-                                                     ["three" double%]])
-                                 :handle "tbl1")
-        p1 (make-project [["one" (make-attribute-ref "one")]
-                          ["two" (make-attribute-ref "two")]]
-                         tbl1)
-        p2 (make-project [["one" (make-attribute-ref "one")]]
-                         (make-project [["one" (make-attribute-ref "one")]
-                                        ["two" (make-attribute-ref "two")]]
-                                       tbl1))
-        o1 (make-order [[(make-attribute-ref "one") :ascending]]
-                       tbl1)]
+  (let [tbl1         (make-base-relation "tbl1"
+                                         (alist->rel-scheme [["one" string%]
+                                                             ["two" integer%]
+                                                             ["three" double%]])
+                                         :handle "tbl1")
+        p1           (make-project [["one" (make-attribute-ref "one")]
+                                    ["two" (make-attribute-ref "two")]]
+                                   tbl1)
+        p2           (make-project [["one" (make-attribute-ref "one")]]
+                                   (make-project [["one" (make-attribute-ref "one")]
+                                                  ["two" (make-attribute-ref "two")]]
+                                                 tbl1))
+        p2-optimized (make-project [["one" (make-attribute-ref "one")]]
+                                   (make-project [["one" (make-attribute-ref "one")]]
+                                                 tbl1))
+        o1           (make-order [[(make-attribute-ref "one") :ascending]]
+                                 tbl1)]
     (testing "empty-query"
       (is (= (make-empty-query) (remove-dead the-empty))))
     (testing "base-relation"
       (is (= tbl1 (remove-dead tbl1))))
     (testing "project"
       (is (= p1 (remove-dead p1)))
-      (is (= (alist->rel-scheme {"one" string%})
-             (query-scheme (remove-dead p2)))))
+      (is (= p2-optimized
+             (remove-dead p2))))
     (testing "restrict"
       (let [r1 (make-restrict (=$ (make-attribute-ref "one")
                                   (make-const string% "foobar"))
                               tbl1)
-            r2 (make-restrict (=$ (make-attribute-ref "one")
-                                  (make-const string% "foobar"))
-                              p2)]
+            r2   (make-restrict (=$ (make-attribute-ref "one")
+                                    (make-const string% "foobar"))
+                                p2)]
         (is (= r1 (remove-dead r1)))
         (testing "removes dead projection from underlying project"
-          (is (= (alist->rel-scheme {"one" string%})
-                 (-> r2 remove-dead restrict-query project-query query-scheme))))))
+          (is (= (make-restrict (=$ (make-attribute-ref "one")
+                                    (make-const string% "foobar"))
+                                p2-optimized)
+                 (opt/remove-dead r2))))))
     (testing "restrict-outer"
       (let [r1 (make-restrict-outer (=$ (make-attribute-ref "one")
                                         (make-const string% "foobar"))
@@ -101,35 +91,36 @@
             r2 (make-restrict-outer (=$ (make-attribute-ref "one")
                                         (make-const string% "foobar"))
                                     p2)]
-        (is (= r1 (remove-dead r1))
-            (= (alist->rel-scheme {"one" string%})
-               (-> r2 remove-dead restrict-outer-query project-query query-scheme)))))
+        (is (= r1 (remove-dead r1)))
+        (is (= (make-restrict-outer (=$ (make-attribute-ref "one")
+                                        (make-const string% "foobar"))
+                                    p2-optimized)
+               (opt/remove-dead r2))) ))
     (testing "order"
-      (let [o2 (make-order [[(make-attribute-ref "one") :ascending]]
-                           p2)]
+        (let [o2 (make-order [[(make-attribute-ref "one") :ascending]] p2)]
         (is (= o1 (remove-dead o1)))
-        (is (= (alist->rel-scheme {"one" string%})
-               (-> o2 remove-dead order-query project-query query-scheme)))))
+        (is (= (rel/make-order [[(make-attribute-ref "one") :ascending]] p2-optimized)
+               (opt/remove-dead o2)))))
     (testing "group"
-      (let [g1 (make-group #{"one"} tbl1)
-            g2 (make-group #{"one"} p2)]
+        (let [g1 (make-group #{"one"} tbl1)
+              g2 (make-group #{"one"} p2)]
         (is (= g1 (remove-dead g1)))
-        (is (= (alist->rel-scheme {"one" string%})
-               (-> g2 remove-dead group-query project-query query-scheme)))))
+        (is (= (rel/make-group #{"one"} p2-optimized)
+               (opt/remove-dead g2)))))
     (testing "top"
-      (let [t1 (make-top 0 1 tbl1)
-            t2 (make-top 0 1 p2)]
+        (let [t1 (make-top 0 1 tbl1)
+              t2 (make-top 0 1 p2)]
         (is (= t1 (remove-dead t1)))
-        (is (= (alist->rel-scheme {"one" string%})
-               (-> t2 remove-dead top-query project-query query-scheme)))))
+        (is (= (rel/make-top 0 1 p2-optimized)
+               (opt/remove-dead t2)))))
     (testing "combine"
       (testing ":product"
         (let [o2 (make-project [["three" (make-attribute-ref "one")]] o1)
               c1 (make-combine :product p1 o2)
               c2 (make-combine :product p2 o2)]
           (is (= c1 (remove-dead c1)))
-          (is (= (alist->rel-scheme {"one" string%})
-                 (-> c2 remove-dead combine-query-1 query-scheme)))))
+          (is (= (rel/make-product p2-optimized o2)
+                 (opt/remove-dead c2)))))
       (testing ":quotient"
         (let [c1 (make-combine :quotient o1 p1)
               c2 (make-combine :quotient o1 p2)]
@@ -144,8 +135,6 @@
                  (-> c2 remove-dead combine-query-2 query-scheme)))))
       (testing "everything else should fail"
         (is (thrown? Exception (remove-dead nil)))))))
-
-
 
 (deftest merge-project-test
   (let [tbl1 (make-base-relation "tbl1"
@@ -330,6 +319,7 @@
                                                       (make-const string% "foobar"))
                                                   tbl1))
                (push-restrict (ro* p1)))))
+
       (testing "with underlying combine"
         (testing "with left outer product"
           (is (= (make-restrict-outer (=$ (make-attribute-ref "one")
@@ -338,20 +328,22 @@
                                                     p1 p2))
                (push-restrict (ro* (make-combine :left-outer-product
                                                  p1 p2))))))
+
         (testing "with union"
           (let [c (make-union p1 p1)
                 p (make-project {"two" (make-attribute-ref "two")} tbl1)]
-            (is (= (make-union p1
+            #_(is (= (make-union p1
                                (push-restrict
                                 (make-restrict-outer (=$ (make-attribute-ref "one")
                                                          (make-const string% "foobar")) p1)))
                    (push-restrict (ro* c))))
-            (is (= (make-union (push-restrict (ro* p)) p1)
+            #_(is (= (make-union (push-restrict (ro* p)) p1)
                    (push-restrict (ro* (make-union p p1)))))
-            (let [rr (ro* (make-union p p))]
+            #_(let [rr (ro* (make-union p p))]
               (is (= (make-restrict-outer (restrict-outer-exp rr)
                                           (push-restrict (restrict-outer-query rr)))
                      (push-restrict rr)))))))
+
       (testing "with underlying restrict"
         (let [t (=$ (make-attribute-ref "one")
                     (make-const string% "foobar"))
@@ -383,11 +375,11 @@
         (testing "with underlying project"
           (is (= (make-project (project-alist p1)
                                (push-restrict (make-order
-                                               {(make-attribute-ref "one") :descending}
+                                               [[(make-attribute-ref "one") :descending]]
                                                (project-query p1))))
                  (push-restrict o1)))
           (is (= (make-order {(make-attribute-ref "one") :descending}
-                             (push-restrict (make-project {"one" (make-aggregation :count (make-attribute-ref "one"))}
+                             (push-restrict (make-project [["one" (make-aggregation :count (make-attribute-ref "one"))]]
                                                           tbl1)))
                  (push-restrict o2))))
         (testing "with underlying order"
@@ -425,3 +417,33 @@
       (is (= c1 (push-restrict c1))))
     (testing "everything else should fail"
       (is (thrown? Exception (push-restrict nil))))))
+
+;; Imported from schemeql2 test suite
+(deftest schemeql2-test
+  (is (= (rel/alist->rel-scheme [["foo" t/integer%]])
+         (rel/query-scheme
+          (opt/optimize-query
+           (q/get-query
+            (monadic [t1 (q/embed tbl1)
+                      t2 (q/embed tbl2)]
+                     (q/restrict (sql/=$ (q/! t1 "one")
+                                         (q/! t2 "four")))
+                     (q/project [["foo" (q/! t1 "two")]])))))))
+  (is (= (rel/alist->rel-scheme [["foo" t/string%]])
+         (rel/query-scheme
+          (opt/optimize-query
+           (q/get-query
+            (monadic [t1 (q/embed tbl1)
+                      t2 (q/embed tbl2)]
+                     (q/union (q/project [["foo" (q/! tbl1 "one")]])
+                              (q/project [["foo" (q/! tbl2 "four")]]))))))))
+  (is (= (rel/alist->rel-scheme [["foo" t/string%]])
+         (rel/query-scheme
+          (opt/optimize-query
+           (q/get-query
+            (monadic [t1 (q/embed tbl1)
+                      t2 (q/embed tbl2)]
+                     (q/restrict (sql/=$ (q/! tbl1 "one")
+                                         (q/! tbl2 "four")))
+                     (q/union (q/project [["foo" (q/! tbl1 "one")]])
+                              (q/project [["foo" (q/! tbl2 "four")]])))))))))
