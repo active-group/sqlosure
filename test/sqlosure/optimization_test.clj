@@ -435,15 +435,15 @@
            (q/get-query
             (monadic [t1 (q/embed tbl1)
                       t2 (q/embed tbl2)]
-                     (q/union (q/project [["foo" (q/! tbl1 "one")]])
-                              (q/project [["foo" (q/! tbl2 "four")]]))))))))
+                     (q/union (q/project [["foo" (q/! t1 "one")]])
+                              (q/project [["foo" (q/! t2 "four")]]))))))))
   (is (= (rel/alist->rel-scheme [["foo" t/string%]])
          (rel/query-scheme
           (opt/optimize-query
            (q/get-query
             (monadic [t1 (q/embed tbl1)
                       t2 (q/embed tbl2)]
-                     (q/restrict (sql/=$ (q/! tbl1 "one")
-                                         (q/! tbl2 "four")))
-                     (q/union (q/project [["foo" (q/! tbl1 "one")]])
-                              (q/project [["foo" (q/! tbl2 "four")]])))))))))
+                     (q/restrict (sql/=$ (q/! t1 "one")
+                                         (q/! t2 "four")))
+                     (q/union (q/project [["foo" (q/! t1 "one")]])
+                              (q/project [["foo" (q/! t2 "four")]])))))))))
