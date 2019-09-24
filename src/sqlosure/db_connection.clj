@@ -38,12 +38,7 @@
                       (fn [^Integer i ty]
                         (let [type-implementation (backend/get-type-implementation backend ty)
                               sql->type           (ti/type-implementation-from-sql type-implementation)]
-                          (sql->type rs (inc i))
-                          #_(t/invoke-type-method
-                           ty
-                           get-from-result-set-method
-                           rs
-                           (inc i))))
+                          (sql->type rs (inc i))))
                       col-types))
         rows       ((fn thisfn []
                       (if (.next rs)

@@ -3,6 +3,9 @@
             [clojure.java.jdbc :as jdbc]
             [clojure.test :refer :all]
             [sqlosure.core :refer :all]
+            [sqlosure.backend :as backend]
+            [sqlosure.type :as type]
+            [sqlosure.type-implementation :as ti]
             [sqlosure.backends.postgresql :as postgresql]
             [sqlosure.query-comprehension :as qc]
             [sqlosure.db-connection :as db]))
@@ -171,10 +174,35 @@
                    ["employee_region_id" (! regions "region_id")]
                    ["employee_region_description" (! regions "region_description")]])))
 
+;; For the sake of showing how to overwrite the default implementations of
+;; the type coercion from/to sql, we overwrite doubles to be interpreted
+;; as Java longs rounded to two digits.
+
+(defn round-to-two-decimals
+  [n]
+  (/ (Math/round (* n 100.0)) 100.0))
+
+(def implementation
+  (-> postgresql/implementation
+
+      ;; Reify double
+      (backend/reify-type-implementation
+       type/double%
+       ti/type-implementation-from-sql
+       (fn [rs ix]
+         (round-to-two-decimals (.getDouble rs ix))))
+
+      ;; Reify nullable double
+      (backend/reify-type-implementation
+       type/double%-nullable
+       ti/type-implementation-from-sql
+       (fn [rs ix]
+         (round-to-two-decimals (.getDouble rs ix))))))
+
 (defn run-query
   [q]
   (jdbc/with-db-connection [conn db-spec]
-    (let [connection (db-connect db-spec postgresql/implementation)]
+    (let [connection (db-connect db-spec implementation)]
       (db/run-query connection q))))
 
 ;; Examples taken from here: https://www.w3resource.com/mysql-exercises/northwind/products-table-exercises/
@@ -260,29 +288,55 @@
     (is (= ["Röd Kaviar" 15.0] (last res)))))
 
 ;; 7. Write a query to get Product list (id, name, unit price) of above average price.
-#_(def q7 (query [p (<- products-table)
-                avg (<- (monadic [ps (<- products-table)]
-                                 (project [["avg" ($avg (! ps "unit_price"))]])))]
+(def q7 (query [p (<- products-table)
+                avg (<- (query [ps (<- products-table)]
+                               (project [["avg" ($avg (! ps "unit_price"))]])))]
                (restrict ($> (! p "unit_price") (! avg "avg")))
-               (order [[(! p "unit_price") :ascending]])
-               distinct!
-               (project [["product_name" (! p "product_name")]
-                         ["unit_price" (! p "unit_price")]])))
+               (order    [[(! p "unit_price") :ascending]])
+               (project  [["product_name" (! p "product_name")]
+                          ["unit_price" (! p "unit_price")]])))
 
-#_(deftest query-7-test
+(deftest ^:northwind query-7-test
   (let [res (run-query q7)]
+    (is (= [["Uncle Bob's Organic Dried Pears"	30.0]
+            ["Ikura"	31.0]
+            ["Gumbär Gummibärchen" 31.23]
+            ["Mascarpone Fabioli"	32.0]
+            ["Perth Pasties" 32.8]
+            ["Wimmers gute Semmelknödel" 33.25]
+            ["Camembert Pierrot" 34.0]
+            ["Mozzarella di Giovanni" 34.8]
+            ["Gudbrandsdalsost" 36.0]
+            ["Queso Manchego La Pastora" 38.0]
+            ["Gnocchi di nonna Alice" 38.0]
+            ["Alice Mutton" 39.0]
+            ["Northwoods Cranberry Sauce" 40.0]
+            ["Vegie-spread" 43.9]
+            ["Schoggi Schokolade" 43.9]
+            ["Rössle Sauerkraut" 45.6]
+            ["Ipoh Coffee" 46.0]
+            ["Tarte au sucre" 49.3]
+            ["Manjimup Dried Apples" 53.0]
+            ["Raclette Courdavault" 55.0]
+            ["Carnarvon Tigers" 62.5]
+            ["Sir Rodney's Marmalade" 81.0]
+            ["Mishi Kobe Niku" 97.0]
+            ["Thüringer Rostbratwurst" 123.79]
+            ["Côte de Blaye" 263.5]]
+           res))
     (is (= ["Uncle Bob's Organic Dried Pears" 30.0] (first res)))
     (is (= ["Côte de Blaye" 263.5] (last res)))))
 
 ;; 8. Write a query to get Product list (name, unit price) of twenty most expensive products.
-#_(def q8 (query [p (<- products-table)
-                inner (<- (monadic [ps (<- products-table)]
-                                   (restrict ($>= (! ps "unit_price")
-                                                  (! p "unit_price")))
-                                   distinct!
-                                   (project [["count" ($count (! ps "unit_price"))]])))]
+(def q8 (query [a (<- products-table)
+                inner (<- (query [b (<- products-table)]
+                                 (restrict ($>= (! b "unit_price")
+                                                (! a "unit_price")))
+                                 distinct!
+                                 (project [["count" ($count (! b "unit_price"))]])))]
                (restrict ($>= ($integer 20)
                               (! inner "count")))
+               (order [[(! a "unit_price") :descending]])
                distinct!
-               (project [["twenty_most_expensive_products" (! p "product_name")]
-                         ["unit_price" (! p "unit_price")]])))
+               (project [["twenty_most_expensive_products" (! a "product_name")]
+                         ["unit_price" (! a "unit_price")]])))

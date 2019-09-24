@@ -37,7 +37,7 @@
   "Reify a specific aspect of a type-implementation of type `t`. Applies `f` at
   `lens` of the implementation of type t."
   [backend t lens f]
-  (lens/overhaul backend (lens/>> backend-type-implementations (lens/member t) lens) f))
+  (lens/shove backend (lens/>> backend-type-implementations (lens/member t) lens) f))
 
 (defn get-type-implementation
   "Get the implementation for a type `ty` from a `backend`-implementation."
