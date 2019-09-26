@@ -98,7 +98,6 @@
   (make-rel-scheme (rel-scheme-columns scheme)
                    (into {}
                          (map (fn [[name type]]
-                                ;; FIXME: does not work for product types
                                 [name (t/make-nullable-type type)])
                               (rel-scheme-map scheme)))
                    (rel-scheme-grouped scheme)))

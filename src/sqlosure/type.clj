@@ -45,6 +45,7 @@
    const->datum-fn atomic-type-const->datum-fn
    datum->const-fn atomic-type-datum->const-fn
    data atomic-type-data]
+
   base-type-protocol
   (-name [_] name)
   (-contains? [_ val] (predicate val))
@@ -116,11 +117,6 @@
   [max-size]
   (really-make-bounded-string-type max-size false))
 
-(defn make-nullable-type
-  "Make type nullable."
-  [base]
-  (-nullable base))
-
 (defn non-nullable-type
   "Yield non-nullable version of type."
   [base]
@@ -135,6 +131,19 @@
 (define-record-type set-type
   (make-set-type member-type) set-type?
   [member-type set-type-member-type])
+
+(defn type?
+  "Is a `thing` a type?"
+  [thing]
+  (or (atomic-type? thing) (product-type? thing) (set-type? thing)))
+
+(defn make-nullable-type
+  "Make type nullable."
+  [t]
+  (cond
+    (atomic-type? t)  (-nullable t)
+    (product-type? t) (map make-nullable-type (product-type-components t))
+    (set-type? t)     t))
 
 (defn null?
   [v]
@@ -230,7 +239,7 @@
 (def boolean%-nullable (make-nullable-type boolean%))
 
 ;; Used to represent the type of sql NULL. Corresponds to nil in Clojure.
-(def null% (make-base-type 'unknown nil? identity identity))  ;; FIXME Does this have any real purpose?
+(def null% (make-base-type 'unknown nil? identity identity))
 (def any% (make-base-type 'any (constantly true) identity identity))
 
 (def date% (make-base-type 'date date? identity identity
