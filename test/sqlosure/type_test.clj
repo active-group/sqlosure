@@ -11,15 +11,6 @@
     (is (and (= (base-type-name string-type) 'string)
              (u/universe-lookup-type test-universe 'string)))))
 
-
-(deftest double?-test
-  (is (is-double? 0.3))
-  (is (is-double? 42.0))
-  (is (not (is-double? 1)))
-  (is (not (is-double? nil)))
-  (is (not (is-double? "string")))
-  (is (not (is-double? :keyword))))
-
 (deftest is-boolean?-test
   (is (is-boolean? true))
   (is (is-boolean? false))
@@ -94,22 +85,6 @@
   (is (ordered-type? double%))
   (is (ordered-type? string%))
   (is (not (ordered-type? boolean%))))
-
-(deftest type=?-test
-  (is (type=? string% string%))
-  (is (not (type=? string%-nullable string%)))
-  (let [string-5% (make-bounded-string-type 6)]
-    (is (type=? string-5% string-5%))
-    (is (not (type=? string% string-5%))))
-  (let [my-product1% (make-product-type [string% integer%])
-        my-product2% (make-product-type [integer% string%])]
-    (is (type=? my-product1% my-product1%))
-    (is (not (type=? my-product1% my-product2%)))
-    (is (not (type=? string% my-product2%))))
-  (let [my-set1% (make-set-type string%)
-        my-set2% (make-set-type integer%)]
-    (is (type=? my-set1% my-set1%))
-    (is (not (type=? my-set1% string%)))))
 
 (deftest type->datum-test
   (is (= (type->datum string%) 'string))

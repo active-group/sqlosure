@@ -186,19 +186,6 @@
 
 ;; Checks if two types are the same.
 ;; Verbose definition unnecessary because of Clojures sensible equality (?).
-(def type=? =)
-
-;; Standard types
-
-(defn is-double?
-  "checks if a value is of type double."
-  [x]
-  (instance? Double x))
-
-(defn is-boolean?
-  "Checks if a value if of type boolean. This includes booleans and nil."
-  [x]
-  (or (nil? x) (instance? Boolean x)))
 
 ;; SEE: http://stackoverflow.com/a/14797271
 (defn test-array
@@ -319,14 +306,6 @@
     :else
     (or (universe-lookup-type universe d)
         (assertion-violation `datum->type "unknown type" (first d)))))
-
-
-(defn pair?
-  "Returns true if v is a sequence not empty (like schemes pair? function)."
-  [v]
-  (if (or (list? v) (vector? v))
-    (seq v)
-    false))
 
 (defn const->datum
   "`const->datum` takes a type and a value and applies the types and returns the

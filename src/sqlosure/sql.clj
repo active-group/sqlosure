@@ -12,8 +12,7 @@
               non-nullable-type
               null%
               numeric-type?
-              ordered-type?
-              type=?]]
+              ordered-type?]]
             [sqlosure.universe :refer [make-derived-universe make-universe]]))
 
 (define-record-type sql-table
@@ -79,9 +78,8 @@
 
    ^{:doc "List of SQL expressions or nil."}
    having sql-select-having
-   ;; [ {sql-expr sql-order} ]
+   ;; [[attribute-ref sql-order]]
    ;; ORDER BY
-   ;; FIXME: only column names allowed here
    order-by sql-select-order-by
    ;; [ string ]
    ;; TOP n, etc.
@@ -305,7 +303,7 @@
                                   (do
                                     (check-ordered t1 fail)
                                     (check-ordered t2 fail)
-                                    (when-not (type=? (non-nullable-type t1) (non-nullable-type t2))
+                                    (when-not (= (non-nullable-type t1) (non-nullable-type t2))
                                       (fail t1 t2))))
                                 boolean%)
                               (rel/null-lift-binary-predicate clj)
@@ -383,7 +381,7 @@
 (def =$
   (let [rator (rel/make-rator '=
                               (fn [fail t1 t2]
-                                (when (and fail (not (type=? (non-nullable-type t1) (non-nullable-type t2))))
+                                (when (and fail (not= (non-nullable-type t1) (non-nullable-type t2)))
                                   (fail t1 t2))
                                 boolean%)
                               =
@@ -420,7 +418,7 @@
 (def in$
   (let [rator (rel/make-rator 'in
                               (fn [fail t1 t2]
-                                (when (and fail (not (type=? (make-set-type t1) t2)))
+                                (when (and fail (not= (make-set-type t1) t2))
                                   (fail (make-set-type t1) t2))
                                 boolean%)
                               contains?

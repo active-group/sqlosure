@@ -401,7 +401,7 @@
 
                    (doseq [[k v] a2]
                      (when-let [p2 (get a1 k)]
-                       (when-not (t/type=? v p2)
+                       (when-not (= v p2)
                          (assertion-violation `make-combine "types don't match" rel-op k v p2 query-1 query-2))))
                    (rel-scheme-difference s1 s2))
 
@@ -610,8 +610,8 @@
    ;; case-expr
    (fn [alist t]
      (doseq [[p r] alist]
-       (when-not (t/type=? t/boolean% p) (assertion-violation `expression-type "non-boolean test in case" p r))
-       (when-not (t/type=? t r) (assertion-violation `expression-type "type mismatch in case" p r)))
+       (when-not (= t/boolean% p) (assertion-violation `expression-type "non-boolean test in case" p r))
+       (when-not (= t r) (assertion-violation `expression-type "type mismatch in case" p r)))
      t)
    (fn [subquery] (let [scheme (query-scheme subquery env)]
                     (when-not (rel-scheme-unary? scheme)
@@ -804,7 +804,7 @@
                   (when-not (= (count domain-types) (count arg-types))
                     (fail domain-types arg-types))
                   (doseq [dd domain-types ad arg-types]
-                    (when-not (t/type=? dd ad)
+                    (when-not (= dd ad)
                       (fail dd ad))))
                 range-type)
               proc
