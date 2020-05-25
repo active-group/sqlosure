@@ -8,14 +8,23 @@
             [clojure.pprint :refer [pprint]]
             [active.clojure.condition :as c]))
 
-(define-record-type relation
+(declare fresh-name !)
+
+(define-record-type Relation
   ^{:doc "`relation` is used to track the current state and later rebuild the resulting,
 correct references when running the query monad."}
   (make-relation alias scheme) relation?
   [^{:doc "The current alias."}
    alias relation-alias
    ^{:doc "The current relation-scheme."}
-   scheme relation-scheme])
+   scheme relation-scheme]
+
+  ;; Allow relations to be called directly as functions.
+  ;; This enables the shorthand `(query [t (<- table)]`
+  ;; instead of                 `(query [t (<- table)]`
+  ;;                                    (project (! t "one")))`
+  clojure.lang.IFn
+  (invoke [this a] (! this a)))
 
 (defn- fresh-name
   [name alias]
@@ -70,7 +79,7 @@ correct references when running the query monad."}
 
 (defn assert-alist
   [caller coll]
-  (if (or (list? coll) (vector? coll))
+  (if (or (seq? coll) (vector? coll))
     coll
     (c/assertion-violation caller "alist must be an ordered collection" coll)))
 

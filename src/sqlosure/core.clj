@@ -1,5 +1,5 @@
 (ns sqlosure.core
-  (:require [active.clojure.condition :refer [assertion-violation]]
+  (:require [active.clojure.condition :as c]
             [active.clojure.monad :refer :all]
             [sqlosure.db-connection :as db]
             [sqlosure.optimization :as opt]
@@ -8,13 +8,21 @@
             [sqlosure.relational-algebra-sql :as rsql]
             [sqlosure.sql :as sql]
             [sqlosure.sql-put :as put]
-            [sqlosure.type :as t]))
+            [sqlosure.type :as t]
+            [sqlosure.utils :as utils]))
 
 (defn db-connect
   "`db-connect` takes a connection map and returns a `db-connection`-record for
   that backend. Dispatches on the `:classname` key in `db-spec`."
   [db-spec backend]
   (db/make-db-connection db-spec backend))
+
+(defn variadic->alist
+  [arg1 arg2 args]
+  (when-not (even? (count args))
+    (c/assertion-violation `variadic->alist "args must be even" args))
+  (let [pairs (partition 2 args)]
+    (cons (list arg1 arg2) pairs)))
 
 (defn table
   "Returns a `sqlosure.relational-algebra/base-relation`.
@@ -53,7 +61,7 @@
   [rel name]
   (qc/! rel name))
 
-(defn restrict
+(defn restrict!
   "Restrict the current query by a condition.
 
   expr -> query(nil)
@@ -62,7 +70,12 @@
   [expr]
   (qc/restrict expr))
 
-(defn restrict-outer
+(defn restrict
+  [expr]
+  (utils/print-deprecation-warning! `restrict `restrict!)
+  (restrict! expr))
+
+(defn restrict-outer!
   "Restrict outer part of the current query by a condition.
 
   expr -> query(nil)
@@ -71,7 +84,12 @@
   [expr]
   (qc/restrict-outer expr))
 
-(defn restricted
+(defn restrict-outer
+  [expr]
+  (utils/print-deprecation-warning! `restrict-outer `restrict-outer!)
+  (restrict-outer! expr))
+
+(defn restricted!
   "Restrict the current query by a condition. Returns the resulting state.
 
   Example:
@@ -85,13 +103,20 @@
   [expr]
   (qc/restricted expr))
 
-(defn group
+(defn restricted
+  [expr]
+  (utils/print-deprecation-warning! `restricted `restricted!)
+  (restricted! expr))
+
+(defn group!
   "Group by specified seq of column references `[rel name]`.
   Example
       (query [t (<- embed t-table)]
              (group [t \"some_field\"])"
   [alist]
   (qc/group alist))
+
+(def group group!)
 
 (defn project
   "Project some columns of the current query. Returns the resulting state.
@@ -105,9 +130,11 @@
   ([alist-or-relation]
    (if (qc/relation? alist-or-relation)
      (return alist-or-relation)
-     (qc/project alist-or-relation))))
+     (qc/project alist-or-relation)))  ; This is just for backwards compatibility.
+  ([project-name project-field & more-projections]
+   (qc/project (variadic->alist project-name project-field more-projections))))
 
-(defn order
+(defn order!
   "Takes an alist of [[attribute-ref] :descending/:ascending] to order
   the result by this attribute.
 
@@ -117,10 +144,17 @@
              (project {\"foo\" (! t \"foo\")}))
 
   The corresponding SQL statemant would be \"SELECT foo FROM t ORDER BY foo ASC\"."
-  [alist]
-  (qc/order alist))
+  ([alist]
+   (qc/order alist))
+  ([attr direction & more-orders]
+   (qc/order (variadic->alist attr direction more-orders))))
 
-(defn top
+(defn order
+  [alist]
+  (utils/print-deprecation-warning! `order `order!)
+  (order! alist))
+
+(defn top!
   "`top` is used to define queries that return a cerain number of entries.
   When called with one argument `n`, top constructs a query that only returns
   the first `n` elements.
@@ -128,6 +162,8 @@
   returns the first `n` elements with an offset of `offset`."
   ([n] (qc/top nil n))
   ([offset n] (qc/top offset n)))
+
+(defn top top!)
 
 (def distinct!
   "`distinct!` is used to define queries that only return distinct rows.
@@ -146,7 +182,7 @@
   [aggregation-op & attribute]
   (doseq [a attribute]
     (when-not (rel/attribute-ref? a)
-      (assertion-violation `aggregate "expected attribute-ref" a)))
+      (c/assertion-violation `aggregate "expected attribute-ref" a)))
   (apply rel/make-aggregation aggregation-op attribute))
 
 ;; Aggregations on attributes.
