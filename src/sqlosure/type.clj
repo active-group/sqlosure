@@ -7,7 +7,7 @@
   (:import java.io.Writer
            [java.time LocalDate LocalDateTime]))
 
-(defprotocol base-type-protocol
+(defprotocol TypeProtocol
   "Protocol for base types."
   (-name [this] "Get name of the type.")
   (-contains? [this val] "Does non-null value belong to this base type?")
@@ -16,58 +16,90 @@
   (-non-nullable [this] "Get us non-nullable version of this type.")
   (-numeric? [this] "Is this type numeric?")
   (-ordered? [this] "Is this type ordered?")
-  (-const->datum [this val] "Convert value to datum.")
-  (-datum->const [this datum] "Convert datum to value.")
   (-data [this] "Domain-specific data, for outside use."))
 
 (defn nullable-type?
   "Is type nullable?"
   [ty]
-  (and (satisfies? base-type-protocol ty)
+  (and (satisfies? TypeProtocol ty)
        (-nullable? ty)))
-
-(defn base-type-name
-  "Yield name of base type."
-  [t]
-  (-name t))
 
 (declare make-atomic-type)
 
-(define-record-type atomic-type
-  (make-atomic-type name nullable? numeric? ordered? predicate
-                    const->datum-fn datum->const-fn data)
+(define-record-type AtomicType
+  (make-atomic-type name nullable? numeric? ordered? predicate data)
   atomic-type?
   [name atomic-type-name
    nullable? atomic-type-nullable?
    numeric? atomic-type-numeric?
    ordered? atomic-type-ordered?
    predicate atomic-type-predicate
-   const->datum-fn atomic-type-const->datum-fn
-   datum->const-fn atomic-type-datum->const-fn
    data atomic-type-data]
 
-  base-type-protocol
+  TypeProtocol
   (-name [_] name)
   (-contains? [_ val] (predicate val))
   (-nullable? [_] nullable?)
-  (-nullable [_] (make-atomic-type name true numeric? ordered? predicate
-                                   const->datum-fn datum->const-fn data))
-  (-non-nullable [_] (make-atomic-type name false numeric? ordered? predicate
-                                       const->datum-fn datum->const-fn data))
+  (-nullable [_] (make-atomic-type name true numeric? ordered? predicate data))
+  (-non-nullable [_] (make-atomic-type name false numeric? ordered? predicate data))
   (-numeric? [_] numeric?)
   (-ordered? [_] ordered?)
-  (-const->datum [_ val] (const->datum-fn val))
-  (-datum->const [_ datum] (datum->const-fn datum))
   (-data [_] data))
 
-(defmethod print-method atomic-type [r, ^Writer w]
+(declare really-make-bounded-string-type)
+
+(define-record-type BoundedStringType
+  (really-make-bounded-string-type max-size nullable?) bounded-string-type?
+  [max-size bounded-string-type-max-size
+   nullable? bounded-string-type-nullable?]
+
+  TypeProtocol
+  (-name [_] (list 'bounded-string max-size))
+  (-contains? [_ val] (and (string? val) (<= (count val) max-size)))
+  (-nullable? [_] nullable?)
+  (-nullable [_] (really-make-bounded-string-type max-size true))
+  (-non-nullable [_] (really-make-bounded-string-type max-size false))
+  (-numeric? [_] false)
+  (-ordered? [_] true))
+
+(declare make-nullable-type)
+
+(define-record-type ProductType
+  (really-make-product-type components) product-type?
+  [components product-type-components]
+
+  TypeProtocol
+  (-name [this] "tuple")
+  (-contains?
+   [this vs]
+   (and (seqable? vs)
+        (= (count vs) (count components))
+        (loop [vs  vs
+               cs  components
+               res true]
+          (if (empty? vs)
+            res
+            (recur (rest vs) (rest cs)
+                   (and res (-contains? (first cs) (first vs))))))))
+  (-nullable? [_] false)
+  (-nullable
+   [this]
+   (map make-nullable-type components))
+  (-non-nullable [this] this)
+  (-numeric? [this] false)
+  (-ordered? [this] false)
+  (-data
+   [this]
+   (throw (java.lang.UnsupportedOperationException. "not implemented yet"))))
+
+(defmethod print-method AtomicType [r, ^Writer w]
   (.write w "#")
   (.write w (.getName (class r)))
   (print-method {:name (atomic-type-name r)
                  :nullable? (atomic-type-nullable? r)}
                 w))
 
-(defmethod print-dup atomic-type [r, ^Writer w]
+(defmethod print-dup AtomicType [r, ^Writer w]
   (.write w "#")
   (.write w (.getName (class r)))
   (let [mp {:name (atomic-type-name r)
@@ -80,37 +112,21 @@
   "Returns a new base type as specified.
   If :universe is supplied, the new type will be registered in the universe and
   this function returns a vector containing `[type universe]`."
-  [name predicate const->datum-proc datum->const-proc
-   & {:keys [universe numeric? ordered? data]
-      :or   {universe nil numeric? false ordered? false data nil}}]
-  (let [t (make-atomic-type name
-                            false
-                            (boolean numeric?)
-                            (boolean ordered?)
-                            predicate
-                            const->datum-proc
-                            datum->const-proc
-                            data)]
-    (when universe
+  [name predicate & [opts]]
+  (let [opts (merge {:universe nil
+                     :numeric? false
+                     :ordered? false
+                     :data     nil}
+                    opts)
+        t    (make-atomic-type name
+                               false
+                               (:numeric? opts)
+                               (:ordered? opts)
+                               predicate
+                               (:data opts))]
+    (when-let [universe (:universe opts)]
       (register-type! universe name t))
     t))
-
-(declare really-make-bounded-string-type)
-
-(define-record-type bounded-string-type
-  (really-make-bounded-string-type max-size nullable?) bounded-string-type?
-  [max-size bounded-string-type-max-size
-   nullable? bounded-string-type-nullable?]
-  base-type-protocol
-  (-name [_] (list 'bounded-string max-size))
-  (-contains? [_ val] (and (string? val) (<= (count val) max-size)))
-  (-nullable? [_] nullable?)
-  (-nullable [_] (really-make-bounded-string-type max-size true))
-  (-non-nullable [_] (really-make-bounded-string-type max-size false))
-  (-numeric? [_] false)
-  (-ordered? [_] true)
-  (-const->datum [_ val] val)
-  (-datum->const [_ datum] datum))
 
 (defn make-bounded-string-type
   "Create string type with given maximum number of chars."
@@ -120,7 +136,7 @@
 (defn non-nullable-type
   "Yield non-nullable version of type."
   [base]
-  (if (satisfies? base-type-protocol base)
+  (if (satisfies? TypeProtocol base)
     (-non-nullable base)
     base))
 
@@ -136,6 +152,11 @@
   "Is a `thing` a type?"
   [thing]
   (or (atomic-type? thing) (product-type? thing) (set-type? thing)))
+
+(defn base-type-name
+  "Yield name of base type."
+  [t]
+  (-name t))
 
 (defn make-nullable-type
   "Make type nullable."
@@ -154,7 +175,7 @@
 (defn type-member?
   "Checks if `thing` is a member of a type."
   [thing ty]
-  (if (satisfies? base-type-protocol ty)
+  (if (satisfies? TypeProtocol ty)
     (if (nil? thing)
       (-nullable? ty)
       (-contains? ty thing))
@@ -174,14 +195,14 @@
   "Is type numeric, in the sense of the server's capability to call standard
   operations like MAX and AVG on them."
   [ty]
-  (and (satisfies? base-type-protocol ty)
+  (and (satisfies? TypeProtocol ty)
        (-numeric? ty)))
 
 (defn ordered-type?
   "Is type ordered, in the sense of the servers' capability to make an
   'order by' on them."
   [ty]
-  (and (satisfies? base-type-protocol ty)
+  (and (satisfies? TypeProtocol ty)
        (-ordered? ty)))
 
 ;; Checks if two types are the same.
@@ -210,40 +231,38 @@
   (instance? LocalDateTime d))
 
 ;; Some base types
-(def string% (make-base-type 'string string? identity identity
-                             :ordered? true))
+(def string%
+  (make-base-type 'string string? {:ordered? true}))
 (def string%-nullable (make-nullable-type string%))
 
-(def integer% (make-base-type 'integer integer? identity identity
-                              :numeric? true :ordered? true))
+(def integer%
+  (make-base-type 'integer integer? {:numeric? true :ordered? true}))
 (def integer%-nullable (make-nullable-type integer%))
 
-(def double% (make-base-type 'double is-double? identity identity
-                              :numeric? true :ordered? true))
+(def double% (make-base-type 'double double? {:numeric? true :ordered? true}))
 (def double%-nullable (make-nullable-type double%))
 
-(def boolean% (make-base-type 'boolean is-boolean? identity identity))
+(def boolean% (make-base-type 'boolean is-boolean?))
 (def boolean%-nullable (make-nullable-type boolean%))
 
 ;; Used to represent the type of sql NULL. Corresponds to nil in Clojure.
-(def null% (make-base-type 'unknown nil? identity identity))
-(def any% (make-base-type 'any (constantly true) identity identity))
+(def null% (make-base-type 'unknown nil?))
+(def any% (make-base-type 'any (constantly true)))
 
-(def date% (make-base-type 'date date? identity identity
-                           :ordered? true))
+(def date% (make-base-type 'date date? {:ordered? true}))
 (def date%-nullable (make-nullable-type date%))
 
-(def timestamp% (make-base-type 'timestamp timestamp? identity identity
-                                :ordered? true))
+(def timestamp% (make-base-type 'timestamp timestamp?
+                                {:ordered? true}))
 (def timestamp%-nullable (make-nullable-type timestamp%))
 
-(def blob% (make-base-type 'blob byte-array? 'lose 'lose))
+(def blob% (make-base-type 'blob byte-array?))
 (def blob%-nullable (make-nullable-type blob%))
 
-(def clob% (make-base-type 'clob char-array? 'lose 'lose))
+(def clob% (make-base-type 'clob char-array?))
 (def clob%-nullable (make-nullable-type clob%))
 
-(def bytea% (make-base-type 'bytea byte-array? 'lose 'lose))
+(def bytea% (make-base-type 'bytea byte-array?))
 (def bytea%-nullable (make-nullable-type bytea%))
 
  ;; Serialization
@@ -256,7 +275,7 @@
   * `(type->datum (make-product-type [string% double%])) => (product (string) (double)`"
   [t]
   (cond
-    (satisfies? base-type-protocol t)
+    (satisfies? TypeProtocol t)
     (if (-nullable? t)
       (list 'nullable
             (type->datum (-non-nullable t)))
