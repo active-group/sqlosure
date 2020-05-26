@@ -46,6 +46,22 @@
   (-ordered? [_] ordered?)
   (-data [_] data))
 
+(defmethod print-method AtomicType [r, ^Writer w]
+  (.write w "#")
+  (.write w (.getName (class r)))
+  (print-method {:name (atomic-type-name r)
+                 :nullable? (atomic-type-nullable? r)}
+                w))
+
+(defmethod print-dup AtomicType [r, ^Writer w]
+  (.write w "#")
+  (.write w (.getName (class r)))
+  (let [mp {:name (atomic-type-name r)
+            :nullable? (atomic-type-nullable? r)}]
+    (if *verbose-defrecords*
+      (print-dup mp w)
+      (print-dup (vec (vals mp)) w))))
+
 (declare really-make-bounded-string-type)
 
 (define-record-type BoundedStringType
@@ -92,21 +108,21 @@
    [this]
    (throw (java.lang.UnsupportedOperationException. "not implemented yet"))))
 
-(defmethod print-method AtomicType [r, ^Writer w]
-  (.write w "#")
-  (.write w (.getName (class r)))
-  (print-method {:name (atomic-type-name r)
-                 :nullable? (atomic-type-nullable? r)}
-                w))
+(defn make-product-type
+  [components]
+  #_(when-not (every? #(satisfies? TypeProtocol components) components)
+    (assertion-violation `make-product-type (str "each components must satisfy " `TypeProtocol) components))
+  (really-make-product-type components))
 
-(defmethod print-dup AtomicType [r, ^Writer w]
-  (.write w "#")
-  (.write w (.getName (class r)))
-  (let [mp {:name (atomic-type-name r)
-            :nullable? (atomic-type-nullable? r)}]
-    (if *verbose-defrecords*
-      (print-dup mp w)
-      (print-dup (vec (vals mp)) w))))
+(define-record-type SetType
+  (really-make-set-type member-type) set-type?
+  [member-type set-type-member-type])
+
+(defn make-set-type
+  [member-type]
+  (when-not (satisfies? TypeProtocol member-type)
+    (assertion-violation `make-set-type (str "member-type must satisfy " `TypeProtocol) member-type))
+  (really-make-set-type member-type))
 
 (defn make-base-type
   "Returns a new base type as specified.
@@ -139,14 +155,6 @@
   (if (satisfies? TypeProtocol base)
     (-non-nullable base)
     base))
-
-(define-record-type product-type
-  (make-product-type components) product-type?
-  [components product-type-components])
-
-(define-record-type set-type
-  (make-set-type member-type) set-type?
-  [member-type set-type-member-type])
 
 (defn type?
   "Is a `thing` a type?"
@@ -242,7 +250,7 @@
 (def double% (make-base-type 'double double? {:numeric? true :ordered? true}))
 (def double%-nullable (make-nullable-type double%))
 
-(def boolean% (make-base-type 'boolean is-boolean?))
+(def boolean% (make-base-type 'boolean boolean?))
 (def boolean%-nullable (make-nullable-type boolean%))
 
 ;; Used to represent the type of sql NULL. Corresponds to nil in Clojure.
@@ -267,7 +275,7 @@
 
  ;; Serialization
 
-(defn type->datum
+#_(defn type->datum
   "`type->datum` takes a type and returns it into a recursive list of it's
   subtypes. If the `type` is invalid, raises assertion-violation.
   Examples:
@@ -287,7 +295,7 @@
                         (type->datum (set-type-member-type t)))
     :else (assertion-violation `type->datum "unknown type" t)))
 
-(defn datum->type
+#_(defn datum->type
   "`datum->type` takes a datum (as produced by `type->datum`) and a universe and
   returns the corresponding type. If the type is not a base type defined in
   `type.clj`, try looking it up in the supplied universe. If it's not found,
@@ -326,7 +334,7 @@
     (or (universe-lookup-type universe d)
         (assertion-violation `datum->type "unknown type" (first d)))))
 
-(defn const->datum
+#_(defn const->datum
   "`const->datum` takes a type and a value and applies the types and returns the
   corresponding clojure value. If the type or value are invalid, throws an
   exception.
@@ -336,7 +344,7 @@
      => [\"foo\" 42]`"
   [t val]
   (cond
-    (satisfies? base-type-protocol t)
+    (satisfies? TypeProtocol t)
     (when-not (and (-nullable? t) (nil? val))
       (-const->datum t val))
 
@@ -350,7 +358,7 @@
                     (map (fn [v] (const->datum mem v)) val))
     :else (assertion-violation `const->datum "invalid type" t val)))
 
-(defn datum->const
+#_(defn datum->const
   "`datum->const` takes a type and a datum and turns the datum in the
   corresponding clojure data. If type is invalid or datum does not match the
   type, throws an exception.
@@ -359,7 +367,7 @@
   * `(datum->const (make-set-type integer%) [42 23]) => [42 23]`"
   [t d]
   (cond
-    (satisfies? base-type-protocol t)
+    (satisfies? TypeProtocol t)
     (when-not (and (-nullable? t) (nil? d))
       (-datum->const t d))
     (product-type? t) (cond

@@ -552,7 +552,7 @@
                       tu/person-table))))]
       (is (query? combine)))))
 
-(deftest expression->datum-test
+#_(deftest expression->datum-test
   (is (= (list 'attribute-ref "two") (expression->datum
                                       (make-attribute-ref "two"))))
   (is (= '(const string "foobar")
@@ -574,7 +574,7 @@
          (expression->datum (make-aggregation :count (make-tuple [(make-const integer% 40)
                                                                   (make-const integer% 2)]))))))
 
-(deftest query->datum-test
+#_(deftest query->datum-test
   (is (= (list 'empty-query) (query->datum the-empty)))
   (is (= (list 'base-relation 'tbl1) (query->datum tbl1)))
   (is (= (list 'project (list (list "two" 'attribute-ref "two")
@@ -636,7 +636,7 @@
   (testing "every other input should fail"
     (is (thrown? Exception (query->datum :not-a-query)))))
 
-(deftest datum->query-test
+#_(deftest datum->query-test
   (let [test-universe (register-base-relation! (make-universe)
                                                'tbl1 tbl1)
         query->datum->query #(-> % query->datum (datum->query test-universe))]
@@ -726,7 +726,7 @@
     (is (thrown? Exception
                  (datum->query '(:invalid-argument) (make-universe))))))
 
-(deftest datum->expression-test
+#_(deftest datum->expression-test
   (let [test-universe (make-universe)
         expression->datum->expression #(-> %
                                            expression->datum
@@ -788,8 +788,7 @@
                              (make-const boolean% false))))))
   (testing "everything else should fail"
     (is (thrown? Exception (datum->expression (list 'doesnotexists) sql-universe)))))
-(expression-attribute-names (make-tuple [(make-const integer% 40)
-                                         (make-const integer% 2)]))
+
 (deftest expression-attribute-names-test
   (is (= #{"two"} (expression-attribute-names (make-attribute-ref "two"))))
   (is (= #{} (expression-attribute-names (make-const string% "foobar"))))

@@ -687,9 +687,9 @@
   (or (empty-query? obj) (base-relation? obj) (project? obj) (restrict? obj) (restrict-outer? obj)
       (combine? obj) (order? obj) (group? obj) (top? obj) (distinct-q? obj)))
 
-(declare query->datum)
+#_(declare query->datum)
 
-(defn expression->datum
+#_(defn expression->datum
   "Takes an expression and returns a data representation of it.
   Example:
   * `(expression->datum (make-attribute-ref \"foo\")) => (attribute-ref \"foo\")'"
@@ -707,7 +707,7 @@
    (fn [subquery] (list 'set-subquery-query (query->datum subquery)))
    e))
 
-(defn query->datum
+#_(defn query->datum
   [q]
   (cond
     (empty-query? q) (list 'empty-query)
@@ -734,9 +734,9 @@
     (distinct-q? q) (list 'distinct (query->datum (distinct-q-query q)))
     :else (assertion-violation `query->datum "unknown query" q)))
 
-(declare datum->expression)
+#_(declare datum->expression)
 
-(defn datum->query
+#_(defn datum->query
   [d universe]
   (letfn [(next-step [d*] (datum->query d* universe))]
     (case (first d)
@@ -764,7 +764,7 @@
       top (make-top (second d) (third d) (next-step (fourth d)))
       (assertion-violation `datum->query "invalid datum" d))))
 
-(defn datum->expression
+#_(defn datum->expression
   "Takes a datum and returns the corresponding expression. This is the inverse
   function of expression->datum, so
   `(= d (datum->expression (expression->datum d) u))`

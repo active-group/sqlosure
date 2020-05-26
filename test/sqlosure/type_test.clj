@@ -6,18 +6,9 @@
 
 (deftest make-base-type-test
   (let [test-universe (u/make-universe)
-        string-type (make-base-type 'string string? identity identity
-                                    :universe test-universe)]
+        string-type (make-base-type 'string string? {:universe test-universe})]
     (is (and (= (base-type-name string-type) 'string)
              (u/universe-lookup-type test-universe 'string)))))
-
-(deftest is-boolean?-test
-  (is (is-boolean? true))
-  (is (is-boolean? false))
-  (is (is-boolean? nil))
-  (is (not (is-boolean? 42)))
-  (is (not (is-boolean? "string")))
-  (is (not (is-boolean? :keyword))))
 
 (deftest date?-test
   (is (date? (time/make-date 2000 1 1)))
@@ -86,7 +77,7 @@
   (is (ordered-type? string%))
   (is (not (ordered-type? boolean%))))
 
-(deftest type->datum-test
+#_(deftest type->datum-test
   (is (= (type->datum string%) 'string))
   (is (= (type->datum integer%) 'integer))
   (is (= (type->datum string%-nullable) '(nullable string)))
@@ -99,7 +90,7 @@
   (testing "anything else should return an assertion"
     (is (thrown? Exception (type->datum nil)))))
 
-(deftest datum->type-test
+#_(deftest datum->type-test
   (let [test-universe (u/make-universe)
         my-bounded-string% (make-bounded-string-type 6)
         my-product% (make-product-type [string% integer%])
@@ -127,7 +118,7 @@
       (is (= (datum->type 'long test-universe)
              double%)))))
 
-(deftest const->datum-test
+#_(deftest const->datum-test
   (let [my-bounded% (make-bounded-string-type 5)
         my-product% (make-product-type [integer% string%])
         my-set% (make-set-type integer%)]
@@ -144,7 +135,7 @@
     (is (thrown? Exception (const->datum :non-existent-type 42.0)))
     (is (thrown? Exception (const->datum my-product% 42)))))
 
-(deftest datum->const-test
+#_(deftest datum->const-test
   (let [my-bounded% (make-bounded-string-type 5)
         my-product% (make-product-type [integer% string%])
         my-set% (make-set-type integer%)
