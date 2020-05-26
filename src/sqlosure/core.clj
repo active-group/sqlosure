@@ -163,7 +163,7 @@
   ([n] (qc/top nil n))
   ([offset n] (qc/top offset n)))
 
-(defn top top!)
+(def top top!)
 
 (def distinct!
   "`distinct!` is used to define queries that only return distinct rows.
