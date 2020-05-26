@@ -448,7 +448,6 @@
        (doseq [p alist]
          (let [exp (first p)
                t (expression-type env exp)]
-           ;; FIXME: works only for base types
            (when-not (t/ordered-type? t)
              (assertion-violation `make-order "not an ordered type " t exp))))
        scheme))))
