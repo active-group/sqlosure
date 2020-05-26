@@ -307,7 +307,9 @@
   ;; TODO: Make this a multimethod to support externally defined types or something?
   (cond
     (symbol? d)
-    ;; FIXME: aren't these types registered with the universe, too?
+    ;; TODO: If we actually decide we need this: aren't these types registered with the universe, too?
+    (or (universe-lookup-type universe d)
+        (assertion-violation `datum->type "unknown type" (first d)))
     (case d
       string string%
       integer integer%
@@ -317,8 +319,7 @@
       timestamp timestamp%
       blob blob%
 
-      (or (universe-lookup-type universe d)
-          (assertion-violation `datum->type "unknown type" (first d))))
+      )
 
     (and (coll? d) (not-empty d))
     (case (first d)

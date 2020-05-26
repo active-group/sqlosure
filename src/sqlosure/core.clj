@@ -116,7 +116,10 @@
   [alist]
   (qc/group alist))
 
-(def group group!)
+(defn group
+  [alist]
+  (utils/print-deprecation-warning! `group `group!)
+  (group! alist))
 
 (defn project
   "Project some columns of the current query. Returns the resulting state.

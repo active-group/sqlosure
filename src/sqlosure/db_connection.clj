@@ -53,12 +53,14 @@
   to the value.
   `param-types+args` is a sequence of vectors `[[$sqlosure-type val] ...]`."
   [stmt param-types+args backend]
-  ;; FIXME: don't do map
-  (dorun (map-indexed (fn [ix [ty val]]
-                        (let [type-implementation (backend/get-type-implementation backend ty)
-                              type->sql (ti/type-implementation-to-sql type-implementation)]
-                          (type->sql stmt (inc ix) val)))
-                      param-types+args)))
+  (loop [idx 0
+         pta param-types+args]
+    (when-not (empty? pta)
+      (let [[ty v]              (first pta)
+            type-implementation (backend/get-type-implementation backend ty)
+            type->sql           (ti/type-implementation-to-sql type-implementation)]
+        (type->sql stmt (inc idx) v)
+        (recur (inc idx) (rest pta))))))
 
 (defn run-query
   "Takes a database connection and a query and runs it against the database.
@@ -74,7 +76,7 @@
                         (restrict ($> (! k \"key\")
                                     ($integer 10)))
                         (project {\"value\" (! kv \"value\")})))"
-  [conn q & {:keys [optimize?] :or {optimize? false} :as opts-map}]
+  [conn q & {:keys [optimize?] :or {optimize? true} :as opts-map}]
   (let [qq                       (if optimize? (o/optimize-query q) q)
         scheme                   (rel/query-scheme qq)
         col-types                (rel/rel-scheme-types scheme)
