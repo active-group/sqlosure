@@ -1,4 +1,4 @@
-(defproject de.active-group/sqlosure "0.3.0-SNAPSHOT"
+(defproject de.active-group/sqlosure "0.4.0-SNAPSHOT"
   :description "Compositional relational queries."
   :url "https://github.com/active-group/sqlosure"
   :license {:name "Eclipse Public License"
