@@ -2,7 +2,7 @@
   (:require [sqlosure.relational-algebra :as rel]
             [sqlosure.type :as t]
             [sqlosure.utils :refer [zip]]
-            [active.clojure.monad :refer :all]
+            [active.clojure.monad :as monad :refer [monadic return]]
             [active.clojure.record :refer [define-record-type]]
             [active.clojure.condition :refer [assertion-violation]]
             [clojure.pprint :refer [pprint]]
@@ -33,10 +33,10 @@ correct references when running the query monad."}
 (defn- set-alias!
   "Takes a new alias and puts it in the current state."
   [a]
-  (put-state-component! ::alias a))
+  (monad/put-state-component! ::alias a))
 
 (def ^{:private true} current-alias
-  (get-state-component ::alias))
+  (monad/get-state-component ::alias))
 
 (def ^{:private true} new-alias
   (monadic
@@ -45,12 +45,12 @@ correct references when running the query monad."}
    (return a)))
 
 (def ^{:private true} current-query
-  (get-state-component ::query))
+  (monad/get-state-component ::query))
 
 (defn- set-query!
   "Takes a query and puts it in the current state."
   [new]
-  (put-state-component! ::query new))
+  (monad/put-state-component! ::query new))
 
 (defn- add-to-product
   [make-product transform-scheme q]
@@ -96,7 +96,7 @@ correct references when running the query monad."}
   (monadic
    [alias new-alias
     query current-query]
-   (let [query' ((if (rel/empty-query? query) rel/make-project rel/make-extend )
+   (let [query' ((if (rel/empty-query? query) rel/make-project rel/make-extend)
                  (mapv (fn [[k v]] [(fresh-name k alias) v])
                        alist)
                  query)])
@@ -197,12 +197,12 @@ correct references when running the query monad."}
 (def ^{:private true} the-empty-state (make-state rel/the-empty 0))
 
 (def ^{:private true} query-comprehension-monad-command-config
-  (null-monad-command-config nil the-empty-state))
+  (monad/null-monad-command-config nil the-empty-state))
 
 (defn- run-query-comprehension*
   "Returns `[retval state]`."
   [prod state]
-  (run-free-reader-state-exception
+  (monad/run-free-reader-state-exception
    query-comprehension-monad-command-config
    prod
    state))
@@ -220,7 +220,7 @@ correct references when running the query monad."}
   state, and return it and the scheme. Also resets the state."
   [rel]
   (monadic
-   [state (get-state)]
+   [state (monad/get-state)]
    (let [alias (relation-alias rel)
          scheme (relation-scheme rel)
          alist (map (fn [k]

@@ -521,7 +521,7 @@
   Otherwise, throws an assertion violation."
   [k f]
   (if-not (aggregations-op? k)
-    (c/assertion-violation `ensure-aggregations-op! "now an aggregation operation" k)
+    (c/assertion-violation `ensure-aggregations-op! "not an aggregation operation" k)
     (f)))
 
 (define-record-type aggregation
@@ -816,7 +816,7 @@
   predicate to."
   [pred]
   (fn [v1 v2]
-    (when-not (or (empty? v1) (empty? v2))
+    (when-not (or (nil? v1) (nil? v2))
       (pred v1 v2))))
 
 (defn make-monomorphic-combinator
