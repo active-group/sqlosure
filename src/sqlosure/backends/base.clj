@@ -18,52 +18,52 @@
 
 (def string%
   (ti/implement type/string%
-                (fn [^PreparedStatement stmt ix val] (.setString stmt ix val))
-                (fn [^ResultSet rs ix] (.getString rs ix))))
+                (fn [^PreparedStatement stmt ^Long ix val] (.setString stmt ix val))
+                (fn [^ResultSet rs ^Long ix] (.getString rs ix))))
 
 (def integer%
   (ti/implement type/integer%
-                (fn [^PreparedStatement stmt ix val] (.setInt stmt ix val))
-                (fn [^ResultSet rs ix] (.getInt rs ix))))
+                (fn [^PreparedStatement stmt ^Long ix val] (.setInt stmt ix val))
+                (fn [^ResultSet rs ^Long ix] (.getInt rs ix))))
 
 (def double%
   (ti/implement type/double%
-                (fn [^PreparedStatement stmt ix val] (.setDouble stmt ix val))
-                (fn [^ResultSet rs ix] (.getDouble rs ix)) ))
+                (fn [^PreparedStatement stmt ^Long ix val] (.setDouble stmt ix val))
+                (fn [^ResultSet rs ^Long ix] (.getDouble rs ix)) ))
 
 (def boolean%
   (ti/implement type/boolean%
-                (fn [^PreparedStatement stmt ix val] (.setBoolean stmt ix val))
-                (fn [^ResultSet rs ix] (.getBoolean rs ix))))
+                (fn [^PreparedStatement stmt ^Long ix val] (.setBoolean stmt ix val))
+                (fn [^ResultSet rs ^Long ix] (.getBoolean rs ix))))
 (def blob%
   (ti/implement type/blob%
-                (fn [^PreparedStatement stmt ix val] (.setBlob stmt ix val))
+                (fn [^PreparedStatement stmt ^Long ix val] (.setBlob stmt ix val))
                 (fn [^ResultSet rs ix] (.getBlob rs ix))))
 
 (def bytea%
   (ti/implement type/bytea%
-                (fn [^PreparedStatement stmt ix val] (.setBytes stmt ix val))
-                (fn [^ResultSet rs ix] (.getBytes rs ix))))
+                (fn [^PreparedStatement stmt ^Long ix val] (.setBytes stmt ix val))
+                (fn [^ResultSet rs ^Long ix] (.getBytes rs ix))))
 
 (def clob%
   (ti/implement type/clob%
-                (fn [^PreparedStatement stmt ix val] (.setClob stmt ix val))
-                (fn [^ResultSet rs ix] (.getClob rs ix))))
+                (fn [^PreparedStatement stmt ^Long ix val] (.setClob stmt ix val))
+                (fn [^ResultSet rs ^Long ix] (.getClob rs ix))))
 
 (def date%
   ;; NOTE `val` here is a `java.time.LocalDate` which has to be coerced to and
   ;;      from `java.sql.Date` first.
   (ti/implement type/date%
-                (fn [^PreparedStatement stmt ix val]
+                (fn [^PreparedStatement stmt ^Long ix val]
                   (.setDate stmt ix (time/to-sql-date val)))
-                (fn [^ResultSet rs ix]
+                (fn [^ResultSet rs ^Long ix]
                   (time/from-sql-date (.getDate rs ix)))))
 
 (def timestamp%
   (ti/implement type/timestamp%
-                (fn [^PreparedStatement stmt ix val]
+                (fn [^PreparedStatement stmt ^Long ix val]
                   (.setTimestamp stmt ix (time/to-sql-timestamp val)))
-                (fn [^ResultSet rs ix]
+                (fn [^ResultSet rs ^Long ix]
                   (time/from-sql-timestamp (.getTimestamp rs ix)))))
 
 (def types {type/string%             string%

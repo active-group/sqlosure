@@ -35,7 +35,7 @@
   (let [row-values (fn []
                      ;; should cache the method implementations
                      (map-indexed
-                      (fn [^Integer i ty]
+                      (fn [^Long i ty]
                         (let [type-implementation (backend/get-type-implementation backend ty)
                               sql->type           (ti/type-implementation-from-sql type-implementation)]
                           (sql->type rs (inc i))))
