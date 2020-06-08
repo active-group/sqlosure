@@ -318,7 +318,7 @@
   representation. Uses the default printer from `sqlosure.sql-put`."
   [q & {:keys [optimize?]}]
   (let [optimize (if optimize? opt/optimize-query identity)]
-    (->> q
-         optimize
-         rsql/query->sql
-         put/sql-select->string)))
+    (-> q
+        optimize
+        rsql/query->sql
+        (put/sql-select->string put/default-sql-put-parameterization))))
