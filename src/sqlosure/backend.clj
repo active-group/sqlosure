@@ -1,8 +1,10 @@
 (ns sqlosure.backend
-  (:require [active.clojure.record :refer [define-record-type]]
+  (:require [active.clojure.condition :as c]
             [active.clojure.lens :as lens]
+            [active.clojure.record :refer [define-record-type]]
+
             [sqlosure.backends.base :as base]
-            [active.clojure.condition :as c]))
+            [sqlosure.sql-put :as sql-put]))
 
 ;;   In the following lines, backend will refer to a specific RDBMS (i.e. postgresql, mysql, sqlite, ...)
 
@@ -20,11 +22,22 @@
 ;;   functions it supports and must reject a query if it references an unknown
 ;;   function. Further, is has to know how to "render" these functions into an
 ;;   actual SQL query-string.
-
+;; - The way certain things are laid out in the actual SQL. That includes:
+;;   - The way an "alias" is printed
+;;   - The way "combines" are printed (i.e. UNION, INTERSECTION, ...)
 (define-record-type Backend
-  (make-backend type-implementations functions) backend?
+  (really-make-backend type-implementations functions put-parameterization) backend?
   [type-implementations backend-type-implementations
-   functions backend-functions])
+   functions backend-functions
+   put-parameterization backend-put-parameterization])
+
+(defn make-backend
+  ([type-implementations functions]
+   (make-backend type-implementations functions sql-put/default-sql-put-parameterization))
+  ([type-implementations functions put-parameterization]
+   (when-not (sql-put/sql-put-parameterization? put-parameterization)
+     (c/assertion-violation `make-backend "not a valid put-parameterization" put-parameterization))
+   (really-make-backend type-implementations functions put-parameterization)))
 
 (def backend (make-backend base/types {}))
 
@@ -34,8 +47,7 @@
   (lens/overhaul backend backend-type-implementations conj t))
 
 (defn reify-type-implementation
-  "Reify a specific aspect of a type-implementation of type `t`. Applies `f` at
-  `lens` of the implementation of type t."
+
   [backend t lens f]
   (lens/shove backend (lens/>> backend-type-implementations (lens/member t) lens) f))
 
@@ -59,3 +71,10 @@
                                            (lens/member f)))]
     res
     (c/assertion-violation `get-function "no implementation for function" f)))
+
+(defn reify-put-parameterization
+  "Reify the implementation of certain SQL specific printing operations for a backend."
+  [backend put-parameterization]
+  (when-not (sql-put/sql-put-parameterization? put-parameterization)
+    (c/assertion-violation `reify-put-parameterization "not a valid put-parameterization" put-parameterization))
+  (lens/shove backend backend-put-parameterization put-parameterization))
