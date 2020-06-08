@@ -1,20 +1,18 @@
 (ns sqlosure.db-connection
-  (:require [active.clojure
-             [condition :as c]
-             [record :refer [define-record-type]]]
-            [clojure.java.jdbc :as jdbc]
-            [sqlosure.backend :as backend]
-            [clojure.set :as set]
+  (:require [active.clojure.condition :as c]
+            [active.clojure.record :refer [define-record-type]]
             [clojure.data :as data]
-            [sqlosure
-             [optimization :as o]
-             [relational-algebra :as rel]
-             [relational-algebra-sql :as rsql]
-             [sql :as sql]
-             [sql-put :as put]
-             [time :as time]
-             [type :as t]]
+            [clojure.java.jdbc :as jdbc]
+            [clojure.set :as set]
+
             [sqlosure.backend :as backend]
+            [sqlosure.optimization :as o]
+            [sqlosure.relational-algebra :as rel]
+            [sqlosure.relational-algebra-sql :as rsql]
+            [sqlosure.sql :as sql]
+            [sqlosure.sql-put :as put]
+            [sqlosure.time :as time]
+            [sqlosure.type :as t]
             [sqlosure.type-implementation :as ti])
   (:import [java.sql PreparedStatement ResultSet]))
 
@@ -77,12 +75,14 @@
                                     ($integer 10)))
                         (project {\"value\" (! kv \"value\")})))"
   [conn q & {:keys [optimize?] :or {optimize? true} :as opts-map}]
-  (let [qq                       (if optimize? (o/optimize-query q) q)
-        scheme                   (rel/query-scheme qq)
-        col-types                (rel/rel-scheme-types scheme)
-        asql                     (rsql/query->sql qq)
-        [sql & param-types+args] (put/sql-select->string asql)
-        db                       (db-connection-conn conn)
+  (let [qq                     (if optimize? (o/optimize-query q) q)
+        scheme                 (rel/query-scheme qq)
+        col-types              (rel/rel-scheme-types scheme)
+        asql                   (rsql/query->sql qq)
+        backend                (db-connection-backend conn)
+        put-parameterization   (backend/backend-put-parameterization backend)
+        [sql param-types+args] (put/sql-select->string asql put-parameterization)
+        db                     (db-connection-conn conn)
         run-query-with-params
         (^{:once true} fn* [con]
          (let [^PreparedStatement stmt
@@ -223,14 +223,17 @@
                (fn [k v]
                  ($> k ($integer 10))))"
   [conn sql-table criterion-proc]
-  (let [name (sql/sql-table-name (rel/base-relation-handle sql-table))
-        scheme (rel/base-relation-scheme sql-table)
-        cols (rel/rel-scheme-columns scheme)
-        db (db-connection-conn conn)
-        [crit-s & crit-vals]
+  (let [name                 (sql/sql-table-name (rel/base-relation-handle sql-table))
+        scheme               (rel/base-relation-scheme sql-table)
+        cols                 (rel/rel-scheme-columns scheme)
+        db                   (db-connection-conn conn)
+        backend              (db-connection-backend conn)
+        put-parameterization (backend/backend-put-parameterization backend)
+        [crit-s crit-vals]
         (put/sql-expression->string
          (rsql/expression->sql (apply criterion-proc
-                                      (map rel/make-attribute-ref cols))))
+                                      (map rel/make-attribute-ref cols)))
+         put-parameterization)
         run-query-with-params
         (^{:once true} fn* [con]
          (let [^PreparedStatement stmt
@@ -239,7 +242,7 @@
                 (delete-statement-string
                  (rel/base-relation-name sql-table)
                  crit-s))]
-           (set-parameters stmt crit-vals (db-connection-backend conn))
+           (set-parameters stmt crit-vals backend)
            (.closeOnCompletion stmt)
            (.executeUpdate stmt)))]
     (if-let [con (jdbc/db-find-connection db)]
@@ -284,21 +287,24 @@
                (fn [k v]
                  {\"value\" ($string \"NEWVAL\")})"
   [conn sql-table criterion-proc alist-first & args]
-  (let [name (sql/sql-table-name (rel/base-relation-handle sql-table))
-        scheme (rel/query-scheme sql-table)
-        db (db-connection-conn conn)
-        attr-exprs (map rel/make-attribute-ref
-                        (rel/rel-scheme-columns scheme))
-        alist (map (fn [[k v]]
-                     [k (rsql/expression->sql v)])
-                   (if (fn? alist-first)
-                     (apply alist-first attr-exprs)
-                     (when args
-                       (cons alist-first args)
-                       alist-first)))
-        [crit-s & crit-vals]
+  (let [name                 (sql/sql-table-name (rel/base-relation-handle sql-table))
+        scheme               (rel/query-scheme sql-table)
+        db                   (db-connection-conn conn)
+        attr-exprs           (map rel/make-attribute-ref
+                                  (rel/rel-scheme-columns scheme))
+        alist                (map (fn [[k v]]
+                                    [k (rsql/expression->sql v)])
+                                  (if (fn? alist-first)
+                                    (apply alist-first attr-exprs)
+                                    (when args
+                                      (cons alist-first args)
+                                      alist-first)))
+        backend              (db-connection-backend conn)
+        put-parameterization (backend/backend-put-parameterization backend)
+        [crit-s crit-vals]
         (put/sql-expression->string
-         (rsql/expression->sql (apply criterion-proc attr-exprs)))
+         (rsql/expression->sql (apply criterion-proc attr-exprs))
+         put-parameterization)
         [update-string update-types+vals]
         (update-statement-string
          (rel/base-relation-name sql-table)

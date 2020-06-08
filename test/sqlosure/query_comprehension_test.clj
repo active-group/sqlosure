@@ -1,7 +1,6 @@
 (ns sqlosure.query-comprehension-test
   (:require [active.clojure.monad :refer :all]
             [clojure.test :refer :all]
-            [sqlosure.test-utils :refer [constant-alias]]
             [sqlosure
              [optimization :as opt]
              [query-comprehension :refer :all]
@@ -24,31 +23,20 @@
                                              ["four" string%]])
                          :universe test-universe))
 
-(defn put-query [query]
-  (put/sql-select->string
-   put/default-sql-put-parameterization
-   (query->sql
-    (opt/optimize-query query))))
-
-(defn put-query-no [query]
-  (put/sql-select->string
-   put/default-sql-put-parameterization
-   (query->sql query)))
+(defn test-put-query
+  [query]
+  (put/sql-select->string (query->sql query) put/default-sql-put-parameterization))
 
 (deftest const-restrict-test
-  (is (= [(str "SELECT foo_1 AS foo "
-               "FROM (SELECT two_0 AS foo_1, one_0, two_0 "
-                     "FROM (SELECT one AS one_0, two AS two_0 FROM tbl1 AS alias) AS alias "
-                     "WHERE (one_0 = ?)) AS alias" )
-          [string% "foobar"]]
-         (let [[s args] (sqlosure.sql-put/sql-select->string
-                          (query->sql (get-query (monadic
-                                                  [t1 (embed tbl1)]
-                                                  (restrict (=$ (! t1 "one")
-                                                                (make-const string% "foobar")))
-                                                  (project [["foo" (! t1 "two")]])))))]
-
-           [(constant-alias s) args]))))
+  (is (= ["SELECT foo_1 AS foo FROM ( SELECT two_0 AS foo_1 , one_0 , two_0 FROM ( SELECT one AS one_0 , two AS two_0 FROM tbl1 ) WHERE ( one_0 = ? ) )"
+          [[string% "foobar"]]]
+         (test-put-query
+          (get-query
+           (monadic
+            [t1 (embed tbl1)]
+            (restrict (=$ (! t1 "one")
+                          (make-const string% "foobar")))
+            (project [["foo" (! t1 "two")]])))))))
 
 (deftest group-test
   (is (rel-scheme=?

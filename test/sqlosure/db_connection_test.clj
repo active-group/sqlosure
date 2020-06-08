@@ -21,21 +21,19 @@
                                 (sql/project person))
             delete-1 #(jdbc/delete! db "person" ["id = ?" -1])]
         (testing "without explicit rel-scheme"
-          (do
-            (is (empty? (db/run-query conn get-1)))
-            (apply db/insert! conn person-table axel)
-            (is (= #{axel} (set (db/run-query conn get-1))))
-            ;; Remove the record for the next test.
-            ))
+          (is (empty? (db/run-query conn get-1)))
+          (apply db/insert! conn person-table axel)
+          (is (= #{axel} (set (db/run-query conn get-1))))
+          ;; Remove the record for the next test.
+          )
         (testing "with explicit rel-scheme"
-          (do
-            ;; Clean the last insert
-            (delete-1)
-            (is (empty? (db/run-query conn get-1)))
-            (apply db/insert! conn person-table
-                   (rel/base-relation-scheme person-table)
-                   axel)
-            (is (= #{axel} (set (db/run-query conn get-1)))))
+          ;; Clean the last insert
+          (delete-1)
+          (is (empty? (db/run-query conn get-1)))
+          (apply db/insert! conn person-table
+                 (rel/base-relation-scheme person-table)
+                 axel)
+          (is (= #{axel} (set (db/run-query conn get-1))))
           #_(testing "should fail with underspecified rel-scheme"
               ;; Clean the last insert
               (delete-1)
@@ -54,13 +52,12 @@
         (testing "deletion of one record"
           (let [r (first (db/run-query conn (sql/query [p (sql/<- person-table)]
                                                        (sql/project p))))]
-            (do
-              (is r)  ;; We have one record now.
-              (is (= r (first (db/run-query conn (sql/query [p (sql/<- person-table)]
-                                                            (sql/project p))))))
-              (db/delete! conn person-table
-                          (fn [id _ _ _ _]
-                            (sql/$= id (sql/$integer 1)))))))
+            (is r)  ;; We have one record now.
+            (is (= r (first (db/run-query conn (sql/query [p (sql/<- person-table)]
+                                                          (sql/project p))))))
+            (db/delete! conn person-table
+                        (fn [id _ _ _ _]
+                          (sql/$= id (sql/$integer 1))))))
         (testing "deletion of a set of records"
           ;; Insert a few records we know the id's of.
           (doseq [i (range -5 0)]
