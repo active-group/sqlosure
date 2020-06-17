@@ -7,11 +7,11 @@
 (defn postgresql-put-alias
   [alias]
   (if alias
-    (print " AS " alias)
+    (sql-put/write! "AS" alias)
     ;; Sub-Selections in PostgreSQL must always be aliased (we don't really care
     ;; about the table's name since we construct the projected attribute's names
-    ;; ourselves.
-    (print " AS " (gensym))))
+    ;; ourselves).
+    (sql-put/write! "AS" (gensym))))
 
 (def postgresql-put-parameterization
   (sql-put/make-sql-put-parameterization postgresql-put-alias

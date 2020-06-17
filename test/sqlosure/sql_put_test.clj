@@ -3,6 +3,7 @@
             [clojure.test :refer [deftest is testing]]
             [clojure.string :as string]
 
+            [sqlosure.core :as c]
             [sqlosure.relational-algebra-sql :as rel-alg-sql]
             [sqlosure.relational-algebra :as rel]
             [sqlosure.sql :as sql]
@@ -41,11 +42,6 @@
   (is (= ["?" [[string% nil]]] (test-run (put/put-literal string% nil))))
   (is (= ["?" [[boolean% true]]] (test-run (put/put-literal boolean% true))))
   (is (= ["?" [[boolean% false]]] (test-run (put/put-literal boolean% false)))))
-
-
-(let [o (rel/make-order {(rel/make-attribute-ref "one") :ascending} tbl1)
-      q (rel-alg-sql/query->sql o)]
-  (test-run (put/put-sql-select q)))
 
 (deftest put-sql-select-test
   (is (= ["" []] (test-run (put/put-sql-select (sql/new-sql-select)))))

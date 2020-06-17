@@ -78,16 +78,15 @@
   (let [qq                     (if optimize? (o/optimize-query q) q)
         scheme                 (rel/query-scheme qq)
         col-types              (rel/rel-scheme-types scheme)
-        asql                   (rsql/query->sql qq)
         backend                (db-connection-backend conn)
-        put-parameterization   (backend/backend-put-parameterization backend)
-        [sql param-types+args] (put/sql-select->string asql put-parameterization)
+        [sql param-types+args] (put/sql-select->string
+                                (rsql/query->sql qq)
+                                (backend/backend-put-parameterization backend))
         db                     (db-connection-conn conn)
         run-query-with-params
         (^{:once true} fn* [con]
          (let [^PreparedStatement stmt
-               (apply jdbc/prepare-statement con sql (dissoc opts-map :optimize?))
-               backend (db-connection-backend conn)]
+               (apply jdbc/prepare-statement con sql (dissoc opts-map :optimize?))]
            (set-parameters stmt param-types+args backend)
            (.closeOnCompletion stmt)
            (result-set-seq (.executeQuery stmt) col-types backend)))]
@@ -181,7 +180,7 @@
   (let [[scheme vals] (if (and (seq args) (rel/rel-scheme? (first args)))
                         [(first args) (rest args)]
                         [(rel/query-scheme sql-table) args])
-        db (db-connection-conn conn)
+        db            (db-connection-conn conn)
         run-query-with-params
         (^{:once true} fn* [con]
          (let [^PreparedStatement stmt
@@ -189,13 +188,18 @@
                 con
                 (insert-statement-string
                  (rel/base-relation-name sql-table)
-                 scheme))
+                 scheme)
+                {:return-keys true})
                types+vals (map (fn [ty val]
                                  [ty val])
                                (rel/rel-scheme-types scheme) vals)]
            (set-parameters stmt types+vals (db-connection-backend conn))
            (.closeOnCompletion stmt)
-           (.executeUpdate stmt)))]
+           (.executeUpdate stmt)
+           (let [^ResultSet result-set (.getGeneratedKeys stmt)]
+             (if (.next result-set)
+               (.getObject result-set 1)
+               result-set))))]
     (if-let [con (jdbc/db-find-connection db)]
       (run-query-with-params con)
       (with-open [con (jdbc/get-connection db)]

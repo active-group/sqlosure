@@ -353,4 +353,4 @@
 
 (defn sql-select->string
   [expr put-parameterization]
-  (run put-parameterization (put-sql-select expr)) )
+  (run put-parameterization (put-sql-select expr)))
