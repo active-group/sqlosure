@@ -1,5 +1,6 @@
 (ns sqlosure.core
-  (:require [active.clojure.condition :as c]
+  (:require [active.clojure.monad :as monad]
+            [active.clojure.condition :as c]
             [active.clojure.monad :refer :all]
             [sqlosure.db-connection :as db]
             [sqlosure.optimization :as opt]
@@ -43,12 +44,28 @@
   [& ?forms]
   `(qc/get-query (monadic ~@?forms)))
 
+(defn run-db-with-state
+  "Runs the database program `prog` using the provided `command-config`.
+  Returns the result plus the final state."
+  [command-config prog]
+  (monad/run-free-reader-state-exception command-config prog))
+
+(defn run-db
+  "Runs the database program `prog` using the provided `command-config`.
+  Returns the result or the program."
+  [command-config prog]
+  (first (run-db-with-state command-config prog)))
 
 ;; -----------------------------------------------------------------------------
 ;; -- QUERY COMPREHENSION OPERATORS
 ;; -----------------------------------------------------------------------------
 
 ;; Reexports of query-monad operators.
+(defn embed
+  "Embed a RA query into the current query."
+  [q]
+  (qc/embed q))
+
 (defn <-
   "Embed a RA query into the current query."
   [q]

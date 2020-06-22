@@ -282,8 +282,8 @@
                                           [boolean% boolean%]
                                           boolean%
                                           (fn [a b]
-                                            (or a b (when-not (or (empty? a)
-                                                                  (empty? b))
+                                            (or a b (when-not (or (nil? a)
+                                                                  (nil? b))
                                                       false)))
                                           :universe sql-universe
                                           :data op-or))
@@ -292,7 +292,9 @@
                                            [boolean% boolean%]
                                            boolean%
                                            (fn [a b]
-                                             (and (not-empty a) (not-empty b) a b))
+                                             (and (not (nil? a))
+                                                  (not (nil? b))
+                                                  a b))
                                            :universe sql-universe
                                            :data op-and))
 
