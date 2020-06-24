@@ -47,8 +47,8 @@
 
 (def clob%
   (ti/implement type/clob%
-                (fn [^PreparedStatement stmt ^Long ix val] (.setClob stmt ix val))
-                (fn [^ResultSet rs ^Long ix] (.getClob rs ix))))
+                (fn [^PreparedStatement stmt ^Long ix val] (.setString stmt ix val))
+                (fn [^ResultSet rs ^Long ix] (.getString rs ix))))
 
 (def date%
   ;; NOTE `val` here is a `java.time.LocalDate` which has to be coerced to and
