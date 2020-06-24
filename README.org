@@ -1,0 +1,289 @@
+=sqlosure= is a relational algebra library and DSL for interacting with relational data, primarily in a SQL-Database from your Clojure-program.
+
+* Using it
+  Just add the current version of SQLosure to your =deps.edn=.
+  To interact with a specific database system, you must also include the corresponding JDBC driver.
+  
+  Example using [[https://www.postgresql.org][PostgreSQL]]:
+  #+begin_src 
+  {:deps {de.active-group/sqlosure "0.5.0-SNAPSHOT"
+          org.postgresql/postgresql "42.2.14"}
+  #+end_src
+* Overview
+  The core of =sqlosure= is a declarative query language based on [[https://en.wikipedia.org/wiki/Relational_algebra][relational algebra]].
+  There are two types of values in SQLosure: [[*Queries][queries]] and [[*Expressions][expressions]].
+
+** Example
+   Suppose you want to write queries on a =employee= model.
+   An employee consists of
+   - an id (integer)
+   - a name (string)
+   - a flag that tells us whether they are an admin or not (boolean)
+   Additionally, each user is assigned to an office. An office consists of
+   - an id (integer)
+   - a floor (integer)
+   - a name (string)
+  
+   The corresponding SQL-tables might have these =CREATE=-statements
+
+   #+begin_src sql
+     CREATE TABLE employee (
+       id INT,
+       name TEXT,
+       is_admin BOOLEAN,
+       office_id INT
+     );
+
+     CREATE TABLE office (
+       id INT,
+       floor INT,
+       name TEXT
+     );
+   #+end_src
+ 
+   To construct queries on those tables, you first need to define relations to operate on
+   #+begin_src clojure
+     (ns your.name.space
+       (:require [sqlosure.core :refer :all]
+                 [sqlosure.db-connection :as db-connection]))
+
+     ;; Defines a relation with three fields.
+     (def employee (table "employee" [["id" $integer-t]
+                                      ["name" $string-t]
+                                      ["is_admin" $boolean-t]]))
+
+     (def employee-with-office (table "employee" [["id" $integer-t]
+                                                  ["name" $string-t]
+                                                  ["admin" $boolean-t]
+                                                  ["office_id" $integer-t]]))
+
+     (def office (table "office" [["id" $integer-t]
+                                  ["floor" $integer-t]
+                                  ["name" $string-t]]))
+   #+end_src
+ 
+   The =table= function expects the database table-name as string and a vector of tuples for each attribute we want to consider.
+   Note that your are not required to "project" all fields from a table -- you just need to define what you need in this each particular case.
+   
+   Next, we want to query our database.
+   To accommodate for the differences between different RDBMSs, SQLosure has to concept of a /backend/.
+   Luckily, SQLosure comes equipped with several of those backends.
+   In this case, let's say we want to talk to a PostgreSQL-instance.
+   First, we jot down the [[https://github.com/clojure/java.jdbc][JDBC]] connection map:
+   #+begin_src clojure
+     (def pg-db {:dbtype "postgresql"
+                 :dbname "somedb"
+                 :host "localhost"
+                 :port "5432"
+                 :user "myuser"
+                 :password "secret"})
+   #+end_src
+  
+   To actually run the query, there are two basic modes.
+   The one we will use here is more basic.
+   [[*CRUD][Further down the document]] we will show the more elaborated way.
+   #+begin_src clojure
+     (ns ...
+         [sqlosure.db-connection :as db-connection]
+         [sqlosure.backends.postgresql :as postgresql])
+
+     (def db-conn (db-connect pg-db postgresql/implementation))
+
+     (db-connection/run-query db-conn employee)
+     ;; => [[0 "Marco" true]
+     ;;     [1 "Markus" false]
+     ;;     ...]
+   #+end_src
+   As you can see, running a base relation as the query selects the whole table.
+   Now, we only want employees that are admins.
+   #+begin_src clojure
+     (def admins
+       (query [emp (embed employee)]
+              (restrict! ($= (! emp "is_admin") ($boolean true)))
+              (project emp)))
+   #+end_src
+   Let's break this down
+   - =query= is a macro that allows us to construct relations from relational algebra terms.
+   - To operate on relations in this context, we need to "embed" them via =[emp (embed employee)]=.
+     Think of this as follows: Where on the right hand side of this expression we talk about the relation as a whole,
+     the name on the right hand side refers to the individual values of this relation.
+   - To narrow down the values, we call =restrict!= on them (think of a =WHERE= clause in SQL).
+   - The argument to =restrict!= narrows down the values to those whose attribute ="is_admin"= is equal to false.
+     =$== just the regular === but operates on relations instead of values. SQLosure has many such operators, all prefixed with =$=.
+   - =(! emp "is_admin")= selects the ="is_admin"= attribute from the embedded employee relation.
+   - In the end, we call =project= on all values. This means that, when the query is executed, we want all values with all of their attributes.
+   
+   If we run the query, we get the following result:
+   #+begin_src clojure
+     (db-connection/run-query db-conn admins)
+     ;; => [[0 "Marco" true]
+     ;;     ...
+     ;;     [42 "Tim" true]]
+   #+end_src
+   
+   Now, perhaps we only want to see the names of employees, instead of the whole record.
+   We could of course define a new query that just projects the ="name"= of each employee:
+   #+begin_src clojure
+     (def admin-names
+       (query [emp (embed employee)]
+              (restrict! ($= (! emp "is_admin") ($boolean true)))
+              (project [["name" (! emp "name")]])))
+   #+end_src
+   This would do the trick.
+   Still, we did just define almost the same query as above.
+   This is where it comes into play that the result of a =query=-call is itself a query.
+   This means they easily compose to larger/more complex queries from simpler ones.
+   Thus, we can then redefine =admin-names= as follows:
+    #+begin_src clojure
+      (def admin-names
+        (query [as (embed admins)]
+               (project [["name" (! emp "name")]])))
+   #+end_src
+   We treat =admins= just as a base relation.
+   The schema (e.g. the fields you can select via the =!=-operator) depends on the projection.
+
+   Lastly, let's write a query that returns all admins and the name's of their offices:
+   #+begin_src clojure
+     (def admins-with-offices
+       (query [as (embed admins)
+               os (embed office)]
+              (restrict! ($= (! as "office_id")
+                             (! os "id")))
+              (project [["name" (! as "name")]
+                        ["office" (! os "name")]])))
+     (db-connection/run-query db-conn admins-with-offices)
+     ;; => [["Marco" "Terassen Office"]
+     ;;     ["Tim" "Obergeschoss"]
+     ;;     ...]
+   #+end_src
+
+* CRUD
+  SQLosure provides a DSL for reading and writing from and to databases.
+  To demonstrate, we will keep our tables from [[*Example][the examples above]].
+  There are four basic functions to construct programs that read and write to a database
+  #+begin_src clojure
+    (ns your.name.space
+      (:require [sqlosure.core :refer :all]
+                [sqlosure.db-connection :as db-connection]
+                [sqlosure.lang :as db]))
+
+    ;; Defines a relation with three fields.
+    (def employee ..)
+    (def office ...)
+
+    (db/read! employee)
+    (db/create! employee [42 "Mike" true 0])
+    (db/udpate! employee 
+                (fn [id name admin? office-id]
+                  ($= name ($string "Marco")))
+                (fn [id name admin? office-id]
+                  {"is_admin" ($boolean false)}))
+    (db/delete! employee
+                (fn [id name admin? office-id]
+                  ($= id ($integer 42))))
+  #+end_src
+  What do these functions do?
+  - =read!= operates in much the same way as we saw above. It takes a =query= as it's argument and, upon execution, runs the query.
+  - =create!= takes a base relation (e.g. something that was created via the =table= function) and, upon execution, inserts the record (a vector of values to insert)
+  - =update!= takes a base relation (e.g. something that was created via the =table= function),
+    a predicate function and an update fuction, and, upon execution, applies the update.
+    The predicate function takes as it's arguments all fields of the relation and must return an expression (something constructed from =$=-functions that returns a =$boolean=).
+    The update function takes the same arguments and must return a map with all updates to apply.
+    The keys must correspond to the attributes of the relation, their right hand sides must be =$= const values.
+  - =delete!= takes a base relation (e.g. something that was created via the =table= function),
+    and a predicate function and, upon execution, applies the delete operation.
+    The predicate function takes as it's arguments all fields of the relation and must return an expression (something constructed from =$=-functions that returns a =$boolean=).
+
+    The keen observer might have noticed that a) all those functions just return values and b) there is no mention of a database backend or connection strings.
+    First, let's construct a program out of these functions, using [[https://github.com/active-group/active-clojure][active-clojure]]'s free monad.
+    #+begin_src clojure
+      (ns your.name.space
+        (:require [sqlosure.core :refer :all]
+                  [sqlosure.db-connection :as db-connection]
+                  [sqlosure.lang :as db]
+
+                  [active.clojure.monad :as monad]))
+
+      ;; Defines a relation with three fields.
+      (def employee ..)
+      (def office ...)
+
+      (def make-all-employees-admins!
+        (db/udpate! employee 
+                    (fn [_ _ _ _]
+                      ($boolean true))
+                    (fn [_ _ _ _]
+                      {"is_admin" ($boolean true)})))
+
+      (def prog (monad/monadic (db/create! employee [0 "Marco" false 0])
+                               (db/create! employee [1 "Erika" true 0])
+                               (db/create! employee [2 "Sibylle" false 0])
+                               [employees (db/read! employee)]
+                               make-all-users-admins!
+                               (db/delete! employee (fn [id _ _ _]
+                                                      ($= id ($integer 0))))
+                               [employees-after (db/read! employee)]
+                               (monad/return {:before employees :after employees-after})))
+    #+end_src
+    This program first inserts three employees and reads them back, storing the result as =employees=.
+    Then, after making all employees admins, deletes the user with ="id" = 0=.
+    It then reads the users back once more, storing the result as =employees-after= before returning the two query results.
+    Keep in mind that is still just the description of the operations we want to execute.
+     
+    To actually run the program, we need a "command-config" object.
+    For this, we have two optionse.
+** Option 1: Running against an actual database
+   If we want to run the program with an actual database, we need a db-connection as above.
+   Then, we can run the program using the =run-db= function:
+   #+begin_src clojure
+     (ns your.name.space
+       (:require ...
+                 [sqlosure.runner.database :as db-runner]))
+
+     ...
+     (run-db (db-runner/command-config db-conn) prog)
+     ;; => {:before [[0 "Marco" false 0]
+     ;;              [1 "Erike" true 0]
+     ;;              [2 "Sibylle" false 0]]
+     ;;     :after [[1 "Erika" true 0]
+     ;;             [2 "Sibylle" true 0]]}
+   #+end_src
+   The second argument decides how the program will be executed. 
+   Since we used the =sqlosure.runner.database= runner, the program is executed in the context of our PostgeSQL database, just as before.
+** Option 2: Running with the =embedded= runner
+   Often, we want to construct such programs without really running them against a database.
+   SQLosure provides the =sqlosure.runner.embedded= runner to enable the user to run such programs against a simple, map based "database".
+   Such a database is just a map from table-names to a set of maps, representing the individual records.
+   #+begin_src clojure
+     (ns your.name.space
+       (:require ...
+                 [sqlosure.runner.embedded :as embedded-runner]))
+
+     ...
+     (def empty-db {})
+     (def db {"employees" #{{"id" 42 "name" "Simon" "is_admin" false "office_id" 23}}})
+
+     (run-db (embedded-runner/command-config empty-db) prog)
+     ;; => {:before [[0 "Marco" false 0]
+     ;;              [1 "Erike" true 0]
+     ;;              [2 "Sibylle" false 0]]
+     ;;     :after [[1 "Erika" true 0]
+     ;;             [2 "Sibylle" true 0]]}
+
+     (run-db (embedded-runner/command-config db) prog)
+     ;; => {:before [[0 "Marco" false 0]
+     ;;              [1 "Erike" true 0]
+     ;;              [2 "Sibylle" false 0]
+     ;;              [42 "Simon" false 23]]
+     ;;     :after [[1 "Erika" true 0]
+     ;;             [2 "Sibylle" true 0]
+     ;;              [42 "Simon" true 23]]}
+   #+end_src
+   This yields the exact same result without ever touching the database and is therefore the perfect way to tests your queries
+   (or even just operate on an in-memory "database").
+* Queries
+  TODO
+* Expressions
+  TODO
+* Typing
+  TODO

@@ -12,7 +12,6 @@ pom.xml.asc
 /dev-resources
 *.sql
 /css
-*.org
 /lib/
 .lein-deps-sum
 .lein-repl-history
