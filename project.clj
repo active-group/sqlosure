@@ -5,7 +5,7 @@
             :url  "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.10.1"]
                  [org.clojure/java.jdbc "0.7.11"]
-                 [de.active-group/active-clojure "0.35.0"]]
+                 [de.active-group/active-clojure "0.37.1"]]
 
   :plugins [[lein-cloverage "1.0.6"]
             [lein-kibit "0.1.2"]
