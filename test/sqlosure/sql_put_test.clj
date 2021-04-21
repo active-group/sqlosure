@@ -1,6 +1,6 @@
 (ns sqlosure.sql-put-test
   (:require [active.clojure.lens :as lens]
-            [clojure.test :refer [deftest is testing]]
+            [clojure.test :as t :refer [deftest is testing]]
             [clojure.string :as string]
 
             [sqlosure.core :as c]
@@ -46,8 +46,14 @@
 (deftest put-sql-select-test
   (is (= ["" []] (test-run (put/put-sql-select (sql/new-sql-select)))))
   (is (= ["SELECT * FROM CUSTOMERS" []]
-         (test-run (put/put-sql-select (sql/make-sql-select-table "CUSTOMERS")))))
-
+         (test-run (put/put-sql-select (sql/make-sql-select-table nil "CUSTOMERS")))))
+  (t/testing "table-spaces are printed correctly"
+    (t/is (= ["SELECT * FROM prefix.table" []]
+             (-> (sql/base-relation "table" [])
+                 (rel/base-relation-table-space "prefix")
+                 rel-alg-sql/query->sql
+                 put/put-sql-select
+                 test-run))))
   (let [o (rel/make-order
            {(rel/make-attribute-ref "one") :ascending}
            tbl1)
@@ -57,8 +63,8 @@
            (test-run (put/put-sql-select q)))))
   (let [q1 (-> (sql/new-sql-select)
                (lens/shove sql/sql-select-tables
-                           [["S" (sql/make-sql-select-table "SUPPLIERS")]
-                            [nil (sql/make-sql-select-table "CUSTOMERS")]])
+                           [["S" (sql/make-sql-select-table nil "SUPPLIERS")]
+                            [nil (sql/make-sql-select-table nil "CUSTOMERS")]])
                (lens/shove sql/sql-select-attributes
                            {"UID" (sql/make-sql-expr-column "UID")})
                (lens/shove sql/sql-select-order-by
@@ -73,7 +79,7 @@
         q2 (-> (sql/new-sql-select)
                (lens/shove sql/sql-select-attributes
                            {"cost" (sql/make-sql-expr-column "cost")})
-               (rel-alg-sql/add-table (sql/make-sql-select-table "PARTS"))
+               (rel-alg-sql/add-table (sql/make-sql-select-table nil "PARTS"))
                (lens/shove sql/sql-select-criteria
                            [(sql/make-sql-expr-app sql/op-<
                                                    (sql/make-sql-expr-column "cost")
@@ -127,17 +133,17 @@
 
 (deftest put-tables-test
   (is (= ["foo" []]
-         (test-run (put/put-tables [[nil (sql/make-sql-select-table "foo")]] ", "))))
+         (test-run (put/put-tables [[nil (sql/make-sql-select-table nil "foo")]] ", "))))
   (is (= ["foo ,  bar TESTAS b" []]
-         (test-run (put/put-tables [[nil (sql/make-sql-select-table "foo")]
-                                    ["b" (sql/make-sql-select-table "bar")]]
+         (test-run (put/put-tables [[nil (sql/make-sql-select-table nil "foo")]
+                                    ["b" (sql/make-sql-select-table nil "bar")]]
                                    ", ")))))
 
 (deftest default-put-combine-test
   (let [q1 (-> (sql/new-sql-select)
                (lens/shove sql/sql-select-tables
-                           [["S" (sql/make-sql-select-table "SUPPLIERS")]
-                            [nil (sql/make-sql-select-table "CUSTOMERS")]])
+                           [["S" (sql/make-sql-select-table nil "SUPPLIERS")]
+                            [nil (sql/make-sql-select-table nil "CUSTOMERS")]])
                (lens/shove sql/sql-select-attributes
                            {"UID" (sql/make-sql-expr-column "UID")})
                (lens/shove sql/sql-select-order-by
@@ -152,7 +158,7 @@
         q2 (-> (sql/new-sql-select)
                (lens/shove sql/sql-select-attributes
                            {"cost" (sql/make-sql-expr-column "cost")})
-               (rel-alg-sql/add-table (sql/make-sql-select-table "PARTS"))
+               (rel-alg-sql/add-table (sql/make-sql-select-table nil "PARTS"))
                (lens/shove sql/sql-select-criteria
                            [(sql/make-sql-expr-app sql/op-<
                                                (sql/make-sql-expr-column "cost")

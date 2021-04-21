@@ -97,7 +97,10 @@
 
     (sql/sql-select-table? sel)
     (m/monadic (write! "SELECT * FROM")
-               (write! (sql/sql-select-table-name sel)))
+               (let [table-name (sql/sql-select-table-name sel)])
+               (if-let [table-space (sql/sql-select-table-space sel)]
+                 (write! (string/join "." [table-space table-name]))
+                 (write! table-name)))
 
     :else
     (c/assertion-violation `put-sql-select (str "unhandled query " (pr-str sel)))))

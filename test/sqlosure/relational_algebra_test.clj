@@ -105,21 +105,21 @@
 
 (deftest make-base-relation-test
   (let [test-universe (make-universe)]
-    (is (= (really-make-base-relation :name :scheme nil)
+    (is (= (really-make-base-relation nil :name :scheme nil)
            (make-base-relation :name :scheme)))
-    (is (= (really-make-base-relation :name :scheme :some-handle)
+    (is (= (really-make-base-relation nil :name :scheme :some-handle)
            (make-base-relation :name :scheme :handle :some-handle)))
     (let [rel (make-base-relation "name"
                                   "scheme"
                                   :universe test-universe)]
       (is (= {"name" rel} (universe-get-base-relation-table test-universe)))
-      (is (= (really-make-base-relation "name" "scheme" nil) rel)))
+      (is (= (really-make-base-relation nil "name" "scheme" nil) rel)))
     (let [rel (make-base-relation "name"
                                   "scheme"
                                   :universe test-universe
                                   :handle "some handle")]
       (is (= {"name" rel} (universe-get-base-relation-table test-universe)))
-      (is (= (really-make-base-relation "name" "scheme" "some handle") rel)))))
+      (is (= (really-make-base-relation nil "name" "scheme" "some handle") rel)))))
 
 (deftest make-application-test
   (let [app (make-application + 1 2 3)]

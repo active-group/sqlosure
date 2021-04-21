@@ -116,8 +116,9 @@
 
 (define-record-type sql-select-table
   ^{:doc "The whole SQL table."}
-  (make-sql-select-table name) sql-select-table?
-  [name sql-select-table-name])
+  (make-sql-select-table space name) sql-select-table?
+  [space sql-select-table-space
+   name sql-select-table-name])
 
 (def ^{:private true} sql-combine-op #{:union :intersection :difference})
 

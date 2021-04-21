@@ -141,6 +141,12 @@
   [query fun]
   (with-meta query {::rel-scheme-cache (make-rel-scheme-cache fun)}))
 
+(defn copy-rel-scheme-cache
+  "Apply the [[::rel-scheme-cache]] meta-data from `q2` to `q1`."
+  [q1 q2]
+  (let [rel-scheme-cache (get (meta q2) ::rel-scheme-cache)]
+    (with-meta q1 {::rel-scheme-cache rel-scheme-cache})))
+
 (defn query-scheme
   "Return the query scheme of query `q` as a `rel-scheme`."
   ([q]
@@ -164,8 +170,11 @@
 
 (define-record-type base-relation
   ^{:doc "Primitive relations, depending on the domain universe."}
-  (really-make-base-relation name scheme handle) base-relation?
-  [name base-relation-name
+  (really-make-base-relation table-space name scheme handle) base-relation?
+  [^{:doc "Optional table-space (String). Gets prepended to the
+[[base-relation-name]] when rendered as a SQL statement."}
+   table-space base-relation-table-space
+   name base-relation-name
    scheme base-relation-scheme
    handle base-relation-handle  ;; Domain specific handle.
    ])
@@ -178,7 +187,7 @@
                   :or {universe nil
                        handle nil}}]
   (let [rel (attach-rel-scheme-cache
-             (really-make-base-relation name scheme handle)
+             (really-make-base-relation nil name scheme handle)
              (fn [_] scheme))]
     (when universe
       (u/register-base-relation! universe name rel))

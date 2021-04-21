@@ -114,7 +114,8 @@
     (if-not (sql/sql-table? (rel/base-relation-handle q))
       (c/assertion-violation `query->sql "base relation not a SQL table" q)
       ;; FIXME: results in select * from, but should select in the order of column in rel:
-      (sql/make-sql-select-table (sql/sql-table-name (rel/base-relation-handle q))))
+      (sql/make-sql-select-table (rel/base-relation-table-space q)
+                                 (sql/sql-table-name (rel/base-relation-handle q))))
     (rel/project? q)        (project->sql q)
     (rel/restrict? q)       (let [sql (x->sql-select (query->sql
                                                       (rel/restrict-query q)))

@@ -52,14 +52,37 @@ correct references when running the query monad."}
   [new]
   (monad/put-state-component! ::query new))
 
+(defn local-table-space
+  "Execute `m` with table-space set to `ts`."
+  [ts m]
+  (monad/monadic (monad/with-env (fn [env]
+                                   (assoc env ::table-space ts))
+                   m)))
+
+(def ask-table-space
+  "Return the table-space from the current environment."
+  (monad/get-env-component ::table-space))
+
+(defn transform-table-space
+  "Takes a query and prepend a table-space to it's name if it is a
+  [[sqlosure.relational-algebra/base-relation]].
+  Set the table-space locally via [[local-table-space]]."
+  [q]
+  (if (rel/base-relation? q)
+    (monad/monadic
+     [ts ask-table-space]
+     (let [qs (rel/query-scheme q)])
+     (monad/return (-> q
+                       (rel/base-relation-table-space ts)
+                       (rel/copy-rel-scheme-cache q))))
+    (monad/return q)))
+
 (defn- add-to-product
   [make-product transform-scheme q]
   (monadic
-   [alias new-alias]
-   [query current-query]
-   (let [scheme (transform-scheme (rel/query-scheme q))
-         columns (rel/rel-scheme-columns scheme)
-         fresh (map (fn [k] (fresh-name k alias)) columns)
+   [alias new-alias
+    query current-query
+    q     (transform-table-space q)]
          project-alist (map (fn [k fresh]
                               [fresh (rel/make-attribute-ref k)])
                             columns fresh)

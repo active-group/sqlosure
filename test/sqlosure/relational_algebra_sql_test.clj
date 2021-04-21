@@ -89,7 +89,7 @@
            (map second (sql-select-tables q))))))
 
 (deftest query->sql-test
-  (is (= (make-sql-select-table "tbl1")
+  (is (= (make-sql-select-table nil "tbl1")
          (query->sql tbl1)))
   (testing "project"
     (let [p         (make-project [["two" (make-attribute-ref "two")]
@@ -112,7 +112,7 @@
                   ["count_twos" (make-sql-expr-app op-count
                                                    (make-sql-expr-column "two"))]]
                  (sql-select-attributes grouping-p)))
-          (is (= [[nil (make-sql-select-table "tbl1")]] (sql-select-tables grouping-p)))
+          (is (= [[nil (make-sql-select-table nil "tbl1")]] (sql-select-tables grouping-p)))
           
           (is (= #{"one"} (sql-select-group-by grouping-p)))))))
   (testing "restrict"
@@ -138,8 +138,8 @@
                             (alist->rel-scheme [["B" integer%]]))
           q (make-product t1 t2)
           sql (query->sql q)]
-      (is (= [[nil (make-sql-select-table "t1")]
-              [nil (make-sql-select-table "t2")]]
+      (is (= [[nil (make-sql-select-table nil "t1")]
+              [nil (make-sql-select-table nil "t2")]]
              (sql-select-tables sql))))
     (testing "nested queries just get pushed into the SQL-tables"
       (let [t1 (base-relation "t1"
@@ -149,7 +149,7 @@
                                             (alist->rel-scheme [["B" integer%]])))
             q (make-product t1 q2)
             sql (query->sql q)]
-        (is (= [[nil (make-sql-select-table "t1")]
+        (is (= [[nil (make-sql-select-table nil "t1")]
                 [nil (query->sql q2)]]
                (sql-select-tables sql))))))
 
@@ -168,9 +168,9 @@
                                  (make-attribute-ref "D"))
                              (make-left-outer-product t1 t2))
           sql (query->sql r)]
-      (is (= [[nil (make-sql-select-table 't1)]]
+      (is (= [[nil (make-sql-select-table nil 't1)]]
              (sql-select-tables sql)))
-      (is (= [[nil (make-sql-select-table 't2)]]
+      (is (= [[nil (make-sql-select-table nil 't2)]]
              (sql-select-outer-tables sql)))))
 
   (testing "order"
@@ -182,7 +182,7 @@
                                          (alist->rel-scheme [["one" string%]
                                                              ["two" integer%]])))
           sql (query->sql o)]
-      (is (= [[nil (make-sql-select-table "tbl1")]]
+      (is (= [[nil (make-sql-select-table nil "tbl1")]]
              (sql-select-tables sql)))
       (is (= [[(make-sql-expr-column "one") :ascending]]
              (sql-select-order-by sql)))))
