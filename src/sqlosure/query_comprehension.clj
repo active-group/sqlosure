@@ -83,10 +83,13 @@ correct references when running the query monad."}
    [alias new-alias
     query current-query
     q     (transform-table-space q)]
+   (let [scheme        (transform-scheme (rel/query-scheme q))
+         columns       (rel/rel-scheme-columns scheme)
+         fresh         (map (fn [k] (fresh-name k alias)) columns)
          project-alist (map (fn [k fresh]
                               [fresh (rel/make-attribute-ref k)])
                             columns fresh)
-         qq (rel/make-project project-alist q)])
+         qq            (rel/make-project project-alist q)])
    (set-query! (make-product query qq))
    (return (make-relation alias scheme))))
 
