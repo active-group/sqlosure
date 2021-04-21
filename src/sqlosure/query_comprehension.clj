@@ -1,12 +1,12 @@
 (ns sqlosure.query-comprehension
-  (:require [sqlosure.relational-algebra :as rel]
-            [sqlosure.type :as t]
-            [sqlosure.utils :refer [zip]]
+  (:require [active.clojure.condition :as c :refer [assertion-violation]]
             [active.clojure.monad :as monad :refer [monadic return]]
             [active.clojure.record :refer [define-record-type]]
-            [active.clojure.condition :refer [assertion-violation]]
             [clojure.pprint :refer [pprint]]
-            [active.clojure.condition :as c]))
+
+            [sqlosure.relational-algebra :as rel]
+            [sqlosure.type :as t]
+            [sqlosure.utils :refer [zip]]))
 
 (declare fresh-name !)
 

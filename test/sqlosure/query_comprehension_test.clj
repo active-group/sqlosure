@@ -1,15 +1,15 @@
 (ns sqlosure.query-comprehension-test
-  (:require [active.clojure.monad :refer :all]
-            [clojure.test :refer :all]
-            [sqlosure
-             [optimization :as opt]
-             [query-comprehension :refer :all]
-             [relational-algebra :refer :all]
-             [relational-algebra-sql :refer :all]
-             [sql :refer :all]
-             [sql-put :as put]
-             [type :refer :all]
-             [universe :refer :all]]))
+  (:require [active.clojure.monad :as monad :refer :all]
+            [clojure.test :as t :refer :all]
+
+            [sqlosure.optimization :as opt]
+            [sqlosure.query-comprehension :as qc :refer :all]
+            [sqlosure.relational-algebra :as rel :refer :all]
+            [sqlosure.relational-algebra-sql :refer :all]
+            [sqlosure.sql :as sql :refer :all]
+            [sqlosure.sql-put :as put]
+            [sqlosure.type :as sql-t :refer :all]
+            [sqlosure.universe :refer :all]))
 
 (def test-universe (make-universe))
 
