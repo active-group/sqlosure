@@ -117,17 +117,24 @@
                                           (proc x)))
                              (rest xs))))))
 
+(defn put-table
+  [[alias select]]
+  (if (sql/sql-select-table? select)
+    (m/monadic
+     (let [table-name (sql/sql-select-table-name select)
+           table-space (sql/sql-select-table-space select)])
+     (if table-space
+       (write! (string/join "." [table-space table-name]))
+       (write! table-name))
+     (put-alias alias))
+    (m/monadic (write! "(")
+               (put-sql-select select)
+               (write! ")")
+               (put-alias alias))))
+
 (defn put-tables
   [tables between]
-  (put-joining-infix tables between
-                     (fn [[alias select]]
-                       (if (sql/sql-select-table? select)
-                         (m/monadic (write! (sql/sql-select-table-name select))
-                                    (put-alias alias))
-                         (m/monadic (write! "(")
-                                    (put-sql-select select)
-                                    (write! ")")
-                                    (put-alias alias))))))
+  (put-joining-infix tables between put-table))
 
 (declare put-sql-expression)
 

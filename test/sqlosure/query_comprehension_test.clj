@@ -115,14 +115,14 @@
           (order {(! t1 "one") :ascending})
           (project [["foo" (! t1 "two")]])))))))
 
-(t/deftest local-table-space-test
-  (t/testing "local-table-space puts the correct value to the env"
+(t/deftest with-table-space-test
+  (t/testing "with-table-space puts the correct value to the env"
     (t/is (= [{::qc/table-space "prefix"} {}]
              (monad/run-free-reader-state-exception
               (monad/null-monad-command-config {} {})
-              (qc/local-table-space "prefix"
-                                    (monad/monadic [env (monad/get-env)]
-                                                   (monad/return env))))))))
+              (qc/with-table-space "prefix"
+                (monad/monadic [env (monad/get-env)]
+                               (monad/return env))))))))
 
 (deftest table-space-test
   (let [br (rel/make-base-relation
@@ -134,7 +134,7 @@
                       rel/project-query
                       rel/base-relation-table-space))))
     (t/testing "with a table space"
-      (let [q (qc/local-table-space "prefix" (qc/embed br))]
+      (let [q (qc/with-table-space "prefix" (qc/embed br))]
         (t/is (= "prefix"
                  (-> (qc/get-query q)
                      rel/project-query

@@ -1,14 +1,17 @@
 (ns sqlosure.sql-put-test
   (:require [active.clojure.lens :as lens]
+            [active.clojure.monad :as monad]
             [clojure.test :as t :refer [deftest is testing]]
             [clojure.string :as string]
 
             [sqlosure.core :as c]
+            [sqlosure.optimization :as o]
+            [sqlosure.query-comprehension :as qc]
             [sqlosure.relational-algebra-sql :as rel-alg-sql]
             [sqlosure.relational-algebra :as rel]
             [sqlosure.sql :as sql]
             [sqlosure.sql-put :as put]
-            [sqlosure.type :refer [string% integer% double% boolean%]]))
+            [sqlosure.type :as sql-t :refer [string% integer% double% boolean%]]))
 
 (def tbl1 (sql/base-relation "tbl1"
                              [["one" string%]
@@ -192,3 +195,18 @@
          (test-run (put/put-attributes [[nil (sql/make-sql-expr-column "foo")]
                                         ["something-else" (sql/make-sql-expr-column "bar")]
                                         ["same" (sql/make-sql-expr-column "same")]])))))
+
+(deftest local-table-space-test
+  (let [t (sql/base-relation "rel"
+                             (rel/alist->rel-scheme [["id" sql-t/integer%]]))]
+
+    (t/testing "with a table-space, it is reflected in the final query"
+      (t/is (= ["SELECT id FROM prefix.rel" []]
+               (test-run
+                (put/put-sql-select
+                 (-> (qc/with-table-space "prefix"
+                       (monad/monadic [e (qc/embed t)]
+                                      (qc/project [["id" (e "id")]])))
+                     qc/get-query
+                     o/optimize-query
+                     rel-alg-sql/query->sql))))))))

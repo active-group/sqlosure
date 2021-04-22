@@ -52,7 +52,7 @@ correct references when running the query monad."}
   [new]
   (monad/put-state-component! ::query new))
 
-(defn local-table-space
+(defn with-table-space
   "Execute `m` with table-space set to `ts`."
   [ts m]
   (monad/monadic (monad/with-env (fn [env]
