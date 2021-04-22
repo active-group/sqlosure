@@ -121,7 +121,7 @@
   [[alias select]]
   (if (sql/sql-select-table? select)
     (m/monadic
-     (let [table-name (sql/sql-select-table-name select)
+     (let [table-name  (sql/sql-select-table-name select)
            table-space (sql/sql-select-table-space select)])
      (if table-space
        (write! (string/join "." [table-space table-name]))

@@ -2,6 +2,7 @@
   (:require [active.clojure.condition :as c :refer [assertion-violation]]
             [active.clojure.monad :as monad :refer [monadic return]]
             [active.clojure.record :refer [define-record-type]]
+            [clojure.string :as string]
             [clojure.pprint :refer [pprint]]
 
             [sqlosure.relational-algebra :as rel]
@@ -52,9 +53,17 @@ correct references when running the query monad."}
   [new]
   (monad/put-state-component! ::query new))
 
+(defn valid-table-space?
+  [s]
+  (and (string? s)
+       (every? (fn [c] (not (string/blank? (str c)))) s)))
+
 (defn with-table-space
-  "Execute `m` with table-space set to `ts`."
+  "Execute `m` with table-space set to `ts`.
+  `ts` must not contain blank characters (\\space, newlines, etc.)."
   [ts m]
+  (when-not (valid-table-space? ts)
+    (c/assertion-violation `with-table-space "table-space must not contain blank characters" ts))
   (monad/monadic (monad/with-env (fn [env]
                                    (assoc env ::table-space ts))
                    m)))

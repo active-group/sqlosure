@@ -1,5 +1,6 @@
 (ns sqlosure.query-comprehension-test
-  (:require [active.clojure.monad :as monad :refer :all]
+  (:require [active.clojure.condition :as condition]
+            [active.clojure.monad :as monad :refer :all]
             [clojure.test :as t :refer :all]
 
             [sqlosure.optimization :as opt]
@@ -139,4 +140,8 @@
                  (-> (qc/get-query q)
                      rel/project-query
                      rel/project-query
-                     rel/base-relation-table-space)))))))
+                     rel/base-relation-table-space)))))
+    (t/testing "blank characters are prohibited"
+      (try (qc/with-table-space "with blank" (qc/embed br))
+           (catch Exception e
+             (t/is (condition/assertion-violation? e)))))))
