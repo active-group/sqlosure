@@ -53,13 +53,13 @@
     (fn [db]
       (let [command-config-embedded (embedded-runner/command-config {})
             command-config-h2 (db-runner/command-config (sql/db-connect db h2/implementation))
-            res [#{} #{[2 "bar"] [1 "foo"]}  ]]
+            res [#{} #{[2 "bar"] [1 "foo"]}]]
         (testing "embedded"
           (let [[one two three four] (sql/run-db command-config-embedded prog)]
             (is (empty? one))
-            (is (= #{[1 "foo"] [2 "bar"]} two))
-            (is (= #{[1 "updated"] [2 "bar"]} three))
-            (is (= #{[1 "updated"]} four))))
+            (is (= [[1 "foo"] [2 "bar"]] two))
+            (is (= [[1 "updated"] [2 "bar"]] three))
+            (is (= [[1 "updated"]] four))))
         (testing "h2"
           (let [[one two three four] (sql/run-db command-config-h2 prog)]
             (is (empty? one))

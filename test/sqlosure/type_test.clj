@@ -75,6 +75,7 @@
   (is (ordered-type? integer%))
   (is (ordered-type? double%))
   (is (ordered-type? string%))
+  (is (ordered-type? timestamp%))
   (is (not (ordered-type? boolean%))))
 
 #_(deftest type->datum-test

@@ -5,7 +5,8 @@
             [sqlosure.core :as sqlosure]
             [sqlosure.sql :as sql]
 
-            [sqlosure.runner.embedded :as i]))
+            [sqlosure.runner.embedded :as i])
+  (:import [java.time LocalDateTime]))
 
 (deftest alist-lookup-value-test
   (is (= [] (i/alist-lookup-value [] :value)))
@@ -39,7 +40,6 @@
   (is (= [["b" (rel/make-aggregation :count-all)]]
          (i/alist->aggregations [["a" (rel/make-attribute-ref "a")]
                                  ["b" (rel/make-aggregation :count-all)]]))))
-
 
 (deftest interpret-aggregation-test
   (testing "if it is not an aggregation"
@@ -84,11 +84,12 @@
 
 (deftest unroll-record-test
   (is (= ["a" "b" "c"]
-         (i/unroll-record (rel/make-base-relation "rel"
-                                                  (rel/alist->rel-scheme [["a" sqlosure/$string-t]
-                                                                          ["b" sqlosure/$string-t]
-                                                                          ["c" sqlosure/$string-t]]))
-                          {"c" "c" "a" "a" "b" "b"}))))
+         (i/unroll-record
+          (rel/make-base-relation "rel"
+                                  (rel/alist->rel-scheme [["a" sqlosure/$string-t]
+                                                          ["b" sqlosure/$string-t]
+                                                          ["c" sqlosure/$string-t]]))
+          {"c" "c" "a" "a" "b" "b"}))))
 
 (deftest unroll-rand-test
   (is (= 42 (i/unroll-rand {} (sqlosure/$integer 42))))
@@ -123,117 +124,131 @@
       (is (empty? (i/run-query {} rel/the-empty))))
 
     (testing "base relation"
-        (is (empty? (i/run-query {} rel)))
-        (is (= #{[42 23], [142 123]}
-              (i/run-query {"handle" #{{"a" 42, "b" 23} {"a" 142, "b" 123}}} rel))))
+      (is (empty? (i/run-query {} rel)))
+      (is (= [[142 123] [42 23]]
+             (i/run-query {"handle" #{{"a" 42, "b" 23} {"a" 142, "b" 123}}} rel))))
 
+    (testing "project"
+      (testing "base case"
+        (let [p (sqlosure/query [t (sqlosure/<- rel)]
+                                (sqlosure/project [["a" (sqlosure/! t "a")]]))]
+          (is (empty? (i/run-query {} p)))
+          (is (= [[142] [42]]
+                 (i/run-query {"handle" #{{"a" 42, "b" 23} {"a" 142, "b" 123}}} p)))))
 
-      (testing "project"
-        (testing "base case"
-          (let [p (sqlosure/query [t (sqlosure/<- rel)]
-                                  (sqlosure/project [["a" (sqlosure/! t "a")]]))]
-            (is (empty? (i/run-query {} p)))
-            (is (= #{[42], [142]}
-                  (i/run-query {"handle" #{{"a" 42, "b" 23} {"a" 142, "b" 123}}} p)))))
+      (testing "with aggregation, no grouping"
+        (let [p (sqlosure/query [t (sqlosure/<- rel)]
+                                (sqlosure/project [["a" (sqlosure/$count (sqlosure/! t "a"))]]))]
+          (is (= [[0]] (i/run-query {} p)))
+          (is (= [[2]]
+                 (i/run-query {"handle" #{{"a" 42, "b" 23} {"a" 142, "b" 123}}} p)))))
 
-        (testing "with aggregation, no grouping"
-          (let [p (sqlosure/query [t (sqlosure/<- rel)]
-                                  (sqlosure/project [["a" (sqlosure/$count (sqlosure/! t "a"))]]))]
-            (is (= #{[0]} (i/run-query {} p)))
-            (is (= #{[2]}
-                  (i/run-query {"handle" #{{"a" 42, "b" 23} {"a" 142, "b" 123}}} p)))))
+      (testing "with aggregation plus no grouping"
+        (let [p (sqlosure/query [t (sqlosure/<- rel)]
+                                (sqlosure/group! [t "a"])
+                                (sqlosure/project [["a" (sqlosure/! t "a")]
+                                                   ["b" (sqlosure/$count (sqlosure/! t "b"))]]))]
+          (is (empty? (i/run-query {} p)))
+          (is (= [[142 2] [42 1]]
+                 (i/run-query {"handle" #{{"a" 42, "b" 23}
+                                          {"a" 142, "b" 123}
+                                          {"a" 142, "b" 42}}}
+                              p))))))
 
-        (testing "with aggregation plus no grouping"
-          (let [p (sqlosure/query [t (sqlosure/<- rel)]
-                                  (sqlosure/group! [t "a"])
-                                  (sqlosure/project [["a" (sqlosure/! t "a")]
-                                                    ["b" (sqlosure/$count (sqlosure/! t "b"))]]))]
-            (is (empty? (i/run-query {} p)))
-            (is (= #{[142 2] [42 1]}
-                  (i/run-query {"handle" #{{"a" 42, "b" 23}
-                                                  {"a" 142, "b" 123}
-                                                  {"a" 142, "b" 42}}}
-                                      p))))))
-
-      (testing "restrict"
-        (testing "flat restrict"
-          (let [r (sqlosure/query [t (sqlosure/<- rel)]
-                                  (sqlosure/restrict! (sqlosure/$= (sqlosure/! t "a")
-                                                                  (sqlosure/$integer 42)))
-                                  (sqlosure/project [["b" (sqlosure/! t "b")]]))]
-            (is (empty? (i/run-query #{} r)))
-            (is (= #{[23]} (i/run-query {"handle" #{{"a" 42, "b" 23}
-                                                          {"a" 142, "b" 123}}} r)))))
-        (testing "nested restrict"
-          (let [r (sqlosure/query [t (sqlosure/<- rel)]
-                                  (sqlosure/restrict!
-                                  (sqlosure/$or (sqlosure/$= (sqlosure/! t "a")
-                                                              (sqlosure/$integer 42))
-                                                (sqlosure/$= (sqlosure/! t "b")
-                                                              (sqlosure/$integer 123))))
-                                  (sqlosure/project [["b" (sqlosure/! t "b")]]))]
-            (is (empty? (i/run-query #{} r)))
-            (is (= #{[23] [123]} (i/run-query {"handle" #{{"a" 42, "b" 23}
-                                                                {"a" 142, "b" 123}}} r)))))
-        #_(testing "sequential restricts"
+    (testing "restrict"
+      (testing "flat restrict"
+        (let [r (sqlosure/query [t (sqlosure/<- rel)]
+                                (sqlosure/restrict! (sqlosure/$= (sqlosure/! t "a")
+                                                                 (sqlosure/$integer 42)))
+                                (sqlosure/project [["b" (sqlosure/! t "b")]]))]
+          (is (empty? (i/run-query #{} r)))
+          (is (= [[23]] (i/run-query {"handle" #{{"a" 42, "b" 23}
+                                                 {"a" 142, "b" 123}}} r)))))
+      (testing "nested restrict"
+        (let [r (sqlosure/query [t (sqlosure/<- rel)]
+                                (sqlosure/restrict!
+                                 (sqlosure/$or (sqlosure/$= (sqlosure/! t "a")
+                                                            (sqlosure/$integer 42))
+                                               (sqlosure/$= (sqlosure/! t "b")
+                                                            (sqlosure/$integer 123))))
+                                (sqlosure/project [["b" (sqlosure/! t "b")]]))]
+          (is (empty? (i/run-query #{} r)))
+          (is (= [[123] [23]] (i/run-query {"handle" #{{"a" 42, "b" 23}
+                                                       {"a" 142, "b" 123}}} r)))))
+      #_(testing "sequential restricts"
           (let [r (sqlosure/query [t (sqlosure/<- rel)]
                                   (sqlosure/restrict! (sqlosure/$= (sqlosure/! t "b")
-                                                                  (sqlosure/$integer 123)))
+                                                                   (sqlosure/$integer 123)))
                                   (sqlosure/restrict! (sqlosure/$= (sqlosure/! t "a")
-                                                                  (sqlosure/$integer 42)))
+                                                                   (sqlosure/$integer 42)))
                                   (sqlosure/project [["b" (sqlosure/! t "b")]]))]
             (is (empty? (i/run-query #{} r)))
             (is (= #{[23] [123]} (i/run-query {"handle" #{{"a" 42, "b" 23}
-                                                                {"a" 142, "b" 123}}} r))))))
+                                                          {"a" 142, "b" 123}}} r))))))
 
-      (testing "order"
-        (let [o (sqlosure/query [t (sqlosure/<- rel)]
-                                (sqlosure/order! (sqlosure/! t "a") :ascending)
-                                (sqlosure/project t))
-              o2 (sqlosure/query [t (sqlosure/<- rel)]
-                                (sqlosure/order! (sqlosure/! t "a") :descending)
-                                (sqlosure/project t))]
-          (is (empty? (i/run-query {} o)))
-          (is (= #{[1 "one"] [2 "two"] [3 "three"]}
-                (i/run-query {"handle" #{{"a" 3 "b" "three"}
-                                                {"a" 1 "b" "one"}
-                                                {"a" 2 "b" "two"}}}
-                                    o)))
-          (is (= #{[3 "three"] [2 "two"] [1 "one"]}
-                (i/run-query {"handle" #{{"a" 3 "b" "three"}
-                                                {"a" 1 "b" "one"}
-                                                {"a" 2 "b" "two"}}}
-                                    o2)))))
+    (testing "order"
+      (let [o  (sqlosure/query [t (sqlosure/<- rel)]
+                               (sqlosure/order! (sqlosure/! t "a") :ascending)
+                               (sqlosure/project t))
+            o2 (sqlosure/query [t (sqlosure/<- rel)]
+                               (sqlosure/order! (sqlosure/! t "a") :descending)
+                               (sqlosure/project t))]
+        (is (empty? (i/run-query {} o)))
+        (is (= [[1 "one"] [2 "two"] [3 "three"]]
+               (i/run-query {"handle" #{{"a" 3 "b" "three"}
+                                        {"a" 1 "b" "one"}
+                                        {"a" 2 "b" "two"}}}
+                            o)))
+        (is (= [[3 "three"] [2 "two"] [1 "one"]]
+               (i/run-query {"handle" #{{"a" 3 "b" "three"}
+                                        {"a" 1 "b" "one"}
+                                        {"a" 2 "b" "two"}}}
+                            o2))))
+      (let [r   (rel/make-base-relation "rel"
+                                        (rel/alist->rel-scheme [["ts" sqlosure/$timestamp-t]])
+                                        :handle "handle")
+            ts1 (LocalDateTime/of 1989 10 31 10 30 23 123)
+            ts2 (LocalDateTime/of 1989 10 31 10 30 23 124)
+            ts3 (LocalDateTime/of 2020 4 4 0 0 0 0)
+            q   (fn [direction]
+                  (i/run-query {"handle" #{{"ts" ts1}
+                                           {"ts" ts2}
+                                           {"ts" ts3}}}
+                               (sqlosure/query [t (sqlosure/<- r)]
+                                               (sqlosure/order! [[(sqlosure/! t "ts") direction]])
+                                               (sqlosure/project t))))]
+        (is (= [[ts1] [ts2] [ts3]] (q :ascending)))
+        (is (= [[ts3] [ts2] [ts1]] (q :descending)))))
 
-      (testing "top"
-        (let [t (sqlosure/query [t (sqlosure/<- rel)]
-                                (sqlosure/order! (sqlosure/! t "a") :ascending)
-                                (sqlosure/top! 1)
-                                (sqlosure/project t))
-              t2 (sqlosure/query [t (sqlosure/<- rel)]
-                                (sqlosure/order! (sqlosure/! t "a") :descending)
-                                (sqlosure/top! 1 2)
-                                (sqlosure/project t))]
-          (is (empty? (i/run-query {} t)))
-          (is (= #{[1 "one"]}
-                (i/run-query {"handle" #{{"a" 3 "b" "three"}
-                                                {"a" 1 "b" "one"}
-                                                {"a" 2 "b" "two"}}}
-                                    t)))
-          (is (= #{[2 "two"] [1 "one"]}
-                (i/run-query {"handle" #{{"a" 3 "b" "three"}
-                                                {"a" 1 "b" "one"}
-                                                {"a" 2 "b" "two"}}}
-                                    t2)))))
-      ;; NOTE This test is wonky in terms of Clojure's set semantics -- we can't have a set with a duplicate "record".
-      ;; (testing "distinct"
-      ;;   (let [d (sqlosure/query [t (sqlosure/<- rel)]
-      ;;                           (sqlosure/order! (sqlosure/! t "a") :ascending)
-      ;;                           sqlosure/distinct!
-      ;;                           (sqlosure/project t))]
-      ;;     (is (empty? (i/run-query {} d)))
-      ;;     (is (= #{[1 "one"] [2 "two"]}
-      ;;            (i/run-query {"handle" #{{"a" 2 "b" "two"}
+    (testing "top"
+      (let [t  (sqlosure/query [t (sqlosure/<- rel)]
+                               (sqlosure/order! (sqlosure/! t "a") :ascending)
+                               (sqlosure/top! 1)
+                               (sqlosure/project t))
+            t2 (sqlosure/query [t (sqlosure/<- rel)]
+                               (sqlosure/order! (sqlosure/! t "a") :descending)
+                               (sqlosure/top! 1 2)
+                               (sqlosure/project t))]
+        (is (empty? (i/run-query {} t)))
+        (is (= [[1 "one"]]
+               (i/run-query {"handle" #{{"a" 3 "b" "three"}
+                                        {"a" 1 "b" "one"}
+                                        {"a" 2 "b" "two"}}}
+                            t)))
+        (is (= [[2 "two"] [1 "one"]]
+               (i/run-query {"handle" #{{"a" 3 "b" "three"}
+                                        {"a" 1 "b" "one"}
+                                        {"a" 2 "b" "two"}}}
+                            t2)))))
+    ;; NOTE This test is wonky in terms of Clojure's set semantics -- we can't have a set with a duplicate "record".
+    ;; (testing "distinct"
+    ;;   (let [d (sqlosure/query [t (sqlosure/<- rel)]
+    ;;                           (sqlosure/order! (sqlosure/! t "a") :ascending)
+    ;;                           sqlosure/distinct!
+    ;;                           (sqlosure/project t))]
+    ;;     (is (empty? (i/run-query {} d)))
+    ;;     (is (= #{[1 "one"] [2 "two"]}
+    ;;            (i/run-query {"handle" #{{"a" 2 "b" "two"}
     ;;                                           {"a" 1 "b" "one"}
     ;;                                           {"a" 2 "b" "two"}}}
     ;;                               d)))))
@@ -264,15 +279,15 @@
     (testing "deleting a record that does not exist"
       (is (= [0 {"handle" #{{"a" 42 "b" 23}}}]
              (i/run-delete {"handle" #{{"a" 42 "b" 23}}}
-                                 rel
-                                 (fn [a b]
-                                   (sqlosure/$= a (sqlosure/$integer 23)))))))
+                           rel
+                           (fn [a b]
+                             (sqlosure/$= a (sqlosure/$integer 23)))))))
     (testing "deleting a record that exists"
       (is (= [1 {"handle" #{}}]
              (i/run-delete {"handle" #{{"a" 42 "b" 23}}}
-                                 rel
-                                 (fn [a b]
-                                   (sqlosure/$= a (sqlosure/$integer 42)))))))))
+                           rel
+                           (fn [a b]
+                             (sqlosure/$= a (sqlosure/$integer 42)))))))))
 
 (deftest interpret-updated-test
   (let [rel (rel/make-base-relation "rel"
@@ -282,30 +297,30 @@
     (testing "updating a record that does not exist"
       (is (= [0 {"handle" #{{"a" 42 "b" 23}}}]
              (i/run-update {"handle" #{{"a" 42 "b" 23}}}
-                                 rel
-                                 (fn [a b]
-                                   (sqlosure/$= a (sqlosure/$integer 23)))
-                                 (fn [a b]
-                                   {"a" (sqlosure/$integer 0)})))))
+                           rel
+                           (fn [a b]
+                             (sqlosure/$= a (sqlosure/$integer 23)))
+                           (fn [a b]
+                             {"a" (sqlosure/$integer 0)})))))
     (testing "updating a record that exists"
       (is (= [1 {"handle" #{{"a" 0 "b" 23}
                             {"a" 142 "b" 123}}}]
              (i/run-update {"handle" #{{"a" 42 "b" 23}
-                                             {"a" 142 "b" 123}}}
-                                  rel
-                                  (fn [a b]
-                                    (sqlosure/$= a (sqlosure/$integer 42)))
-                                  (fn [a b]
-                                    {"a" (sqlosure/$integer 0)})))))
+                                       {"a" 142 "b" 123}}}
+                           rel
+                           (fn [a b]
+                             (sqlosure/$= a (sqlosure/$integer 42)))
+                           (fn [a b]
+                             {"a" (sqlosure/$integer 0)})))))
     (testing "updating multiple records"
       (is (= [2 {"handle" #{{"a" 0 "b" 23}
                             {"a" 142 "b" 123}
                             {"a" 0 "b" 123}}}]
              (i/run-update {"handle" #{{"a" 42 "b" 23}
-                                             {"a" 142 "b" 123}
-                                             {"a" 42 "b" 123}}}
-                                 rel
-                                 (fn [a b]
-                                   (sqlosure/$= a (sqlosure/$integer 42)))
-                                 (fn [a b]
-                                   {"a" (sqlosure/$integer 0)})))))))
+                                       {"a" 142 "b" 123}
+                                       {"a" 42 "b" 123}}}
+                           rel
+                           (fn [a b]
+                             (sqlosure/$= a (sqlosure/$integer 42)))
+                           (fn [a b]
+                             {"a" (sqlosure/$integer 0)})))))))

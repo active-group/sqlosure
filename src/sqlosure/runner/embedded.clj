@@ -1,8 +1,8 @@
 (ns sqlosure.runner.embedded
   "Definition of an 'embedded' query runner that operates on Clojure data-structures.
   The data-structure this runner operates on is a map from strings (corresponding
-  to the [[sqlosure.relational-algebra/base-relation-handle]]'s name to sets of
-  maps.
+  to the [[sqlosure.relational-algebra/base-relation-handle]]'s name to a vector
+  of maps.
 
   Example:
 
@@ -13,7 +13,7 @@
                      {\"a\" 23, \"b\" false}}})
 
   (sqlosure.runner/run-query (runner db) table)
-  ;; => #{[42 true], [23 false]}
+  ;; => [[42 true], [23 false]]
   "
   (:require [active.clojure.condition :as c]
             [active.clojure.monad :as monad]
@@ -242,7 +242,7 @@
               (c/assertion-violation `interpret "not a query" q)))
           (record->vector [cols record]
             (mapv #(get record %) cols))]
-    (into #{} (mapv (comp (partial into []) (partial unroll-record q)) (interpret* db q)))))
+    (mapv (comp (partial into []) (partial unroll-record q)) (interpret* db q))))
 
 (defn ensure-schema!
   [relation record]
