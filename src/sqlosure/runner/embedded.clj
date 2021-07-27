@@ -16,8 +16,8 @@
   ;; => [[42 true], [23 false]]
   "
   (:require [active.clojure.condition :as c]
+            [active.clojure.lens :as lens]
             [active.clojure.monad :as monad]
-            [clojure.set :as set]
             [sqlosure.relational-algebra :as rel]
             [sqlosure.sql :as sql]
             [sqlosure.lang :as lang]))
@@ -140,6 +140,24 @@
     (rel/application? operand)
     (apply-restriction operand row)))
 
+(defn translate-comparison-op
+  [sym]
+  (cond
+    (= sym '<)
+    (fn [a b] (.isBefore a b))
+
+    (= sym '>)
+    (fn [a b] (.isAfter a b))
+
+    (= sym '<=)
+    (fn [a b] (or (.isBefore a b)
+                  (= a b)))
+    (= sym '>=)
+    (fn [a b] (or (.isAfter a b)
+                  (= a b)))
+
+    (= sym '=)  =))
+
 (defn apply-restriction
   [restriction row]
   ;; a restriction is always an application
@@ -148,7 +166,16 @@
   (let [rator          (rel/application-rator restriction)
         rands          (rel/application-rands restriction)
         unrolled-rands (map (partial unroll-rand row) rands)]
-    (apply (rel/rator-proc rator) unrolled-rands)))
+    ;; We need to be a little more careful when applying functions here.
+    ;; For example, timestamps and dates are valid rands for <, but
+    ;; must be compared by .isBefore, etc.
+    (cond
+      ;; Handle dates explicitly
+      (or (every? #(instance? java.time.LocalDateTime %) unrolled-rands)
+          (every? #(instance? java.time.LocalDateTime %) unrolled-rands))
+      (apply (translate-comparison-op (rel/rator-name rator)) unrolled-rands)
+      :else
+      (apply (rel/rator-proc rator) unrolled-rands))))
 
 (defn run-query
   [db q]
@@ -323,13 +350,13 @@
     [affected-rows-count (assoc db handle (into #{} new-records))]))
 
 (defn run-db-action
-  [run-any env state m]
-  (let [db (::db state)]
+  [lens run-any env state m]
+  (let [db (lens/yank state lens)]
     (cond
       (lang/create? m)
       (let [new-db (run-insert db (lang/create-table m) (lang/create-record m))]
         [nil
-         (assoc state ::db new-db)])
+         (lens/shove state lens new-db)])
 
       (lang/read? m)
       [(run-query db (lang/read-query m))
@@ -341,20 +368,33 @@
                                                      (lang/update-predicate-fn m)
                                                      (lang/update-update-fn m))]
         [(lang/make-write-result affected-rows-count)
-         (assoc state ::db new-db)])
+         (lens/shove state lens new-db)])
 
       (lang/delete? m)
       (let [[affected-rows-count new-db] (run-delete db
                                                      (lang/delete-table m)
                                                      (lang/delete-predicate-fn m))]
         [(lang/make-write-result affected-rows-count)
-         (assoc state ::db new-db)])
+         (lens/shove state lens new-db)])
 
       :else
       monad/unknown-command)))
 
 (defn command-config
   "Takes a `db` and returns command config for running queries with the embedded
-  runner."
+  runner.
+  The database will be 'isolated' in the sense that it will use its own part of
+  the state without interfering with anything else."
   [db]
-  (monad/make-monad-command-config run-db-action {} {::db db}))
+  (monad/make-monad-command-config (partial run-db-action (lens/member ::db)) {} {::db db}))
+
+(defn integrated-command-config
+  "Takes a `lens` and returns command config for running queries with the
+  embedded runner.
+  The lens focuses on some part of the state this command-config is embedded in.
+  It is in this sense 'integrated'.
+
+  Use this if you have some larger state where the embedded db is supposed to be
+  at some specific place in the state rather than just under `::db`."
+  [lens]
+  (monad/make-monad-command-config (partial run-db-action lens) {} {}))
