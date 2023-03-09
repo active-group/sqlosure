@@ -45,6 +45,10 @@
                         (.close rs))))]
     rows))
 
+(defn- log-statement [sql-str]
+  ;;(println "Executing sql:" (pr-str sql-str))
+  nil)
+
 (defn- set-parameters
   "Add the parameters to the given statement.
   Uses the approriate jdbc get and set functions depending on the type attached
@@ -85,6 +89,7 @@
         db                     (db-connection-conn conn)
         run-query-with-params
         (^{:once true} fn* [con]
+         (log-statement sql)
          (let [^PreparedStatement stmt
                (apply jdbc/prepare-statement con sql (dissoc opts-map :optimize?))]
            (set-parameters stmt param-types+args backend)
@@ -181,15 +186,15 @@
                         [(first args) (rest args)]
                         [(rel/query-scheme sql-table) args])
         db            (db-connection-conn conn)
+        sql           (insert-statement-string
+                       (rel/base-relation-name sql-table)
+                       scheme)
         run-query-with-params
         (^{:once true} fn* [con]
+         (log-statement sql)
          (let [^PreparedStatement stmt
-               (jdbc/prepare-statement
-                con
-                (insert-statement-string
-                 (rel/base-relation-name sql-table)
-                 scheme)
-                {:return-keys true})
+               (jdbc/prepare-statement con sql
+                                       {:return-keys true})
                types+vals (map (fn [ty val]
                                  [ty val])
                                (rel/rel-scheme-types scheme) vals)]
@@ -238,14 +243,14 @@
          (rsql/expression->sql (apply criterion-proc
                                       (map rel/make-attribute-ref cols)))
          put-parameterization)
+        sql                  (delete-statement-string
+                              (rel/base-relation-name sql-table)
+                              crit-s)
         run-query-with-params
         (^{:once true} fn* [con]
+         (log-statement sql)
          (let [^PreparedStatement stmt
-               (jdbc/prepare-statement
-                con
-                (delete-statement-string
-                 (rel/base-relation-name sql-table)
-                 crit-s))]
+               (jdbc/prepare-statement con sql)]
            (set-parameters stmt crit-vals backend)
            (.closeOnCompletion stmt)
            (.executeUpdate stmt)))]
@@ -254,7 +259,7 @@
       (with-open [con (jdbc/get-connection db)]
         (run-query-with-params con)))))
 
-(defn- update-statement-string
+(defn- update-statement-string+vals
   [table-name set-vals crit-s? crit-vals?]
   (let [set-vals-string (->> set-vals
                              (map (fn [[k v]]
@@ -310,15 +315,14 @@
          (rsql/expression->sql (apply criterion-proc attr-exprs))
          put-parameterization)
         [update-string update-types+vals]
-        (update-statement-string
+        (update-statement-string+vals
          (rel/base-relation-name sql-table)
          alist crit-s crit-vals)
         run-query-with-params
         (^{:once true} fn* [con]
+         (log-statement update-string)
          (let [^PreparedStatement stmt
-               (jdbc/prepare-statement
-                con
-                update-string)]
+               (jdbc/prepare-statement con update-string)]
            (set-parameters stmt update-types+vals (db-connection-backend conn))
            (.closeOnCompletion stmt)
            (.executeUpdate stmt)))]
