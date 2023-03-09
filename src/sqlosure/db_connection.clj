@@ -162,25 +162,54 @@
          (apply str (interpose ", " (rel/rel-scheme-columns scheme))) ") "
          "VALUES (" values ")")))
 
-(defn- compile-insert [backend sql-table scheme vals]
+(defn- prepare-insert [sql-table scheme]
   (let [sql           (insert-statement-string
                        (rel/base-relation-name sql-table)
-                       scheme)
-        types+vals (map (fn [ty val]
-                          [ty val])
-                        (rel/rel-scheme-types scheme) vals)]
-    (fn [con]
+                       scheme)]
+    (fn [con backend]
       (log-statement sql)
       (let [^PreparedStatement stmt
             (jdbc/prepare-statement con sql
                                     {:return-keys true})]
-        (set-parameters stmt types+vals backend)
-        (.closeOnCompletion stmt)
-        (.executeUpdate stmt)
-        (let [^ResultSet result-set (.getGeneratedKeys stmt)]
-          (if (.next result-set)
-            (.getObject result-set 1)
-            result-set))))))
+        (fn [vals]
+          (let [types+vals (map (fn [ty val]
+                                  [ty val])
+                                (rel/rel-scheme-types scheme) vals)]
+            (.clearParameters stmt)
+            (set-parameters stmt types+vals backend)
+            (.closeOnCompletion stmt)
+            (.executeUpdate stmt)
+            (let [^ResultSet result-set (.getGeneratedKeys stmt)]
+              (if (.next result-set)
+                (.getObject result-set 1)
+                result-set))))))))
+
+(defn insert-multi!
+  "`insert-multi!` takes a db-connection and an sql-table and a list of lists of values and
+  attempts to insert them into the connected databases table, in a more efficient way than calling [insert!] multiple times.
+  The table to insert into is the `relational-algebra/base-relation-handle` of
+  `sql-table`. If a `scheme` is given, then a subset of the table's columns can be inserted.
+
+  Example:
+
+      (def db-spec { ... })  ;; Your db-connection map.
+      ;; For inserts that contain every column of the specified table:
+      (insert-multi! (db-connect db-spec) some-table [[arg1 arg2 ... argN] ...])
+
+      ;; For inserts that only specify a subset of all columns:
+      (insert-multi! (db-connect db-spec) some-table
+                                          (alist->rel-scheme {\"foo\" $integer-t
+                                                              \"bar\" $string-t}
+                                          [[int1 str1] [int2 str2] ...]))"
+  ([conn sql-table vals-lists]
+   (insert-multi! conn sql-table (rel/query-scheme sql-table) vals-lists))
+  ([conn sql-table scheme vals-lists]
+   (let [cq (prepare-insert sql-table scheme)]
+     (with-open-jdbc-con conn
+       (fn [con]
+         (let [run (cq con (db-connection-backend conn))]
+           (doall (map run
+                       vals-lists))))))))
 
 (defn insert!
   "`insert!` takes a db-connection and an sql-table and some rest `args` and
@@ -209,9 +238,8 @@
   [conn sql-table & args]
   (let [[scheme vals] (if (and (seq args) (rel/rel-scheme? (first args)))
                         [(first args) (rest args)]
-                        [(rel/query-scheme sql-table) args])
-        cq            (compile-insert (db-connection-backend conn) sql-table scheme vals)]
-    (with-open-jdbc-con conn cq)))
+                        [(rel/query-scheme sql-table) args])]
+    (first (insert-multi! conn sql-table [vals]))))
 
 (defn- delete-statement-string
   [table-name crit-s]
@@ -291,15 +319,13 @@
                                     (when args
                                       (cons alist-first args)
                                       alist-first)))
-        put-parameterization (backend/backend-put-parameterization backend)
-        [crit-s crit-vals]
-        (put/sql-expression->string
-         (rsql/expression->sql (apply criterion-proc attr-exprs))
-         put-parameterization)
-        [update-string update-types+vals]
-        (update-statement-string+vals
-         (rel/base-relation-name sql-table)
-         alist crit-s crit-vals)]
+        [crit-s crit-vals] (put/sql-expression->string
+                            (rsql/expression->sql (apply criterion-proc attr-exprs))
+                            (backend/backend-put-parameterization backend))
+        
+        [update-string update-types+vals] (update-statement-string+vals
+                                           (rel/base-relation-name sql-table)
+                                           alist crit-s crit-vals)]
   (fn [con]
     (log-statement update-string)
     (let [^PreparedStatement stmt

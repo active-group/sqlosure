@@ -45,6 +45,34 @@
                                                        "first" $string-t})
                                -1 "Cormac")))))))))
 
+(deftest insert-multi!-test
+  (with-actor-db db-spec h2/implementation
+    (fn [db]
+      (let [conn     (sql/db-connect db h2/implementation)
+            axel     [-1 "Axel" "Hacke" (time/make-date 1956 1 20) false]
+            maria    [-2 "Maria" "Test" (time/make-date 1980 2 22) false]
+            get-all    (sql/query [person (sql/<- person-table)]
+                                  (sql/restrict! (sql/$or (sql/$= (sql/! person "id") (sql/$integer (first axel)))
+                                                          (sql/$= (sql/! person "id") (sql/$integer (first maria)))))
+                                  (sql/project person))
+            delete-all (fn []
+                         (jdbc/delete! db "person" ["id = ?" (first axel)])
+                         (jdbc/delete! db "person" ["id = ?" (first maria)]))]
+        (testing "without explicit rel-scheme"
+          (is (empty? (db/run-query conn get-all)))
+          (db/insert-multi! conn person-table
+                            [axel maria])
+          (is (= #{axel maria} (set (db/run-query conn get-all)))))
+        
+        (testing "with explicit rel-scheme"
+          ;; Clean the last insert
+          (delete-all)
+          (is (empty? (db/run-query conn get-all)))
+          (db/insert-multi! conn person-table
+                            (rel/base-relation-scheme person-table)
+                            [axel maria])
+          (is (= #{axel maria} (set (db/run-query conn get-all)))))))))
+
 (deftest delete!-test
   (with-actor-db db-spec h2/implementation
     (fn [db]
