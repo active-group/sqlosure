@@ -69,7 +69,7 @@
     (if-let [con (jdbc/db-find-connection db)]
       (f con)
       (with-open [con (jdbc/get-connection db)]
-        (f con (db-connection-backend conn))))))
+        (f con)))))
 
 (defn- compile-query [q backend {:keys [optimize?] :or {optimize? true} :as opts-map}]
   (let [qq                     (if optimize? (o/optimize-query q) q)
